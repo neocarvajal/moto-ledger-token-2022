@@ -69,6 +69,9 @@ El programa será la fuente de verdad para:
 La aplicación se encargará de:
 
 - Preparar las instrucciones y las cuentas necesarias.
+- Derivar las PDA de fidelización y las ATA usando explícitamente la dirección del programa Token-2022.
+- Pasar `TOKEN_2022_PROGRAM_ADDRESS` de forma explícita a las instrucciones Codama `configurarProgramaFidelidad` y `otorgarPuntos`. Los clientes generados por programa pueden conservar por defecto la dirección del SPL Token clásico; no es necesario editar esos archivos generados para resolverlo.
+- Calcular el tamaño del mint con las extensiones seleccionadas y solicitar el rent correspondiente; no asumir los 82 bytes del mint clásico.
 - Solicitar las firmas de las wallets correspondientes.
 - Consultar las cuentas y balances on-chain.
 - Mostrar el saldo y las transacciones verificables.
