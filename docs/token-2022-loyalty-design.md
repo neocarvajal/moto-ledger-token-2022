@@ -24,17 +24,17 @@ La configuración podrá actualizarse mediante una instrucción autorizada. Cada
 
 La cuenta `Cliente` actual identifica al cliente mediante la wallet del concesionario que lo registró y su cédula. No almacena la wallet personal del comprador. Para no modificar su estructura, añadiré una cuenta PDA independiente que vincule el cliente con la wallet que acepta la asociación.
 
-La vinculación requerirá una firma de la wallet del comprador. El programa comprobará la relación con la cuenta Cliente y evitará que una wallet o un cliente queden vinculados de forma ambigua.
+La vinculación requerirá dos firmas: la del concesionario que autoriza la asociación y la wallet del comprador que demuestra que controla la dirección que recibirá los puntos. El programa comprobará que el concesionario es el propietario de la cuenta Cliente y que todavía no existe una vinculación para ese cliente.
 
 ### Registro de puntos por venta
 
 Cada emisión tendrá una cuenta PDA derivada de la venta. Esta cuenta registrará la venta, el cliente, la wallet beneficiaria y la cantidad emitida. La existencia de esa PDA impedirá otorgar puntos dos veces por la misma venta.
 
-La emisión se realizará junto con el registro de la venta en una misma transacción, de forma que ambas operaciones se confirmen o reviertan juntas. La implementación deberá validar en el programa que la venta corresponde al concesionario, cliente y motocicleta indicados.
+La emisión se realiza mediante la instrucción `otorgar_puntos`, que debe incluirse en la misma transacción que `registrar_venta`. Así ambas operaciones se confirman o revierten juntas. La implementación deberá validar en el programa que la venta corresponde al concesionario, cliente y motocicleta indicados.
 
 ## Token-2022
 
-El activo de fidelización se implementará con el programa Token-2022, separado de los tokens SPL clásicos que ya aparecen en la demostración actual de la aplicación.
+El activo de fidelización se implementará con el programa Token-2022, separado de los tokens SPL clásicos que ya aparecen en la demostración actual de la aplicación. El mint se crea desde el cliente antes de configurar el programa, porque su autoridad debe establecerse desde el inicio con la PDA del programa.
 
 Criterios previstos:
 
@@ -42,7 +42,9 @@ Criterios previstos:
 - Cero decimales para representar puntos enteros.
 - Extensión NonTransferable para impedir transferencias entre wallets.
 - Metadatos asociados al mint mediante las extensiones compatibles de Token-2022.
-- La PDA de configuración del programa controlará la autoridad de emisión mediante firmas PDA.
+- La autoridad de emisión será la PDA derivada de `["autoridad_fidelidad", concesionario]`; el cliente debe asignarla como mint authority al crear el mint.
+- La instrucción de configuración comprueba que el mint pertenece a Token-2022, tiene cero decimales, usa esa PDA como mint authority y contiene la extensión `NonTransferable`.
+- El programa emite los puntos mediante CPI a Token-2022.
 - El programa emitirá los puntos a la cuenta de tokens asociada a la wallet vinculada al cliente.
 
 No añadiré PermanentDelegate por defecto. Los puntos no transferibles no requieren esa autoridad para el flujo básico de acumulación. Solo incorporaría un delegado permanente si implemento y justifico una función de recuperación o reversión que realmente lo necesite.
@@ -76,7 +78,7 @@ La aplicación no decidirá la cantidad definitiva de puntos ni podrá emitirlos
 
 El repositorio contiene el código fuente de referencia en `programs/registro/src/lib.rs`, el IDL en `idl.json` y el cliente TypeScript generado por Codama en `app/lib/moto-ledger/generated`. El frontend consume el programa ya desplegado y no contiene actualmente un workspace Anchor completo para compilarlo.
 
-Antes de desplegar la actualización debo confirmar el entorno de compilación utilizado para el programa original y que conservo su upgrade authority. La actualización del IDL y del cliente Codama se hará después de definir y validar las nuevas instrucciones del programa.
+El código ahora importa `anchor-spl` con soporte para `token_2022` y usa sus interfaces de CPI. Antes de compilar debo habilitar esa dependencia y su feature correspondiente en el entorno de Solana Playground. Antes de desplegar la actualización debo confirmar el entorno de compilación utilizado para el programa original y que conservo su upgrade authority. La actualización del IDL y del cliente Codama se hará después de definir y validar las nuevas instrucciones del programa.
 
 ## Alcance que no se presupone
 
