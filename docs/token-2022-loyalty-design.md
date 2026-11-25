@@ -30,7 +30,9 @@ La vinculación requerirá dos firmas: la del concesionario que autoriza la asoc
 
 Cada emisión tendrá una cuenta PDA derivada de la venta. Esta cuenta registrará la venta, el cliente, la wallet beneficiaria y la cantidad emitida. La existencia de esa PDA impedirá otorgar puntos dos veces por la misma venta.
 
-La emisión se realiza mediante la instrucción `otorgar_puntos`, que debe incluirse en la misma transacción que `registrar_venta`. Así ambas operaciones se confirman o revierten juntas. Los metadatos del mint quedan fuera de esta primera versión del programa. La implementación deberá validar en el programa que la venta corresponde al concesionario, cliente y motocicleta indicados.
+La emisión se realiza mediante la instrucción `otorgar_puntos`. Cuando el comprador ya tiene su wallet vinculada, esta instrucción debe incluirse en la misma transacción que `registrar_venta`, de modo que ambas operaciones se confirmen o reviertan juntas.
+
+La primera compra tiene un flujo distinto: el cliente puede no tener todavía una wallet vinculada. En ese caso registro primero la venta; después, el comprador firma la vinculación de su wallet junto con el concesionario y, finalmente, el concesionario acredita los puntos de esa primera venta. La PDA `PuntosVenta` impide que esa recompensa se emita más de una vez. La validación on-chain exige que el cliente tenga al menos una compra registrada antes de permitir la vinculación. Los metadatos del mint quedan fuera de esta primera versión del programa.
 
 ## Token-2022
 
@@ -44,7 +46,8 @@ Criterios previstos:
 - La autoridad de emisión será la PDA derivada de `["autoridad_fidelidad", concesionario]`; el cliente debe asignarla como mint authority al crear el mint.
 - La instrucción de configuración comprueba que el mint pertenece a Token-2022, tiene cero decimales, usa esa PDA como mint authority y contiene la extensión `NonTransferable`.
 - El programa emite los puntos mediante CPI a Token-2022.
-- El programa emitirá los puntos a la cuenta de tokens asociada a la wallet vinculada al cliente.
+- El programa emite los puntos a la cuenta de tokens asociada a la wallet vinculada al cliente.
+- La extensión `NonTransferable` se inicializa antes de `InitializeMint`; la creación, inicialización de extensión e inicialización del mint deben prepararse en el orden exigido por Token-2022.
 
 No añadiré PermanentDelegate por defecto. Los puntos no transferibles no requieren esa autoridad para el flujo básico de acumulación. Solo incorporaría un delegado permanente si implemento y justifico una función de recuperación o reversión que realmente lo necesite.
 
