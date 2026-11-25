@@ -30,7 +30,7 @@ La vinculación requerirá dos firmas: la del concesionario que autoriza la asoc
 
 Cada emisión tendrá una cuenta PDA derivada de la venta. Esta cuenta registrará la venta, el cliente, la wallet beneficiaria y la cantidad emitida. La existencia de esa PDA impedirá otorgar puntos dos veces por la misma venta.
 
-La emisión se realiza mediante la instrucción `otorgar_puntos`, que debe incluirse en la misma transacción que `registrar_venta`. Así ambas operaciones se confirman o revierten juntas. La implementación deberá validar en el programa que la venta corresponde al concesionario, cliente y motocicleta indicados.
+La emisión se realiza mediante la instrucción `otorgar_puntos`, que debe incluirse en la misma transacción que `registrar_venta`. Así ambas operaciones se confirman o revierten juntas. Los metadatos del mint quedan fuera de esta primera versión del programa. La implementación deberá validar en el programa que la venta corresponde al concesionario, cliente y motocicleta indicados.
 
 ## Token-2022
 
@@ -41,7 +41,6 @@ Criterios previstos:
 - Un mint de puntos por concesionario.
 - Cero decimales para representar puntos enteros.
 - Extensión NonTransferable para impedir transferencias entre wallets.
-- Metadatos asociados al mint mediante las extensiones compatibles de Token-2022.
 - La autoridad de emisión será la PDA derivada de `["autoridad_fidelidad", concesionario]`; el cliente debe asignarla como mint authority al crear el mint.
 - La instrucción de configuración comprueba que el mint pertenece a Token-2022, tiene cero decimales, usa esa PDA como mint authority y contiene la extensión `NonTransferable`.
 - El programa emite los puntos mediante CPI a Token-2022.
