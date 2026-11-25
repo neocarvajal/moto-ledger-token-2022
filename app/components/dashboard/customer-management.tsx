@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { deriveClientePda } from "../../lib/moto-ledger/pdas";
-import type { Cliente } from "../../lib/moto-ledger/generated/src/generated/accounts";
+import type { Cliente } from "../../lib/moto-ledger/src/generated/accounts";
 
 function parseCedula(value: string) {
   const parsed = Number(value.trim());
