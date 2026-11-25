@@ -555,9 +555,10 @@ pub struct ActualizarPuntosFidelidad<'info> {
 
 #[derive(Accounts)]
 pub struct VincularWalletCliente<'info> {
+    pub owner: Signer<'info>,
     #[account(mut)]
     pub wallet: Signer<'info>,
-    #[account(seeds = [b"cliente", cliente.owner.as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()], bump)]
+    #[account(seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()], bump, constraint = cliente.owner == owner.key() @ Errores::Unauthorized)]
     pub cliente: Account<'info, Cliente>,
     #[account(init, payer = wallet, space = WalletCliente::LEN, seeds = [b"wallet_cliente", cliente.key().as_ref()], bump)]
     pub wallet_cliente: Account<'info, WalletCliente>,
