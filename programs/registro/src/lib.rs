@@ -472,6 +472,11 @@ pub mod registro {
     }
 
     pub fn vincular_wallet_cliente(context: Context<VincularWalletCliente>) -> Result<()> {
+        require!(
+            context.accounts.cliente.total_motos_cliente > 0,
+            Errores::ClienteSinCompras
+        );
+
         context.accounts.wallet_cliente.set_inner(WalletCliente {
             cliente: context.accounts.cliente.key(),
             wallet: context.accounts.wallet.key(),
@@ -768,6 +773,8 @@ pub enum Errores {
     WalletClienteInvalida,
     #[msg("Error: El contador ha alcanzado su valor máximo.")]
     ContadorInvalido,
+    #[msg("El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet")]
+    ClienteSinCompras,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
