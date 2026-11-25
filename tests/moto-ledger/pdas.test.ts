@@ -90,4 +90,36 @@ describe("MotoLedger PDA derivation", () => {
       255,
     ]);
   });
+
+  it("derives loyalty configuration and mint authority PDAs from Rust seeds", async () => {
+    const [programaFidelidad] = await deriveProgramaFidelidadPda(dealership);
+    const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealership);
+
+    expect(programaFidelidad).toBeTruthy();
+    expect(autoridadFidelidad).toBeTruthy();
+    expect(programaFidelidad).not.toBe(autoridadFidelidad);
+    await expect(deriveProgramaFidelidadPda(dealership)).resolves.toEqual([
+      programaFidelidad,
+      expect.any(Number),
+    ]);
+  });
+
+  it("derives customer wallet and per-sale reward PDAs", async () => {
+    const [walletCliente] = await deriveWalletClientePda(owner);
+    const [puntosVenta] = await derivePuntosVentaPda(motorcycle);
+
+    expect(walletCliente).toBeTruthy();
+    expect(puntosVenta).toBeTruthy();
+    expect(walletCliente).not.toBe(puntosVenta);
+  });
+
+  it("derives the loyalty ATA with the Token-2022 program", async () => {
+    const mint = address("So11111111111111111111111111111111111111112");
+    const first = await deriveToken2022Ata(owner, mint);
+    const second = await deriveToken2022Ata(owner, mint);
+
+    expect(first).toEqual(second);
+    expect(first[0]).toBeTruthy();
+  });
+
 });
