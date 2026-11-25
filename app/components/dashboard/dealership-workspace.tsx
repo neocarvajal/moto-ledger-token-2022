@@ -19,8 +19,8 @@ import {
   getConcesionarioDecoder,
   getConcesionarioDiscriminatorBytes,
   type Concesionario,
-} from "../../lib/moto-ledger/generated/src/generated/accounts/concesionario";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/generated/src/generated/programs";
+} from "../../lib/moto-ledger/src/generated/accounts/concesionario";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { MotorcycleRegistration } from "./motorcycle-registration";
 import { MotorcycleCatalog } from "./motorcycle-catalog";
 import { CustomerManagement } from "./customer-management";
