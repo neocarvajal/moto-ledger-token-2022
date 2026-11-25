@@ -443,19 +443,25 @@ pub mod registro {
         require!(puntos_por_venta > 0, Errores::PuntosInvalidos);
         require_keys_eq!(context.accounts.token_program.key(), anchor_spl::token_2022::ID, Errores::Token2022Requerido);
         require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
-        let mint_data = context.accounts.mint.to_account_info().try_borrow_data()?;
-        let mint_state = StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(&mint_data)?;
+        
+        let mint_account_info = context.accounts.mint.to_account_info();
+        let mint_data = mint_account_info.try_borrow_data()?;
+        let mint_state = StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(&mint_data,)?;
         let mint_extensions = mint_state.get_extension_types()?;
+
         require!(mint_extensions.contains(&ExtensionType::NonTransferable), Errores::MintNoTransferible);
         drop(mint_data);
         require_keys_eq!(context.accounts.mint.mint_authority.unwrap_or_default(), context.accounts.autoridad_fidelidad.key(), Errores::AutoridadMintInvalida);
+        
         context.accounts.programa_fidelidad.set_inner(ProgramaFidelidad {
             concesionario: context.accounts.concesionario.key(),
             mint: context.accounts.mint.key(),
             puntos_por_venta,
             bump: context.bumps.programa_fidelidad,
         });
+
         msg!("Programa de fidelizacion configurado para {}", nombre_concesionario);
+        
         Ok(())
     }
 
@@ -516,29 +522,87 @@ pub mod registro {
 
 
 #[account]
-pub struct ProgramaFidelidad { pub concesionario: Pubkey, pub mint: Pubkey, pub puntos_por_venta: u64, pub bump: u8 }
-impl ProgramaFidelidad { pub const LEN: usize = DISCRIMINATOR + 32 + 32 + 8 + 1; }
+pub struct ProgramaFidelidad { 
+    pub concesionario: Pubkey, 
+    pub mint: Pubkey, 
+    pub puntos_por_venta: u64, 
+    pub bump: u8 
+}
+
+impl ProgramaFidelidad { 
+    pub const LEN: usize = 
+    DISCRIMINATOR + 
+    32 + 
+    32 + 
+    8 + 
+    1; 
+}
 
 #[account]
-pub struct WalletCliente { pub cliente: Pubkey, pub wallet: Pubkey, pub bump: u8 }
-impl WalletCliente { pub const LEN: usize = DISCRIMINATOR + 32 + 32 + 1; }
+pub struct WalletCliente { 
+    pub cliente: Pubkey, 
+    pub wallet: Pubkey, 
+    pub bump: u8 
+}
+
+impl WalletCliente { 
+    pub const LEN: usize = 
+    DISCRIMINATOR + 
+    32 + 
+    32 + 
+    1; 
+}
 
 #[account]
-pub struct PuntosVenta { pub venta: Pubkey, pub cliente: Pubkey, pub wallet: Pubkey, pub cantidad: u64, pub fecha_emision: i64, pub bump: u8 }
-impl PuntosVenta { pub const LEN: usize = DISCRIMINATOR + 32 + 32 + 32 + 8 + 8 + 1; }
+pub struct PuntosVenta {
+     pub venta: Pubkey, 
+     pub cliente: Pubkey, 
+     pub wallet: Pubkey, 
+     pub cantidad: u64, 
+     pub fecha_emision: i64, 
+     pub bump: u8 
+}
+
+impl PuntosVenta { 
+    pub const LEN: usize = 
+    DISCRIMINATOR + 
+    32 + 
+    32 + 
+    32 + 
+    8 + 
+    8 + 
+    1; 
+}
 
 #[derive(Accounts)]
 #[instruction(nombre_concesionario: String)]
 pub struct ConfigurarProgramaFidelidad<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut, seeds = [b"concesionario", nombre_concesionario.as_bytes(), owner.key().as_ref()], bump, constraint = concesionario.owner == owner.key() @ Errores::Unauthorized)]
+    #[account(
+        mut,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", nombre_concesionario.as_bytes(), owner.key().as_ref()], 
+        bump, 
+    )]
     pub concesionario: Account<'info, Concesionario>,
-    #[account(init, payer = owner, space = ProgramaFidelidad::LEN, seeds = [b"programa_fidelidad", concesionario.key().as_ref()], bump)]
+
+    #[account(
+        init, 
+        payer = owner, 
+        space = ProgramaFidelidad::LEN, 
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
     pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+    
     /// CHECK: PDA que actua como autoridad del mint.
-    #[account(seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()], bump)]
+    #[account(
+        seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
     pub autoridad_fidelidad: UncheckedAccount<'info>,
+
     pub mint: InterfaceAccount<'info, Mint>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
@@ -547,21 +611,45 @@ pub struct ConfigurarProgramaFidelidad<'info> {
 #[derive(Accounts)]
 pub struct ActualizarPuntosFidelidad<'info> {
     pub owner: Signer<'info>,
-    #[account(seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()], bump, constraint = concesionario.owner == owner.key() @ Errores::Unauthorized)]
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()], 
+        bump, 
+    )]
     pub concesionario: Account<'info, Concesionario>,
-    #[account(mut, seeds = [b"programa_fidelidad", concesionario.key().as_ref()], bump, has_one = concesionario)]
+    
+    #[account(
+        mut,
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()], 
+        bump, 
+    )]
     pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
 }
 
 #[derive(Accounts)]
 pub struct VincularWalletCliente<'info> {
     pub owner: Signer<'info>,
+    
     #[account(mut)]
     pub wallet: Signer<'info>,
-    #[account(seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()], bump, constraint = cliente.owner == owner.key() @ Errores::Unauthorized)]
+    
+    #[account(
+        constraint = cliente.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()], 
+        bump
+    )]
     pub cliente: Account<'info, Cliente>,
-    #[account(init, payer = wallet, space = WalletCliente::LEN, seeds = [b"wallet_cliente", cliente.key().as_ref()], bump)]
+
+    #[account(
+        init, 
+        payer = wallet, 
+        space = WalletCliente::LEN, 
+        seeds = [b"wallet_cliente", cliente.key().as_ref()], 
+        bump
+    )]
     pub wallet_cliente: Account<'info, WalletCliente>,
+    
     pub system_program: Program<'info, System>,
 }
 
@@ -569,23 +657,61 @@ pub struct VincularWalletCliente<'info> {
 pub struct OtorgarPuntos<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()], bump, constraint = concesionario.owner == owner.key() @ Errores::Unauthorized)]
+    
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()], 
+        bump
+    )]
     pub concesionario: Account<'info, Concesionario>,
-    #[account(seeds = [b"programa_fidelidad", concesionario.key().as_ref()], bump, has_one = concesionario)]
+    
+    #[account(
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
     pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+    
     pub venta: Account<'info, Venta>,
+    
     pub cliente: Account<'info, Cliente>,
-    #[account(seeds = [b"wallet_cliente", cliente.key().as_ref()], bump, has_one = cliente)]
+    
+    #[account(
+        has_one = cliente,
+        seeds = [b"wallet_cliente", cliente.key().as_ref()], 
+        bump
+    )]
     pub wallet_cliente: Account<'info, WalletCliente>,
-    #[account(init, payer = owner, space = PuntosVenta::LEN, seeds = [b"puntos_venta", venta.key().as_ref()], bump)]
+    
+    #[account(
+        init, 
+        payer = owner, 
+        space = PuntosVenta::LEN, 
+        seeds = [b"puntos_venta", venta.key().as_ref()], 
+        bump
+    )]
     pub puntos_venta: Account<'info, PuntosVenta>,
+    
     /// CHECK: PDA validada por sus seeds; firma el CPI de mint_to.
-    #[account(seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()], bump)]
+    #[account(
+        seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
     pub autoridad_fidelidad: UncheckedAccount<'info>,
-    #[account(mut, address = programa_fidelidad.mint)]
+    
+    #[account(
+        mut, 
+        address = programa_fidelidad.mint
+    )]
     pub mint: InterfaceAccount<'info, Mint>,
-    #[account(mut, constraint = token_account.mint == mint.key(), constraint = token_account.owner == wallet_cliente.wallet)]
+    
+    #[account(
+        mut, 
+        constraint = token_account.mint == mint.key(), 
+        constraint = token_account.owner == wallet_cliente.wallet
+    )]
     pub token_account: InterfaceAccount<'info, TokenAccount>,
+    
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
@@ -594,53 +720,36 @@ pub struct OtorgarPuntos<'info> {
 pub enum Errores {
     #[msg("Error, el serial N.I.V debe tener una longitud de 17 caracteres")]
     NivInvalido,
-
     #[msg("Error, la placa debe tener una longitud de 7 caracteres")]
     PlacaInvalida,
-
     #[msg("No tienes autorizacion para realizar esta operacion")]
     Unauthorized,
-
     #[msg("La duracion de la garantia debe ser mayor a cero")]
     DuracionGarantiaInvalida,
-
     #[msg("El kilometraje maximo debe ser mayor a cero")]
     KilometrajeGarantiaInvalido,
-
     #[msg("El nombre del cliente no puede superar los 50 caracteres")]
     NombreClienteInvalido,
-
     #[msg("La cedula del cliente debe ser mayor a cero")]
     CedulaInvalida,
-
     #[msg("El precio de venta debe ser mayor a cero")]
     PrecioVentaInvalido,
-
     #[msg("La descripcion del servicio no puede superar los 100 caracteres")]
     DescripcionServicioInvalida,
-
     #[msg("La garantia no se encuentra activa")]
     GarantiaNoActiva,
-
     #[msg("La garantia aun no ha comenzado")]
     GarantiaNoIniciada,
-
     #[msg("La garantia ha vencido")]
     GarantiaVencida,
-
     #[msg("El kilometraje supera el limite de la garantia")]
     KilometrajeGarantiaExcedido,
-
     #[msg("La descripcion de la reclamacion no puede superar los 100 caracteres")]
     DescripcionReclamacionInvalida,
-
     #[msg("No se puede eliminar una moto que ya fue vendida")]
     MotoVendida,
-
     #[msg("No se puede eliminar una moto que tiene historial de servicios o reclamaciones")]
     MotoConHistorial,
-
-
     #[msg("La cantidad de puntos debe ser mayor a cero")]
     PuntosInvalidos,
     #[msg("El mint debe tener activa la extension NonTransferable de Token-2022")]
@@ -657,7 +766,6 @@ pub enum Errores {
     VentaNoCorresponde,
     #[msg("La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens")]
     WalletClienteInvalida,
-
     #[msg("Error: El contador ha alcanzado su valor máximo.")]
     ContadorInvalido,
 }

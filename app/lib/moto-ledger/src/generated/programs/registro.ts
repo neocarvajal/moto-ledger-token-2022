@@ -39,10 +39,13 @@ import {
   getConcesionarioCodec,
   getGarantiaCodec,
   getMotoCodec,
+  getProgramaFidelidadCodec,
+  getPuntosVentaCodec,
   getReclamacionCodec,
   getRegistroGlobalCodec,
   getServicioCodec,
   getVentaCodec,
+  getWalletClienteCodec,
   type Cliente,
   type ClienteArgs,
   type Concesionario,
@@ -51,6 +54,10 @@ import {
   type GarantiaArgs,
   type Moto,
   type MotoArgs,
+  type ProgramaFidelidad,
+  type ProgramaFidelidadArgs,
+  type PuntosVenta,
+  type PuntosVentaArgs,
   type Reclamacion,
   type ReclamacionArgs,
   type RegistroGlobal,
@@ -59,46 +66,67 @@ import {
   type ServicioArgs,
   type Venta,
   type VentaArgs,
+  type WalletCliente,
+  type WalletClienteArgs,
 } from "../accounts";
 import {
+  getActualizarPuntosFidelidadInstruction,
   getConfigurarGarantiaInstruction,
+  getConfigurarProgramaFidelidadInstruction,
   getEliminarMotoInstruction,
+  getOtorgarPuntosInstruction,
   getReclamarGarantiaInstruction,
   getRegistrarClienteInstruction,
   getRegistrarConcesionarioInstruction,
   getRegistrarMotoInstruction,
   getRegistrarServicioInstruction,
   getRegistrarVentaInstruction,
+  getVincularWalletClienteInstruction,
+  parseActualizarPuntosFidelidadInstruction,
   parseConfigurarGarantiaInstruction,
+  parseConfigurarProgramaFidelidadInstruction,
   parseEliminarMotoInstruction,
+  parseOtorgarPuntosInstruction,
   parseReclamarGarantiaInstruction,
   parseRegistrarClienteInstruction,
   parseRegistrarConcesionarioInstruction,
   parseRegistrarMotoInstruction,
   parseRegistrarServicioInstruction,
   parseRegistrarVentaInstruction,
+  parseVincularWalletClienteInstruction,
+  type ActualizarPuntosFidelidadInput,
   type ConfigurarGarantiaInput,
+  type ConfigurarProgramaFidelidadInput,
   type EliminarMotoInput,
+  type OtorgarPuntosInput,
+  type ParsedActualizarPuntosFidelidadInstruction,
   type ParsedConfigurarGarantiaInstruction,
+  type ParsedConfigurarProgramaFidelidadInstruction,
   type ParsedEliminarMotoInstruction,
+  type ParsedOtorgarPuntosInstruction,
   type ParsedReclamarGarantiaInstruction,
   type ParsedRegistrarClienteInstruction,
   type ParsedRegistrarConcesionarioInstruction,
   type ParsedRegistrarMotoInstruction,
   type ParsedRegistrarServicioInstruction,
   type ParsedRegistrarVentaInstruction,
+  type ParsedVincularWalletClienteInstruction,
   type ReclamarGarantiaInput,
   type RegistrarClienteInput,
   type RegistrarConcesionarioInput,
   type RegistrarMotoInput,
   type RegistrarServicioInput,
   type RegistrarVentaInput,
+  type VincularWalletClienteInput,
 } from "../instructions";
 
 export const REGISTRO_PROGRAM_ADDRESS =
   "64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj" as Address<"64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj">;
 
 export enum RegistroAccount {
+  ProgramaFidelidad,
+  WalletCliente,
+  PuntosVenta,
   RegistroGlobal,
   Concesionario,
   Moto,
@@ -113,6 +141,39 @@ export function identifyRegistroAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array
 ): RegistroAccount {
   const data = "data" in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([56, 1, 9, 133, 178, 107, 116, 230])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.ProgramaFidelidad;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([206, 39, 69, 88, 47, 244, 46, 203])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.WalletCliente;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([53, 141, 188, 193, 11, 101, 106, 88])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.PuntosVenta;
+  }
   if (
     containsBytes(
       data,
@@ -216,6 +277,10 @@ export enum RegistroInstruction {
   RegistrarServicio,
   ReclamarGarantia,
   EliminarMoto,
+  ConfigurarProgramaFidelidad,
+  ActualizarPuntosFidelidad,
+  VincularWalletCliente,
+  OtorgarPuntos,
 }
 
 export function identifyRegistroInstruction(
@@ -310,6 +375,50 @@ export function identifyRegistroInstruction(
   ) {
     return RegistroInstruction.EliminarMoto;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([18, 246, 215, 115, 127, 161, 17, 155])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.ConfigurarProgramaFidelidad;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([42, 104, 44, 90, 39, 162, 206, 229])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.ActualizarPuntosFidelidad;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([35, 24, 114, 22, 51, 250, 203, 135])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.VincularWalletCliente;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([8, 64, 55, 96, 170, 77, 42, 106])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.OtorgarPuntos;
+  }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
     { instructionData: data, programName: "registro" }
@@ -342,7 +451,19 @@ export type ParsedRegistroInstruction<
     } & ParsedReclamarGarantiaInstruction<TProgram>)
   | ({
       instructionType: RegistroInstruction.EliminarMoto;
-    } & ParsedEliminarMotoInstruction<TProgram>);
+    } & ParsedEliminarMotoInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.ConfigurarProgramaFidelidad;
+    } & ParsedConfigurarProgramaFidelidadInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.ActualizarPuntosFidelidad;
+    } & ParsedActualizarPuntosFidelidadInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.VincularWalletCliente;
+    } & ParsedVincularWalletClienteInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.OtorgarPuntos;
+    } & ParsedOtorgarPuntosInstruction<TProgram>);
 
 export function parseRegistroInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>
@@ -405,6 +526,34 @@ export function parseRegistroInstruction<TProgram extends string>(
         ...parseEliminarMotoInstruction(instruction),
       };
     }
+    case RegistroInstruction.ConfigurarProgramaFidelidad: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.ConfigurarProgramaFidelidad,
+        ...parseConfigurarProgramaFidelidadInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.ActualizarPuntosFidelidad: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.ActualizarPuntosFidelidad,
+        ...parseActualizarPuntosFidelidadInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.VincularWalletCliente: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.VincularWalletCliente,
+        ...parseVincularWalletClienteInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.OtorgarPuntos: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.OtorgarPuntos,
+        ...parseOtorgarPuntosInstruction(instruction),
+      };
+    }
     default:
       throw new SolanaError(
         SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
@@ -422,6 +571,12 @@ export type RegistroPlugin = {
 };
 
 export type RegistroPluginAccounts = {
+  programaFidelidad: ReturnType<typeof getProgramaFidelidadCodec> &
+    SelfFetchFunctions<ProgramaFidelidadArgs, ProgramaFidelidad>;
+  walletCliente: ReturnType<typeof getWalletClienteCodec> &
+    SelfFetchFunctions<WalletClienteArgs, WalletCliente>;
+  puntosVenta: ReturnType<typeof getPuntosVentaCodec> &
+    SelfFetchFunctions<PuntosVentaArgs, PuntosVenta>;
   registroGlobal: ReturnType<typeof getRegistroGlobalCodec> &
     SelfFetchFunctions<RegistroGlobalArgs, RegistroGlobal>;
   concesionario: ReturnType<typeof getConcesionarioCodec> &
@@ -479,6 +634,26 @@ export type RegistroPluginInstructions = {
     input: EliminarMotoInput,
     config?: { programAddress?: Address | HasAddress }
   ) => ReturnType<typeof getEliminarMotoInstruction> & SelfPlanAndSendFunctions;
+  configurarProgramaFidelidad: (
+    input: ConfigurarProgramaFidelidadInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getConfigurarProgramaFidelidadInstruction> &
+    SelfPlanAndSendFunctions;
+  actualizarPuntosFidelidad: (
+    input: ActualizarPuntosFidelidadInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getActualizarPuntosFidelidadInstruction> &
+    SelfPlanAndSendFunctions;
+  vincularWalletCliente: (
+    input: VincularWalletClienteInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getVincularWalletClienteInstruction> &
+    SelfPlanAndSendFunctions;
+  otorgarPuntos: (
+    input: OtorgarPuntosInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getOtorgarPuntosInstruction> &
+    SelfPlanAndSendFunctions;
 };
 
 export type RegistroPluginRequirements = ClientWithRpc<
@@ -496,6 +671,12 @@ export function registroProgram(
     return extendClient(client, {
       registro: <RegistroPlugin>{
         accounts: {
+          programaFidelidad: addSelfFetchFunctions(
+            client,
+            getProgramaFidelidadCodec()
+          ),
+          walletCliente: addSelfFetchFunctions(client, getWalletClienteCodec()),
+          puntosVenta: addSelfFetchFunctions(client, getPuntosVentaCodec()),
           registroGlobal: addSelfFetchFunctions(
             client,
             getRegistroGlobalCodec()
@@ -569,6 +750,38 @@ export function registroProgram(
             addSelfPlanAndSendFunctions(
               client,
               getEliminarMotoInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          configurarProgramaFidelidad: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getConfigurarProgramaFidelidadInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          actualizarPuntosFidelidad: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getActualizarPuntosFidelidadInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          vincularWalletCliente: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getVincularWalletClienteInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          otorgarPuntos: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getOtorgarPuntosInstruction(input, {
                 programAddress:
                   instructionConfig?.programAddress ?? config.programAddress,
               })

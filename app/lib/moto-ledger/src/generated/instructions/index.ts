@@ -6,11 +6,15 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./actualizarPuntosFidelidad";
 export * from "./configurarGarantia";
+export * from "./configurarProgramaFidelidad";
 export * from "./eliminarMoto";
+export * from "./otorgarPuntos";
 export * from "./reclamarGarantia";
 export * from "./registrarCliente";
 export * from "./registrarConcesionario";
 export * from "./registrarMoto";
 export * from "./registrarServicio";
 export * from "./registrarVenta";
+export * from "./vincularWalletCliente";
