@@ -6,7 +6,7 @@ import {
   getUtf8Encoder,
   type Address,
 } from "@solana/kit";
-import { REGISTRO_PROGRAM_ADDRESS } from "./generated/src/generated/programs";
+import { REGISTRO_PROGRAM_ADDRESS } from "./src/generated/programs";
 
 const utf8 = getUtf8Encoder();
 const addressEncoder = getAddressEncoder();
