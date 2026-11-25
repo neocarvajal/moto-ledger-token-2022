@@ -4,7 +4,7 @@ import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { tokenProgram } from "@solana-program/token";
 import { memoProgram } from "@solana-program/memo";
 import { systemProgram } from "@solana-program/system";
-import { registroProgram } from "./moto-ledger/generated/src/generated/programs/registro";
+import { registroProgram } from "./moto-ledger/src/generated/programs/registro";
 
 export type ClusterMoniker = "devnet" | "testnet" | "mainnet" | "localnet";
 
