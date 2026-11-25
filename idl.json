@@ -1,6 +1,9 @@
 {
   "version": "0.1.0",
   "name": "registro",
+   "metadata": {
+    "address": "64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj"
+  },
   "instructions": [
     {
       "name": "registrarConcesionario",
@@ -1081,8 +1084,5 @@
       "name": "ClienteSinCompras",
       "msg": "El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet"
     }
-  ],
-  "metadata": {
-    "address": "64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj"
-  }
+  ]
 }
