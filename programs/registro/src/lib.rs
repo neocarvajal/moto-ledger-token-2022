@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, MintTo, TokenAccount, TokenInterface};
+use anchor_spl::token_2022::spl_token_2022::extension::{BaseStateWithExtensions, ExtensionType, StateWithExtensions};
 
 declare_id!("64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj");
 
@@ -442,6 +443,11 @@ pub mod registro {
         require!(puntos_por_venta > 0, Errores::PuntosInvalidos);
         require_keys_eq!(context.accounts.token_program.key(), anchor_spl::token_2022::ID, Errores::Token2022Requerido);
         require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
+        let mint_data = context.accounts.mint.to_account_info().try_borrow_data()?;
+        let mint_state = StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(&mint_data)?;
+        let mint_extensions = mint_state.get_extension_types()?;
+        require!(mint_extensions.contains(&ExtensionType::NonTransferable), Errores::MintNoTransferible);
+        drop(mint_data);
         require_keys_eq!(context.accounts.mint.mint_authority.unwrap_or_default(), context.accounts.autoridad_fidelidad.key(), Errores::AutoridadMintInvalida);
         context.accounts.programa_fidelidad.set_inner(ProgramaFidelidad {
             concesionario: context.accounts.concesionario.key(),
@@ -636,6 +642,8 @@ pub enum Errores {
 
     #[msg("La cantidad de puntos debe ser mayor a cero")]
     PuntosInvalidos,
+    #[msg("El mint debe tener activa la extension NonTransferable de Token-2022")]
+    MintNoTransferible,
     #[msg("Esta operacion requiere el programa Token-2022")]
     Token2022Requerido,
     #[msg("El mint de fidelizacion debe tener cero decimales")]
