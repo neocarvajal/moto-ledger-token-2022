@@ -65,10 +65,13 @@ export const REGISTRO_ERROR__VENTA_NO_CORRESPONDE = 0x1786; // 6022
 export const REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA = 0x1787; // 6023
 /** ContadorInvalido: Error: El contador ha alcanzado su valor máximo. */
 export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1788; // 6024
+/** ClienteSinCompras: El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet */
+export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1789; // 6025
 
 export type RegistroError =
   | typeof REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA
   | typeof REGISTRO_ERROR__CEDULA_INVALIDA
+  | typeof REGISTRO_ERROR__CLIENTE_SIN_COMPRAS
   | typeof REGISTRO_ERROR__CONTADOR_INVALIDO
   | typeof REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS
   | typeof REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA
@@ -98,6 +101,7 @@ if (process.env["NODE_ENV"] !== "production") {
   registroErrorMessages = {
     [REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA]: `La autoridad del mint no coincide con la PDA del programa`,
     [REGISTRO_ERROR__CEDULA_INVALIDA]: `La cedula del cliente debe ser mayor a cero`,
+    [REGISTRO_ERROR__CLIENTE_SIN_COMPRAS]: `El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet`,
     [REGISTRO_ERROR__CONTADOR_INVALIDO]: `Error: El contador ha alcanzado su valor máximo.`,
     [REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS]: `El mint de fidelizacion debe tener cero decimales`,
     [REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA]: `La descripcion de la reclamacion no puede superar los 100 caracteres`,
