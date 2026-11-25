@@ -3,8 +3,10 @@ import { deriveRegistroGlobalPda } from "../../app/lib/moto-ledger/pdas";
 import {
   getRegistroGlobalDecoder,
   getRegistroGlobalDiscriminatorBytes,
-} from "../../app/lib/moto-ledger/generated/src/generated/accounts/registroGlobal";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../app/lib/moto-ledger/generated/src/generated/programs";
+} from "../../app/lib/moto-ledger/src/generated/accounts/registroGlobal"
+
+
+import { REGISTRO_PROGRAM_ADDRESS } from "../../app/lib/moto-ledger/src/generated/programs";
 
 const rpcUrl = process.env.MOTO_LEDGER_DEVNET_RPC_URL;
 const timeout = 30_000;

@@ -9,7 +9,7 @@ import {
   deriveServicioPda,
   deriveVentaPda,
 } from "../../app/lib/moto-ledger/pdas";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../app/lib/moto-ledger/generated/src/generated/programs";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../app/lib/moto-ledger/src/generated/programs";
 
 // Fixtures deterministas. Las direcciones esperadas son vectores conocidos
 // calculados independientemente de las funciones derive* que se prueban.

@@ -18,9 +18,9 @@ import {
   getRegistrarServicioInstructionDataDecoder,
   getRegistrarVentaInstruction,
   getRegistrarVentaInstructionDataDecoder,
-} from "../../app/lib/moto-ledger/generated/src/generated";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../app/lib/moto-ledger/generated/src/generated/programs";
-import { TipoServicio } from "../../app/lib/moto-ledger/generated/src/generated/types";
+} from "../../app/lib/moto-ledger/src/generated/";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../app/lib/moto-ledger/src/generated/programs";
+import { TipoServicio } from "../../app/lib/moto-ledger/src/generated/types";
 
 const ownerAddress = address(
   "CCF4CnM99mXSxz2sFffxT4A4CZxpWNsKNPbwueJThGMo"
