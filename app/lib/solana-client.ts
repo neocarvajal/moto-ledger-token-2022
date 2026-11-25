@@ -2,6 +2,7 @@ import { createClient, lamports } from "@solana/kit";
 import { walletSigner } from "@solana/kit-plugin-wallet";
 import { solanaRpc, rpcAirdrop } from "@solana/kit-plugin-rpc";
 import { tokenProgram } from "@solana-program/token";
+import { token2022Program } from "@solana-program/token-2022";
 import { memoProgram } from "@solana-program/memo";
 import { systemProgram } from "@solana-program/system";
 import { registroProgram } from "./moto-ledger/src/generated/programs/registro";
@@ -60,6 +61,7 @@ export function createAppClient(
     .use(rpcAirdrop())
     .use(systemProgram())
     .use(tokenProgram())
+    .use(token2022Program())
     .use(memoProgram())
     .use(registroProgram());
 }
