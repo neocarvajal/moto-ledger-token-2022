@@ -61,6 +61,7 @@ export function CustomerWalletLink({
   const [now, setNow] = useState(() => Date.now());
   const buildingRef = useRef(false);
   const sendingRef = useRef(false);
+  const cancelledRef = useRef(false);
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
@@ -179,6 +180,7 @@ export function CustomerWalletLink({
   useEffect(() => {
     if (!token || !session?.signedTransaction || session.status !== "signed" || sendingRef.current) return;
     sendingRef.current = true;
+    cancelledRef.current = false;
     setBusy(true);
     setError(null);
 
@@ -197,6 +199,8 @@ export function CustomerWalletLink({
           )
           .send();
 
+        if (cancelledRef.current) return;
+
         // sendTransaction only acknowledges RPC receipt; wait until the cluster
         // confirms execution before marking the wallet link as completed.
         let confirmed = false;
@@ -204,6 +208,7 @@ export function CustomerWalletLink({
           const statuses = await client.rpc
             .getSignatureStatuses([signature])
             .send();
+          if (cancelledRef.current) return;
           const status = statuses.value[0];
 
           if (status?.err) {
@@ -227,6 +232,7 @@ export function CustomerWalletLink({
           );
         }
 
+        if (cancelledRef.current) return;
         const completion = await fetch(`/api/wallet-link/${token}/complete`, {
           method: "POST",
         });
@@ -239,7 +245,7 @@ export function CustomerWalletLink({
         toast.success("Wallet del cliente vinculada correctamente.");
       } catch (cause) {
         sendingRef.current = false;
-        setError(cause instanceof Error ? cause.message : "No se pudo enviar la transacción.");
+        if (!cancelledRef.current) setError(cause instanceof Error ? cause.message : "No se pudo enviar la transacción.");
       } finally {
         setBusy(false);
       }
@@ -289,6 +295,7 @@ export function CustomerWalletLink({
   };
 
   const closeRequest = async () => {
+    cancelledRef.current = true;
     if (token && session?.status !== "completed") await fetch(`/api/wallet-link/${token}/cancel`, { method: "POST" }).catch(() => undefined);
     setShowLinkModal(false);
     setToken(null);
@@ -298,6 +305,7 @@ export function CustomerWalletLink({
     setError(null);
     buildingRef.current = false;
     sendingRef.current = false;
+    setBusy(false);
   };
 
   const startLink = async () => {
@@ -314,6 +322,7 @@ export function CustomerWalletLink({
     setSuccessSignature(null);
     buildingRef.current = false;
     sendingRef.current = false;
+    cancelledRef.current = false;
     try {
       const response = await fetch("/api/wallet-link", {
         method: "POST",
@@ -385,14 +394,14 @@ export function CustomerWalletLink({
                 <h2 id="link-wallet-title" className="mt-1 text-[17px] font-bold text-[#252a30]">Vincular wallet del cliente</h2>
                 <p className="mt-1 text-[10px] text-[#858d96]">{clienteNombre} · C.I. {clienteCedula}</p>
               </div>
-              <button type="button" onClick={() => void closeRequest()} disabled={busy || session?.status === "signed"} aria-label="Cerrar vinculación" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa] disabled:opacity-40">✕</button>
+              <button type="button" onClick={() => void closeRequest()} aria-label="Cerrar vinculación" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa] disabled:opacity-40">✕</button>
             </div>
             {!token || !url ? (
               <div className="p-8 text-center">
                 <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#f2c6ca] border-t-[#e60012]" />
                 <p className="mt-4 text-[12px] font-semibold text-[#252a30]">Preparando solicitud segura…</p>
                 {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] text-red-700">{error}</p>}
-                {!busy && <button type="button" onClick={() => setShowLinkModal(false)} className="mt-4 text-[10px] font-semibold text-[#737b84] underline">Cerrar</button>}
+                <button type="button" onClick={() => void closeRequest()} className="mt-4 text-[10px] font-semibold text-[#737b84] underline">Cancelar proceso y cerrar</button>
               </div>
             ) : successSignature ? (
               <div className="p-8 text-center">
@@ -446,7 +455,7 @@ export function CustomerWalletLink({
                     </div>
                   </div>
                   {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
-                  {session?.status !== "signed" && <button type="button" onClick={() => void closeRequest()} className="mt-4 text-[10px] font-semibold text-[#737b84] underline">Cancelar solicitud y cerrar</button>}
+                  <button type="button" onClick={() => void closeRequest()} className="mt-4 rounded-lg border border-[#e2e5e8] px-4 py-2 text-[10px] font-semibold text-[#68717b] hover:bg-[#f7f8fa]">Cancelar proceso y cerrar</button>
                 </div>
               </div>
             )}
