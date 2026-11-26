@@ -41,10 +41,19 @@ import {
   type Cliente,
 } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import type { Concesionario } from "../../lib/moto-ledger/src/generated/accounts/concesionario";
+import type { PuntosVenta } from "../../lib/moto-ledger/src/generated/accounts/puntosVenta";
 
 type MotorcycleRecord = { address: string; data: Moto };
 type CustomerRecord = { address: string; data: Cliente };
-type SaleRecord = { address: string; data: Venta };
+type SaleRecord = { address: string; data: Venta; reward?: PuntosVenta };
+type SaleConfirmation = {
+  points: bigint | null;
+  wallet: string | null;
+  signature: string | null;
+  saleAddress: string;
+  customerName: string;
+  motorcycle: string;
+};
 type SaleDetails = {
   sale: SaleRecord;
   customer: Cliente;
@@ -94,6 +103,7 @@ export function SalesManagement({
   const [busy, setBusy] = useState(false);
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
   const [saleDetails, setSaleDetails] = useState<SaleDetails | null>(null);
+  const [lastSaleConfirmation, setLastSaleConfirmation] = useState<SaleConfirmation | null>(null);
 
   const availableMotorcycles = useMemo(
     () => motorcycles.filter((item) => !item.data.vendida),
@@ -149,8 +159,22 @@ export function SalesManagement({
         }))
         .sort((a, b) => Number(b.data.fechaVenta - a.data.fechaVenta));
 
+      // Load the persistent reward receipt associated with each sale.
+      const salesWithRewards = await Promise.all(saleRecords.map(async (sale) => {
+        try {
+          const [rewardPda] = await derivePuntosVentaPda(address(sale.address));
+          const rewardInfo = await client.rpc.getAccountInfo(rewardPda, { encoding: "base64" }).send();
+          if (!rewardInfo.value) return sale;
+          const reward = await client.registro.accounts.puntosVenta.fetch(rewardPda);
+          return { ...sale, reward: reward.data };
+        } catch (error) {
+          console.warn("No se pudo consultar el comprobante de puntos de la venta:", sale.address, error);
+          return sale;
+        }
+      }));
+
       setMotorcycles(motoRecords);
-      setSales(saleRecords);
+      setSales(salesWithRewards);
       setSerial((current) =>
         motoRecords.some((item) => item.data.serial === current && !item.data.vendida)
           ? current
@@ -349,6 +373,7 @@ export function SalesManagement({
       const [puntosVenta] = await derivePuntosVentaPda(venta);
       let result: { context: { signature: string } } | null = null;
       let awardedPoints: bigint | null = null;
+      let awardedWallet: string | null = null;
       let reconciledOnChain = false;
 
       try {
@@ -392,6 +417,7 @@ export function SalesManagement({
             rewardInstruction,
           ]);
           awardedPoints = loyaltyProgram.data.puntosPorVenta;
+          awardedWallet = customerWallet;
         } else {
           result = await saleInstruction.sendTransaction();
         }
@@ -410,9 +436,11 @@ export function SalesManagement({
             ]);
             if (saleInfo.value) {
               reconciledOnChain = true;
-              awardedPoints = rewardInfo.value && walletInfo.value && loyaltyInfo.value
-                ? (await client.registro.accounts.programaFidelidad.fetch(programaFidelidad)).data.puntosPorVenta
-                : null;
+              if (rewardInfo.value) {
+                const rewardRecord = await client.registro.accounts.puntosVenta.fetch(puntosVenta);
+                awardedPoints = rewardRecord.data.cantidad;
+                awardedWallet = rewardRecord.data.wallet;
+              }
               break;
             }
           } catch (reconciliationError) {
@@ -436,6 +464,14 @@ export function SalesManagement({
             : `Venta confirmada y ${formatAmount(awardedPoints)} puntos emitidos. La wallet no devolvió la firma, pero ambas cuentas existen en Solana.`
         );
       }
+      setLastSaleConfirmation({
+        points: awardedPoints,
+        wallet: awardedWallet,
+        signature: result?.context.signature ?? null,
+        saleAddress: venta,
+        customerName: customer.data.nombreCliente,
+        motorcycle: `${motorcycle.data.marca} ${motorcycle.data.modelo} · ${motorcycle.data.serial}`,
+      });
       setCedula("");
       setPrice("");
       setCustomerName("");
