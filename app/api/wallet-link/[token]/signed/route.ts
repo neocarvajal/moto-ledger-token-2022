@@ -11,8 +11,8 @@ import {
 
 export const runtime = "nodejs";
 
-function sameBytes(left: Uint8Array, right: Uint8Array) {
-  return left.length === right.length && left.every((byte, index) => byte === right[index]);
+function sameBytes(left: ArrayLike<number>, right: ArrayLike<number>) {
+  return left.length === right.length && Array.from(left).every((byte, index) => byte === right[index]);
 }
 
 export async function POST(
