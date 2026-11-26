@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
+const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["alliance-truth-baker-wallpaper.trycloudflare.com"],
+  allowedDevOrigins,
 
   async headers() {
     return [
