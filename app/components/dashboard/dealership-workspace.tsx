@@ -47,6 +47,11 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
   const [loadingDealerships, setLoadingDealerships] = useState(false);
   const [busy, setBusy] = useState<"create" | null>(null);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadDealerships = useCallback(async () => {
     if (!walletAddress) {
@@ -160,6 +165,18 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
       setBusy(null);
     }
   };
+
+  // Keep the server render and the first client render identical. Wallet
+  // extensions can expose the connected account before hydration completes.
+  if (!mounted) {
+    return (
+      <section className="rounded-xl border border-[#e9ebee] bg-white p-7 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
+        <div className="h-11 w-11 animate-pulse rounded-xl bg-[#f7f8fa]" />
+        <div className="mt-4 h-4 w-56 animate-pulse rounded bg-[#f1f2f4]" />
+        <div className="mt-3 h-3 w-full max-w-lg animate-pulse rounded bg-[#f7f8fa]" />
+      </section>
+    );
+  }
 
   if (!connected) {
     return (
