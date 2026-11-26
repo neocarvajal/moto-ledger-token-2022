@@ -23,31 +23,37 @@ export function getPinataClient() {
 export async function getOrCreateDealershipGroup(dealership: string) {
   const pinata = getPinataClient();
   const groupName = `MotoLedger-${dealership}`;
+  let stage = "consulta del grupo";
 
-  console.info("[Pinata] Buscando grupo:", groupName);
+  try {
+    console.info("[Pinata] 1. Consultando grupo:", groupName);
 
-  const existing = await pinata.groups.public
-    .list()
-    .name(groupName)
-    .limit(100);
+    const existing = await pinata.groups.public
+      .list()
+      .name(groupName)
+      .limit(100);
 
-  const exactMatch = existing.groups.find(
-    (group) => group.name === groupName
-  );
+    const exactMatch = existing.groups.find(
+      (group) => group.name === groupName
+    );
 
-  if (exactMatch) {
-    console.info("[Pinata] Grupo encontrado:", exactMatch.id);
-    return exactMatch;
+    if (exactMatch) {
+      console.info("[Pinata] 2. Grupo existente:", exactMatch.id);
+      return exactMatch;
+    }
+
+    stage = "creación del grupo";
+    console.info("[Pinata] 3. Creando grupo:", groupName);
+
+    const created = await pinata.groups.public.create({
+      name: groupName,
+      isPublic: true,
+    });
+
+    console.info("[Pinata] 4. Grupo creado:", created.id);
+    return created;
+  } catch (error) {
+    console.error(`[Pinata] Error durante ${stage}:`, error);
+    throw error;
   }
-
-  console.info("[Pinata] Creando grupo:", groupName);
-
-  const created = await pinata.groups.public.create({
-    name: groupName,
-    isPublic: true,
-  });
-
-  console.info("[Pinata] Grupo creado:", created.id);
-
-  return created;
 }
