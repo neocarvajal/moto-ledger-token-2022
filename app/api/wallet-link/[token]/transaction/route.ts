@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBase64Encoder, getTransactionDecoder } from "@solana/kit";
+import { address, getBase64Encoder, getTransactionDecoder } from "@solana/kit";
 import { claimWalletLinkValue, getWalletLinkSession, updateWalletLinkSession } from "../../../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
@@ -25,8 +25,8 @@ export async function POST(
       return NextResponse.json({ error: "La solicitud no está esperando una transacción." }, { status: 409 });
     }
     const transaction = getTransactionDecoder().decode(getBase64Encoder().encode(body.transaction));
-    const ownerSignature = transaction.signatures[current.owner];
-    const buyerSignature = transaction.signatures[current.walletAddress];
+    const ownerSignature = transaction.signatures[address(current.owner)];
+    const buyerSignature = transaction.signatures[address(current.walletAddress)];
     if (
       !ownerSignature ||
       ownerSignature.every((byte) => byte === 0) ||
