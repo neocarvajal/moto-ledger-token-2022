@@ -408,7 +408,7 @@ export function CustomerWalletLink({
                   <p className="mt-1 text-[10px] text-[#68717b]">C.I. {clienteCedula}</p>
                   <p className="mt-3 break-all font-mono text-[10px] text-[#68717b]">{linkedWallet}</p>
                 </div>
-                <a className="mt-4 inline-block break-all text-[10px] font-semibold text-[#168354] underline" href={\`https://explorer.solana.com/tx/\${successSignature}?cluster=\${cluster}\`} target="_blank" rel="noopener noreferrer">Ver transacción en Solana Explorer ↗</a>
+                <a className="mt-4 inline-block break-all text-[10px] font-semibold text-[#168354] underline" href={`https://explorer.solana.com/tx/${successSignature}?cluster=${cluster}`} target="_blank" rel="noopener noreferrer">Ver transacción en Solana Explorer ↗</a>
                 <p className="mt-4 text-[10px] text-[#68717b]">El proceso finalizó. Ya puedes cerrar esta ventana.</p>
                 <button type="button" onClick={() => void closeRequest()} className="mt-5 rounded-lg bg-[#252a30] px-5 py-2.5 text-[10px] font-semibold text-white">Cerrar ventana</button>
               </div>
@@ -418,14 +418,14 @@ export function CustomerWalletLink({
                   <div className="rounded-xl border border-[#e9ebee] bg-white p-3 shadow-sm"><QRCodeSVG value={url} size={164} level="M" includeMargin /></div>
                   <p className="mt-3 text-center text-[10px] font-bold text-[#252a30]">Escanea con el teléfono del comprador</p>
                   <p className="mt-1 break-all text-center text-[9px] text-[#9aa1a9]">{url}</p>
-                  <p className={\`mt-3 text-[11px] font-bold tabular-nums \${(session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now <= 30000 ? "text-red-600" : "text-[#68717b]"}\`}>
-                    Tiempo restante: {(() => { const seconds = Math.max(0, Math.ceil(((session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now) / 1000)); return \`\${Math.floor(seconds / 60)}:\${String(seconds % 60).padStart(2, "0")}\`; })()}
+                  <p className={`mt-3 text-[11px] font-bold tabular-nums ${(session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now <= 30000 ? "text-red-600" : "text-[#68717b]"}`}>
+                    Tiempo restante: {(() => { const seconds = Math.max(0, Math.ceil(((session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now) / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`; })()}
                   </p>
                 </div>
                 <div className="min-w-0">
                   <p className="text-[11px] leading-relaxed text-[#737b84]">El comprador abrirá esta solicitud y conectará su wallet. El concesionario autorizará la dirección y preparará la transacción; finalmente, el comprador la firmará desde su teléfono.</p>
                   <div className="mt-4 space-y-3">
-                    <div className={\`rounded-lg border p-3 \${!session?.walletAddress ? "border-[#e9ebee] bg-[#fafbfc]" : "border-[#ccebd9] bg-[#f3fbf6]"}\`}>
+                    <div className={`rounded-lg border p-3 ${!session?.walletAddress ? "border-[#e9ebee] bg-[#fafbfc]" : "border-[#ccebd9] bg-[#f3fbf6]"}`}>
                       <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">1 · CONEXIÓN DEL COMPRADOR</p>
                       <p className="mt-1 text-[10px] font-semibold text-[#424950]">{!session?.walletAddress ? "Esperando que el cliente escanee el QR y conecte su wallet…" : "Wallet detectada correctamente."}</p>
                     </div>
@@ -436,11 +436,11 @@ export function CustomerWalletLink({
                         {!session.transaction && <button type="button" onClick={() => void authorizeWallet()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{busy ? "Preparando transacción…" : "Confirmar wallet y firmar"}</button>}
                       </div>
                     )}
-                    <div className={\`rounded-lg border p-3 \${session?.transaction ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}\`}>
+                    <div className={`rounded-lg border p-3 ${session?.transaction ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
                       <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">2 · AUTORIZACIÓN DEL CONCESIONARIO</p>
                       <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session?.transaction ? "Transacción preparada y firma del concesionario aplicada." : "Pendiente de confirmar la wallet detectada."}</p>
                     </div>
-                    <div className={\`rounded-lg border p-3 \${session?.status === "signed" ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}\`}>
+                    <div className={`rounded-lg border p-3 ${session?.status === "signed" ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
                       <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">3 · FIRMA DEL COMPRADOR Y CONFIRMACIÓN</p>
                       <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session?.status === "signed" ? "Firma recibida. Enviando y esperando confirmación de Solana…" : "Esperando que el comprador firme desde su wallet."}</p>
                     </div>
