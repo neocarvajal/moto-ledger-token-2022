@@ -31,11 +31,20 @@ export async function POST(request: Request) {
       cluster: body.cluster as WalletLinkCluster,
     });
 
-    return NextResponse.json({
-      token,
-      expiresAt: session.expiresAt,
-      status: session.status,
-    });
+    return NextResponse.json(
+      {
+        token,
+        expiresAt: session.expiresAt,
+        status: session.status,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("wallet-link create:", error);
     return NextResponse.json(
