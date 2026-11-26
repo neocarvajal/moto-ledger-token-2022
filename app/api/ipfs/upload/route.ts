@@ -135,6 +135,8 @@ function hasValidImageSignature(bytes: Buffer, mimeType: string) {
 }
 
 export async function POST(request: Request) {
+  let pinataStage = "validación de la solicitud";
+
   try {
     const form = await request.formData();
     const file = form.get("image");
@@ -203,9 +205,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "El contenido del archivo no coincide con el formato de imagen declarado." }, { status: 400 });
     }
 
+    pinataStage = "inicialización del cliente";
     const pinata = getPinataClient();
-    const group = await getOrCreateDealershipGroup(dealership);
 
+    pinataStage = "consulta o creación del grupo";
+    console.info("[Pinata] 1. Consultando o creando grupo...");
+    const group = await getOrCreateDealershipGroup(dealership);
+    console.info("[Pinata] 4. Grupo listo:", group.id);
+
+    pinataStage = "subida de imagen";
+    console.info("[Pinata] 5. Subiendo imagen...");
     const imageResult = await pinata.upload.public
       .file(file)
       .name(`${symbol}-loyalty-image`)
@@ -215,6 +224,7 @@ export async function POST(request: Request) {
         cluster,
         category: "loyalty-image",
       });
+    console.info("[Pinata] Imagen subida:", imageResult.cid);
 
     const imageUri = `ipfs://${imageResult.cid}`;
     const metadata = {
@@ -228,6 +238,8 @@ export async function POST(request: Request) {
       `${symbol}-metadata.json`,
       { type: "application/json" }
     );
+    pinataStage = "subida de metadata JSON";
+    console.info("[Pinata] 6. Subiendo metadata JSON...");
     const metadataResult = await pinata.upload.public
       .file(metadataFile)
       .name(`${symbol}-metadata.json`)
@@ -237,6 +249,7 @@ export async function POST(request: Request) {
         cluster,
         category: "loyalty-token-metadata",
       });
+    console.info("[Pinata] Metadata subida:", metadataResult.cid);
 
     return NextResponse.json({
       imageUri,
@@ -248,7 +261,7 @@ export async function POST(request: Request) {
       groupId: group.id,
     });
   } catch (error) {
-    console.error("IPFS metadata upload error:", error);
+    console.error(`[Pinata] Error durante ${pinataStage}:`, error);
     const message =
       error instanceof Error && messageIncludesPinataJwt(error.message)
         ? "El servicio IPFS no está configurado en el servidor."
