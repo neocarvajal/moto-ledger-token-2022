@@ -94,3 +94,17 @@
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+
+/* Keep the pointer affordance consistent across the dashboard. */
+@layer base {
+  a,
+  button:not(:disabled),
+  label:has(input[type="file"]) {
+    cursor: pointer;
+  }
+
+  input[type="file"]::file-selector-button {
+    cursor: pointer;
+  }
+}
