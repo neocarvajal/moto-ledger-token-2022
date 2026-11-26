@@ -55,6 +55,8 @@ export function CustomerWalletLink({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successSignature, setSuccessSignature] = useState<string | null>(null);
+  const [qrCreatedAt, setQrCreatedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const buildingRef = useRef(false);
   const sendingRef = useRef(false);
 
@@ -75,6 +77,12 @@ export function CustomerWalletLink({
       });
     return () => { active = false; };
   }, [client, cliente]);
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [token]);
 
   useEffect(() => {
     if (!token || session?.status === "completed" || session?.status === "cancelled") return;
@@ -194,6 +202,7 @@ export function CustomerWalletLink({
     setToken(null);
     setUrl(null);
     setSession(null);
+    setQrCreatedAt(null);
     setError(null);
     buildingRef.current = false;
     sendingRef.current = false;
@@ -227,6 +236,8 @@ export function CustomerWalletLink({
       const payload = (await response.json()) as { token?: string; error?: string };
       if (!response.ok || !payload.token) throw new Error(payload.error ?? "No se pudo crear el QR.");
       setToken(payload.token);
+      setQrCreatedAt(Date.now());
+      setNow(Date.now());
       setUrl(`${window.location.origin}/vincular-wallet/${payload.token}`);
       setSession(null);
     } catch (cause) {
@@ -280,7 +291,9 @@ export function CustomerWalletLink({
               </div>
             )}
             <p className="mt-2 break-all text-[9px] text-[#9aa1a9]">{url}</p>
-            <p className="mt-2 text-[9px] text-[#9aa1a9]">El QR caduca en cinco minutos.</p>
+            <p className={`mt-2 text-[10px] font-semibold tabular-nums ${(session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now <= 30000 ? "text-red-600" : "text-[#68717b]"}`}>
+              Tiempo restante: {(() => { const seconds = Math.max(0, Math.ceil(((session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now) / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`; })()}
+            </p>
             {session?.status !== "signed" && <button type="button" onClick={() => void closeRequest()} className="mt-3 text-[9px] font-semibold text-[#737b84] underline">Cerrar solicitud</button>}
           </div>
         </div>
