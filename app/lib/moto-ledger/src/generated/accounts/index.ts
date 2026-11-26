@@ -6,6 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./canjeServicio";
+export * from "./catalogoServicios";
 export * from "./cliente";
 export * from "./concesionario";
 export * from "./garantia";

@@ -35,6 +35,8 @@ import {
   type SelfPlanAndSendFunctions,
 } from "@solana/program-client-core";
 import {
+  getCanjeServicioCodec,
+  getCatalogoServiciosCodec,
   getClienteCodec,
   getConcesionarioCodec,
   getGarantiaCodec,
@@ -47,6 +49,10 @@ import {
   getServicioCodec,
   getVentaCodec,
   getWalletClienteCodec,
+  type CanjeServicio,
+  type CanjeServicioArgs,
+  type CatalogoServicios,
+  type CatalogoServiciosArgs,
   type Cliente,
   type ClienteArgs,
   type Concesionario,
@@ -75,10 +81,14 @@ import {
 import {
   getActualizarMetadataFidelidadInstruction,
   getActualizarPuntosFidelidadInstruction,
+  getActualizarServicioCatalogoInstruction,
+  getAgregarServicioCatalogoInstruction,
+  getCanjearServicioInstruction,
   getConfigurarGarantiaInstruction,
   getConfigurarProgramaFidelidadInstruction,
   getDesvincularWalletClienteInstruction,
   getEliminarMotoInstruction,
+  getInicializarCatalogoServiciosInstruction,
   getOtorgarPuntosInstruction,
   getReclamarGarantiaInstruction,
   getRegistrarClienteInstruction,
@@ -90,10 +100,14 @@ import {
   getVincularWalletClienteInstruction,
   parseActualizarMetadataFidelidadInstruction,
   parseActualizarPuntosFidelidadInstruction,
+  parseActualizarServicioCatalogoInstruction,
+  parseAgregarServicioCatalogoInstruction,
+  parseCanjearServicioInstruction,
   parseConfigurarGarantiaInstruction,
   parseConfigurarProgramaFidelidadInstruction,
   parseDesvincularWalletClienteInstruction,
   parseEliminarMotoInstruction,
+  parseInicializarCatalogoServiciosInstruction,
   parseOtorgarPuntosInstruction,
   parseReclamarGarantiaInstruction,
   parseRegistrarClienteInstruction,
@@ -105,17 +119,25 @@ import {
   parseVincularWalletClienteInstruction,
   type ActualizarMetadataFidelidadInput,
   type ActualizarPuntosFidelidadInput,
+  type ActualizarServicioCatalogoInput,
+  type AgregarServicioCatalogoInput,
+  type CanjearServicioInput,
   type ConfigurarGarantiaInput,
   type ConfigurarProgramaFidelidadInput,
   type DesvincularWalletClienteInput,
   type EliminarMotoInput,
+  type InicializarCatalogoServiciosInput,
   type OtorgarPuntosInput,
   type ParsedActualizarMetadataFidelidadInstruction,
   type ParsedActualizarPuntosFidelidadInstruction,
+  type ParsedActualizarServicioCatalogoInstruction,
+  type ParsedAgregarServicioCatalogoInstruction,
+  type ParsedCanjearServicioInstruction,
   type ParsedConfigurarGarantiaInstruction,
   type ParsedConfigurarProgramaFidelidadInstruction,
   type ParsedDesvincularWalletClienteInstruction,
   type ParsedEliminarMotoInstruction,
+  type ParsedInicializarCatalogoServiciosInstruction,
   type ParsedOtorgarPuntosInstruction,
   type ParsedReclamarGarantiaInstruction,
   type ParsedRegistrarClienteInstruction,
@@ -143,6 +165,8 @@ export enum RegistroAccount {
   MetadataFidelidad,
   WalletCliente,
   PuntosVenta,
+  CatalogoServicios,
+  CanjeServicio,
   RegistroGlobal,
   Concesionario,
   Moto,
@@ -200,6 +224,28 @@ export function identifyRegistroAccount(
     )
   ) {
     return RegistroAccount.PuntosVenta;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([174, 10, 23, 175, 104, 198, 2, 75])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.CatalogoServicios;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([50, 1, 93, 255, 157, 135, 61, 175])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.CanjeServicio;
   }
   if (
     containsBytes(
@@ -311,6 +357,10 @@ export enum RegistroInstruction {
   VincularWalletCliente,
   DesvincularWalletCliente,
   OtorgarPuntos,
+  InicializarCatalogoServicios,
+  ActualizarServicioCatalogo,
+  AgregarServicioCatalogo,
+  CanjearServicio,
 }
 
 export function identifyRegistroInstruction(
@@ -482,6 +532,50 @@ export function identifyRegistroInstruction(
   ) {
     return RegistroInstruction.OtorgarPuntos;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([233, 103, 3, 77, 47, 108, 174, 102])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.InicializarCatalogoServicios;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([146, 42, 138, 106, 31, 193, 196, 48])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.ActualizarServicioCatalogo;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([186, 167, 20, 103, 114, 19, 2, 225])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.AgregarServicioCatalogo;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([249, 104, 245, 143, 177, 199, 48, 66])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.CanjearServicio;
+  }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
     { instructionData: data, programName: "registro" }
@@ -535,7 +629,19 @@ export type ParsedRegistroInstruction<
     } & ParsedDesvincularWalletClienteInstruction<TProgram>)
   | ({
       instructionType: RegistroInstruction.OtorgarPuntos;
-    } & ParsedOtorgarPuntosInstruction<TProgram>);
+    } & ParsedOtorgarPuntosInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.InicializarCatalogoServicios;
+    } & ParsedInicializarCatalogoServiciosInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.ActualizarServicioCatalogo;
+    } & ParsedActualizarServicioCatalogoInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.AgregarServicioCatalogo;
+    } & ParsedAgregarServicioCatalogoInstruction<TProgram>)
+  | ({
+      instructionType: RegistroInstruction.CanjearServicio;
+    } & ParsedCanjearServicioInstruction<TProgram>);
 
 export function parseRegistroInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>
@@ -647,6 +753,34 @@ export function parseRegistroInstruction<TProgram extends string>(
         ...parseOtorgarPuntosInstruction(instruction),
       };
     }
+    case RegistroInstruction.InicializarCatalogoServicios: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.InicializarCatalogoServicios,
+        ...parseInicializarCatalogoServiciosInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.ActualizarServicioCatalogo: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.ActualizarServicioCatalogo,
+        ...parseActualizarServicioCatalogoInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.AgregarServicioCatalogo: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.AgregarServicioCatalogo,
+        ...parseAgregarServicioCatalogoInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.CanjearServicio: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.CanjearServicio,
+        ...parseCanjearServicioInstruction(instruction),
+      };
+    }
     default:
       throw new SolanaError(
         SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
@@ -672,6 +806,10 @@ export type RegistroPluginAccounts = {
     SelfFetchFunctions<WalletClienteArgs, WalletCliente>;
   puntosVenta: ReturnType<typeof getPuntosVentaCodec> &
     SelfFetchFunctions<PuntosVentaArgs, PuntosVenta>;
+  catalogoServicios: ReturnType<typeof getCatalogoServiciosCodec> &
+    SelfFetchFunctions<CatalogoServiciosArgs, CatalogoServicios>;
+  canjeServicio: ReturnType<typeof getCanjeServicioCodec> &
+    SelfFetchFunctions<CanjeServicioArgs, CanjeServicio>;
   registroGlobal: ReturnType<typeof getRegistroGlobalCodec> &
     SelfFetchFunctions<RegistroGlobalArgs, RegistroGlobal>;
   concesionario: ReturnType<typeof getConcesionarioCodec> &
@@ -764,6 +902,26 @@ export type RegistroPluginInstructions = {
     config?: { programAddress?: Address | HasAddress }
   ) => ReturnType<typeof getOtorgarPuntosInstruction> &
     SelfPlanAndSendFunctions;
+  inicializarCatalogoServicios: (
+    input: InicializarCatalogoServiciosInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getInicializarCatalogoServiciosInstruction> &
+    SelfPlanAndSendFunctions;
+  actualizarServicioCatalogo: (
+    input: ActualizarServicioCatalogoInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getActualizarServicioCatalogoInstruction> &
+    SelfPlanAndSendFunctions;
+  agregarServicioCatalogo: (
+    input: AgregarServicioCatalogoInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getAgregarServicioCatalogoInstruction> &
+    SelfPlanAndSendFunctions;
+  canjearServicio: (
+    input: CanjearServicioInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getCanjearServicioInstruction> &
+    SelfPlanAndSendFunctions;
 };
 
 export type RegistroPluginRequirements = ClientWithRpc<
@@ -791,6 +949,11 @@ export function registroProgram(
           ),
           walletCliente: addSelfFetchFunctions(client, getWalletClienteCodec()),
           puntosVenta: addSelfFetchFunctions(client, getPuntosVentaCodec()),
+          catalogoServicios: addSelfFetchFunctions(
+            client,
+            getCatalogoServiciosCodec()
+          ),
+          canjeServicio: addSelfFetchFunctions(client, getCanjeServicioCodec()),
           registroGlobal: addSelfFetchFunctions(
             client,
             getRegistroGlobalCodec()
@@ -920,6 +1083,38 @@ export function registroProgram(
             addSelfPlanAndSendFunctions(
               client,
               getOtorgarPuntosInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          inicializarCatalogoServicios: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInicializarCatalogoServiciosInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          actualizarServicioCatalogo: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getActualizarServicioCatalogoInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          agregarServicioCatalogo: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAgregarServicioCatalogoInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          canjearServicio: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCanjearServicioInstruction(input, {
                 programAddress:
                   instructionConfig?.programAddress ?? config.programAddress,
               })

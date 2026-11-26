@@ -63,15 +63,35 @@ export const REGISTRO_ERROR__MINT_INVALIDO = 0x1785; // 6021
 export const REGISTRO_ERROR__VENTA_NO_CORRESPONDE = 0x1786; // 6022
 /** WalletClienteInvalida: La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens */
 export const REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA = 0x1787; // 6023
+/** ServicioNoEncontrado: El servicio no existe en el catalogo */
+export const REGISTRO_ERROR__SERVICIO_NO_ENCONTRADO = 0x1788; // 6024
+/** ServicioNoDisponible: El servicio no esta disponible para canje */
+export const REGISTRO_ERROR__SERVICIO_NO_DISPONIBLE = 0x1789; // 6025
+/** CatalogoLleno: El catalogo alcanzo el maximo de servicios */
+export const REGISTRO_ERROR__CATALOGO_LLENO = 0x178a; // 6026
+/** NombreServicioInvalido: El nombre del servicio debe contener entre 1 y 40 caracteres */
+export const REGISTRO_ERROR__NOMBRE_SERVICIO_INVALIDO = 0x178b; // 6027
+/** SaldoInsuficiente: El cliente no tiene suficientes puntos BERA para este servicio */
+export const REGISTRO_ERROR__SALDO_INSUFICIENTE = 0x178c; // 6028
+/** IdCanjeInvalido: El identificador del canje debe ser mayor a cero */
+export const REGISTRO_ERROR__ID_CANJE_INVALIDO = 0x178d; // 6029
+/** CanjeDuranteGarantia: Este servicio de fidelizacion solo puede canjearse cuando la garantia ya no cubre la motocicleta */
+export const REGISTRO_ERROR__CANJE_DURANTE_GARANTIA = 0x178e; // 6030
+/** GarantiaNoCorresponde: La garantia no corresponde a la motocicleta seleccionada */
+export const REGISTRO_ERROR__GARANTIA_NO_CORRESPONDE = 0x178f; // 6031
+/** MotoNoVendida: La motocicleta debe estar registrada como vendida */
+export const REGISTRO_ERROR__MOTO_NO_VENDIDA = 0x1790; // 6032
 /** ContadorInvalido: Error: El contador ha alcanzado su valor máximo. */
-export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1788; // 6024
+export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1791; // 6033
 /** ClienteSinCompras: El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet */
-export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1789; // 6025
+export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1792; // 6034
 /** MetadataCidInvalido: El CID debe contener entre 1 y 100 caracteres alfanuméricos */
-export const REGISTRO_ERROR__METADATA_CID_INVALIDO = 0x178a; // 6026
+export const REGISTRO_ERROR__METADATA_CID_INVALIDO = 0x1793; // 6035
 
 export type RegistroError =
   | typeof REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA
+  | typeof REGISTRO_ERROR__CANJE_DURANTE_GARANTIA
+  | typeof REGISTRO_ERROR__CATALOGO_LLENO
   | typeof REGISTRO_ERROR__CEDULA_INVALIDA
   | typeof REGISTRO_ERROR__CLIENTE_SIN_COMPRAS
   | typeof REGISTRO_ERROR__CONTADOR_INVALIDO
@@ -80,20 +100,27 @@ export type RegistroError =
   | typeof REGISTRO_ERROR__DESCRIPCION_SERVICIO_INVALIDA
   | typeof REGISTRO_ERROR__DURACION_GARANTIA_INVALIDA
   | typeof REGISTRO_ERROR__GARANTIA_NO_ACTIVA
+  | typeof REGISTRO_ERROR__GARANTIA_NO_CORRESPONDE
   | typeof REGISTRO_ERROR__GARANTIA_NO_INICIADA
   | typeof REGISTRO_ERROR__GARANTIA_VENCIDA
+  | typeof REGISTRO_ERROR__ID_CANJE_INVALIDO
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO
   | typeof REGISTRO_ERROR__METADATA_CID_INVALIDO
   | typeof REGISTRO_ERROR__MINT_INVALIDO
   | typeof REGISTRO_ERROR__MINT_NO_TRANSFERIBLE
   | typeof REGISTRO_ERROR__MOTO_CON_HISTORIAL
+  | typeof REGISTRO_ERROR__MOTO_NO_VENDIDA
   | typeof REGISTRO_ERROR__MOTO_VENDIDA
   | typeof REGISTRO_ERROR__NIV_INVALIDO
   | typeof REGISTRO_ERROR__NOMBRE_CLIENTE_INVALIDO
+  | typeof REGISTRO_ERROR__NOMBRE_SERVICIO_INVALIDO
   | typeof REGISTRO_ERROR__PLACA_INVALIDA
   | typeof REGISTRO_ERROR__PRECIO_VENTA_INVALIDO
   | typeof REGISTRO_ERROR__PUNTOS_INVALIDOS
+  | typeof REGISTRO_ERROR__SALDO_INSUFICIENTE
+  | typeof REGISTRO_ERROR__SERVICIO_NO_DISPONIBLE
+  | typeof REGISTRO_ERROR__SERVICIO_NO_ENCONTRADO
   | typeof REGISTRO_ERROR__TOKEN2022_REQUERIDO
   | typeof REGISTRO_ERROR__UNAUTHORIZED
   | typeof REGISTRO_ERROR__VENTA_NO_CORRESPONDE
@@ -103,6 +130,8 @@ let registroErrorMessages: Record<RegistroError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
   registroErrorMessages = {
     [REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA]: `La autoridad del mint no coincide con la PDA del programa`,
+    [REGISTRO_ERROR__CANJE_DURANTE_GARANTIA]: `Este servicio de fidelizacion solo puede canjearse cuando la garantia ya no cubre la motocicleta`,
+    [REGISTRO_ERROR__CATALOGO_LLENO]: `El catalogo alcanzo el maximo de servicios`,
     [REGISTRO_ERROR__CEDULA_INVALIDA]: `La cedula del cliente debe ser mayor a cero`,
     [REGISTRO_ERROR__CLIENTE_SIN_COMPRAS]: `El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet`,
     [REGISTRO_ERROR__CONTADOR_INVALIDO]: `Error: El contador ha alcanzado su valor máximo.`,
@@ -111,20 +140,27 @@ if (process.env["NODE_ENV"] !== "production") {
     [REGISTRO_ERROR__DESCRIPCION_SERVICIO_INVALIDA]: `La descripcion del servicio no puede superar los 100 caracteres`,
     [REGISTRO_ERROR__DURACION_GARANTIA_INVALIDA]: `La duracion de la garantia debe ser mayor a cero`,
     [REGISTRO_ERROR__GARANTIA_NO_ACTIVA]: `La garantia no se encuentra activa`,
+    [REGISTRO_ERROR__GARANTIA_NO_CORRESPONDE]: `La garantia no corresponde a la motocicleta seleccionada`,
     [REGISTRO_ERROR__GARANTIA_NO_INICIADA]: `La garantia aun no ha comenzado`,
     [REGISTRO_ERROR__GARANTIA_VENCIDA]: `La garantia ha vencido`,
+    [REGISTRO_ERROR__ID_CANJE_INVALIDO]: `El identificador del canje debe ser mayor a cero`,
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO]: `El kilometraje supera el limite de la garantia`,
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO]: `El kilometraje maximo debe ser mayor a cero`,
     [REGISTRO_ERROR__METADATA_CID_INVALIDO]: `El CID debe contener entre 1 y 100 caracteres alfanuméricos`,
     [REGISTRO_ERROR__MINT_INVALIDO]: `El mint no coincide con el configurado para este concesionario`,
     [REGISTRO_ERROR__MINT_NO_TRANSFERIBLE]: `El mint debe tener activa la extension NonTransferable de Token-2022`,
     [REGISTRO_ERROR__MOTO_CON_HISTORIAL]: `No se puede eliminar una moto que tiene historial de servicios o reclamaciones`,
+    [REGISTRO_ERROR__MOTO_NO_VENDIDA]: `La motocicleta debe estar registrada como vendida`,
     [REGISTRO_ERROR__MOTO_VENDIDA]: `No se puede eliminar una moto que ya fue vendida`,
     [REGISTRO_ERROR__NIV_INVALIDO]: `Error, el serial N.I.V debe tener una longitud de 17 caracteres`,
     [REGISTRO_ERROR__NOMBRE_CLIENTE_INVALIDO]: `El nombre del cliente no puede superar los 50 caracteres`,
+    [REGISTRO_ERROR__NOMBRE_SERVICIO_INVALIDO]: `El nombre del servicio debe contener entre 1 y 40 caracteres`,
     [REGISTRO_ERROR__PLACA_INVALIDA]: `Error, la placa debe tener una longitud de 7 caracteres`,
     [REGISTRO_ERROR__PRECIO_VENTA_INVALIDO]: `El precio de venta debe ser mayor a cero`,
     [REGISTRO_ERROR__PUNTOS_INVALIDOS]: `La cantidad de puntos debe ser mayor a cero`,
+    [REGISTRO_ERROR__SALDO_INSUFICIENTE]: `El cliente no tiene suficientes puntos BERA para este servicio`,
+    [REGISTRO_ERROR__SERVICIO_NO_DISPONIBLE]: `El servicio no esta disponible para canje`,
+    [REGISTRO_ERROR__SERVICIO_NO_ENCONTRADO]: `El servicio no existe en el catalogo`,
     [REGISTRO_ERROR__TOKEN2022_REQUERIDO]: `Esta operacion requiere el programa Token-2022`,
     [REGISTRO_ERROR__UNAUTHORIZED]: `No tienes autorizacion para realizar esta operacion`,
     [REGISTRO_ERROR__VENTA_NO_CORRESPONDE]: `La venta no corresponde al concesionario o al cliente indicados`,

@@ -8,4 +8,5 @@
 
 export * from "./estadoGarantia";
 export * from "./estadoReclamacion";
+export * from "./servicioCatalogo";
 export * from "./tipoServicio";

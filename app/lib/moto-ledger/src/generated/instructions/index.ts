@@ -8,10 +8,14 @@
 
 export * from "./actualizarMetadataFidelidad";
 export * from "./actualizarPuntosFidelidad";
+export * from "./actualizarServicioCatalogo";
+export * from "./agregarServicioCatalogo";
+export * from "./canjearServicio";
 export * from "./configurarGarantia";
 export * from "./configurarProgramaFidelidad";
 export * from "./desvincularWalletCliente";
 export * from "./eliminarMoto";
+export * from "./inicializarCatalogoServicios";
 export * from "./otorgarPuntos";
 export * from "./reclamarGarantia";
 export * from "./registrarCliente";
