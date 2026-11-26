@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   claimWalletLinkValue,
+  getWalletLinkSession,
   isSolanaAddress,
   updateWalletLinkSession,
 } from "../../../../../lib/wallet-link-store";
@@ -18,7 +19,7 @@ export async function POST(
       return NextResponse.json({ error: "La dirección de wallet no es válida." }, { status: 400 });
     }
 
-    const current = await updateWalletLinkSession(token, (session) => session);
+    const current = await getWalletLinkSession(token);
     if (!current) return NextResponse.json({ error: "La solicitud expiró." }, { status: 404 });
     const claimed = await claimWalletLinkValue(token, "wallet", body.walletAddress);
     if (!claimed) return NextResponse.json({ error: "Otra wallet ya reclamó esta solicitud." }, { status: 409 });
