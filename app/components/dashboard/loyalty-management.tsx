@@ -2,7 +2,13 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Image from "next/image";
-import { address } from "@solana/kit";
+import { address, unwrapOption } from "@solana/kit";
+import {
+  fetchMint,
+  getUpdateTokenMetadataFieldInstruction,
+  isExtension,
+  tokenMetadataField,
+} from "@solana-program/token-2022";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
@@ -30,6 +36,12 @@ type ExistingLoyaltyProgram = {
   mint: string;
   programaFidelidad: string;
   puntosPorVenta: bigint;
+  name: string;
+  symbol: string;
+  description: string;
+  imageUri: string | null;
+  metadataUri: string;
+  updateAuthority: string | null;
 };
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -84,6 +96,7 @@ export function LoyaltyManagement({
   const [programLoading, setProgramLoading] = useState(true);
   const [programLoadError, setProgramLoadError] = useState<string | null>(null);
   const [reloadProgram, setReloadProgram] = useState(0);
+  const [updateBusy, setUpdateBusy] = useState(false);
 
   useEffect(() => {
     setName(`${nombreConcesionario} Rewards`);
@@ -109,12 +122,60 @@ export function LoyaltyManagement({
           programaFidelidad
         );
 
+        const mintAddress = account.data.mint;
+        const mintAccount = await fetchMint(client.rpc, mintAddress);
+        const extensions = unwrapOption(mintAccount.data.extensions) ?? [];
+        const tokenMetadata = extensions.find((item) =>
+          isExtension("TokenMetadata", item)
+        );
+
+        if (!tokenMetadata) {
+          throw new Error("El mint no contiene la extensión TokenMetadata.");
+        }
+
+        const metadataUri = tokenMetadata.uri;
+        let description = "";
+        const additionalMetadata = tokenMetadata.additionalMetadata;
+        if (additionalMetadata instanceof Map) {
+          description = additionalMetadata.get("description") ?? "";
+        }
+
+        let imageUri: string | null = null;
+        try {
+          const metadataResponse = await fetch(metadataUri, { cache: "no-store" });
+          if (metadataResponse.ok) {
+            const metadataJson = (await metadataResponse.json()) as {
+              image?: string;
+              description?: string;
+            };
+            if (metadataJson.image) {
+              imageUri = toGatewayUrl(metadataJson.image, "");
+            }
+            if (!description && metadataJson.description) {
+              description = metadataJson.description;
+            }
+          }
+        } catch (metadataError) {
+          console.warn("No se pudo recuperar el JSON de metadata:", metadataError);
+        }
+
+        const updateAuthority = unwrapOption(tokenMetadata.updateAuthority);
+
         if (!cancelled) {
           setExistingProgram({
-            mint: account.data.mint,
+            mint: mintAddress,
             programaFidelidad,
             puntosPorVenta: account.data.puntosPorVenta,
+            name: tokenMetadata.name,
+            symbol: tokenMetadata.symbol,
+            description,
+            imageUri,
+            metadataUri,
+            updateAuthority: updateAuthority ?? null,
           });
+          setName(tokenMetadata.name);
+          setSymbol(tokenMetadata.symbol);
+          setDescription(description);
         }
       } catch (error) {
         // A missing PDA means this dealership has not created its loyalty
@@ -317,6 +378,130 @@ export function LoyaltyManagement({
     }
   };
 
+  const handleUpdateExistingMetadata = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!existingProgram || !connected?.signer || !connected.account) {
+      toast.error("Conecta la wallet propietaria del programa para actualizar la metadata.");
+      return;
+    }
+    if (existingProgram.updateAuthority !== connected.account.address) {
+      toast.error("La wallet conectada no es la autoridad de actualización de TokenMetadata.");
+      return;
+    }
+    if (!image) {
+      toast.error("Selecciona la nueva imagen del programa.");
+      return;
+    }
+    if (!ALLOWED_TYPES.includes(image.type) || image.size === 0 || image.size > MAX_IMAGE_SIZE) {
+      toast.error("La imagen debe ser PNG, JPG o WEBP y pesar máximo 5 MB.");
+      return;
+    }
+    if (name.trim().length < 3 || name.trim().length > 64) {
+      toast.error("El nombre debe tener entre 3 y 64 caracteres.");
+      return;
+    }
+    if (symbol.trim().length < 2 || symbol.trim().length > 10) {
+      toast.error("El símbolo debe tener entre 2 y 10 caracteres.");
+      return;
+    }
+    if (description.trim().length > 500) {
+      toast.error("La descripción no puede superar 500 caracteres.");
+      return;
+    }
+
+    setUpdateBusy(true);
+    try {
+      const dealershipAccount = await client.registro.accounts.concesionario.fetch(
+        address(concesionario)
+      );
+      if (dealershipAccount.data.owner !== connected.account.address) {
+        throw new Error("La wallet conectada no es propietaria de este concesionario.");
+      }
+
+      const timestamp = Date.now();
+      const nonce = createNonce();
+      const wallet = connected.account.address;
+      const message = [
+        "MotoLedger IPFS metadata upload",
+        `wallet:${wallet}`,
+        `dealership:${concesionario}`,
+        `cluster:${apiCluster}`,
+        `timestamp:${timestamp}`,
+        `nonce:${nonce}`,
+      ].join("\n");
+      const signature = await client.wallet.signMessage(new TextEncoder().encode(message));
+
+      const form = new FormData();
+      form.set("name", name.trim());
+      form.set("symbol", symbol.trim().toUpperCase());
+      form.set("description", description.trim());
+      form.set("wallet", wallet);
+      form.set("dealership", concesionario);
+      form.set("cluster", apiCluster);
+      form.set("timestamp", String(timestamp));
+      form.set("nonce", nonce);
+      const signatureBase64 = btoa(
+        Array.from(signature, (byte) => String.fromCharCode(byte)).join("")
+      );
+      form.set("signature", signatureBase64);
+      form.set("image", image);
+
+      const response = await fetch("/api/ipfs/upload", { method: "POST", body: form });
+      const payload = (await response.json()) as UploadResult | { error?: string };
+      if (!response.ok) {
+        throw new Error("error" in payload && payload.error
+          ? payload.error
+          : "No se pudo subir la nueva metadata a IPFS.");
+      }
+
+      const uploaded = payload as UploadResult;
+      const metadataUri = toGatewayUrl(uploaded.metadataUri, uploaded.metadataCid);
+      const mintAddress = address(existingProgram.mint);
+      const instructions = [
+        getUpdateTokenMetadataFieldInstruction({
+          metadata: mintAddress,
+          updateAuthority: connected.signer,
+          field: tokenMetadataField("Name"),
+          value: name.trim(),
+        }),
+        getUpdateTokenMetadataFieldInstruction({
+          metadata: mintAddress,
+          updateAuthority: connected.signer,
+          field: tokenMetadataField("Symbol"),
+          value: symbol.trim().toUpperCase(),
+        }),
+        getUpdateTokenMetadataFieldInstruction({
+          metadata: mintAddress,
+          updateAuthority: connected.signer,
+          field: tokenMetadataField("Uri"),
+          value: metadataUri,
+        }),
+        getUpdateTokenMetadataFieldInstruction({
+          metadata: mintAddress,
+          updateAuthority: connected.signer,
+          field: tokenMetadataField("Key", ["description"]),
+          value: description.trim(),
+        }),
+      ];
+
+      await client.sendTransaction(instructions);
+      setImage(null);
+      setImagePreview(null);
+      setReloadProgram((value) => value + 1);
+      toast.success("Metadata actualizada en el mint Token-2022 existente.");
+    } catch (error) {
+      console.error("No se pudo actualizar la metadata de fidelización:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar la metadata del token."
+      );
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
+
   const copyValue = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -370,6 +555,33 @@ export function LoyaltyManagement({
           <span className="rounded-full bg-[#edf8f2] px-3 py-1 text-[9px] font-semibold text-[#168451]">Activo</span>
         </div>
 
+        <div className="mt-4 flex flex-col gap-4 rounded-lg bg-[#f7f8fa] p-4 sm:flex-row sm:items-center">
+          <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e2e5e8] bg-white">
+            {existingProgram.imageUri ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={existingProgram.imageUri}
+                alt={existingProgram.name}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <span className="px-2 text-center text-[10px] text-[#9299a1]">
+                Imagen no disponible
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-[14px] font-bold text-[#252a30]">{existingProgram.name}</h3>
+            <p className="mt-1 text-[10px] font-semibold tracking-wide text-[#d90011]">{existingProgram.symbol}</p>
+            <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">
+              {existingProgram.description || "Sin descripción"}
+            </p>
+            <a href={existingProgram.metadataUri} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[9px] font-semibold text-[#d90011] underline">
+              Ver metadata JSON ↗
+            </a>
+          </div>
+        </div>
+
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <a
             href={`https://explorer.solana.com/address/${existingProgram.mint}?cluster=${apiCluster}`}
@@ -388,6 +600,53 @@ export function LoyaltyManagement({
             <p className="mt-1 text-[9px] text-[#858d96]">Puntos configurados on-chain</p>
           </div>
         </div>
+
+        <form onSubmit={handleUpdateExistingMetadata} className="mt-4 rounded-lg border border-[#eff0f2] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[11px] font-bold text-[#252a30]">Actualizar identidad del token</h3>
+              <p className="mt-1 text-[9px] text-[#858d96]">Sube una nueva imagen y actualiza el JSON y TokenMetadata del mint existente.</p>
+            </div>
+            <span className="rounded-full bg-[#f7f8fa] px-2 py-1 text-[9px] text-[#858d96]">No crea otro mint</span>
+          </div>
+
+          {existingProgram.updateAuthority !== connected?.account?.address && (
+            <p className="mt-3 rounded-md bg-[#fff9f9] p-2 text-[9px] leading-relaxed text-[#95666a]">
+              La wallet conectada no es la autoridad de actualización de este mint. Puedes consultar la imagen y metadata, pero otra wallet debe firmar los cambios.
+            </p>
+          )}
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[9px] font-semibold text-[#555e68]">Nombre</span>
+              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={64} disabled={updateBusy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[11px]" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[9px] font-semibold text-[#555e68]">Símbolo</span>
+              <input value={symbol} onChange={(event) => setSymbol(event.target.value.toUpperCase())} maxLength={10} disabled={updateBusy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[11px]" />
+            </label>
+          </div>
+          <label className="mt-3 block">
+            <span className="mb-1 block text-[9px] font-semibold text-[#555e68]">Descripción</span>
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} rows={2} disabled={updateBusy} className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2 text-[11px]" />
+          </label>
+          <label className="mt-3 block">
+            <span className="mb-1 block text-[9px] font-semibold text-[#555e68]">Nueva imagen</span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setImage(event.target.files?.[0] ?? null)} disabled={updateBusy} className="block w-full rounded-lg border border-[#e2e5e8] px-2 py-2 text-[10px]" />
+          </label>
+          {imagePreview && (
+            <div className="mt-3 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagePreview} alt="Vista previa de la nueva imagen" className="h-16 w-16 rounded-lg border object-contain" />
+              <span className="text-[9px] text-[#858d96]">Nueva imagen seleccionada</span>
+            </div>
+          )}
+          <div className="mt-4 flex justify-end">
+            <button type="submit" disabled={updateBusy || !image || existingProgram.updateAuthority !== connected?.account?.address || !supportedCluster} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+              {updateBusy ? "Actualizando metadata…" : "Actualizar metadata del mint"}
+            </button>
+          </div>
+        </form>
 
         <a
           href={`https://explorer.solana.com/address/${existingProgram.programaFidelidad}?cluster=${apiCluster}`}
