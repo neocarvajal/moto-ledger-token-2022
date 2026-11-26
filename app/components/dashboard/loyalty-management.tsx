@@ -15,6 +15,7 @@ import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
 import { createLoyaltyMint } from "../../lib/moto-ledger/loyalty-mint";
 import { deriveProgramaFidelidadPda } from "../../lib/moto-ledger/pdas";
+import { ServiceCatalogManagement } from "./service-catalog-management";
 
 type TokenMetadataJson = {
   name: string;
@@ -712,6 +713,7 @@ export function LoyaltyManagement({
           <p className="mt-1 break-all font-mono text-[10px] text-[#555e68]">{existingProgram.programaFidelidad}</p>
           <p className="mt-2 text-[9px] font-semibold text-[#d90011]">Ver cuenta en Explorer ↗</p>
         </a>
+      <ServiceCatalogManagement concesionario={concesionario} />
       </section>
     );
   }
