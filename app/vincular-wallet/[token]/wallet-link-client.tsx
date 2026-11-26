@@ -130,6 +130,10 @@ export function WalletLinkClient({ token }: { token: string }) {
           [connected.signer!],
           [transaction]
         );
+        const customerSignature = signedTransaction[0].signatures[connected.account.address];
+        if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
+          throw new Error("Esta wallet no permite firmar transacciones parcialmente. Abre la solicitud desde una wallet compatible con firma de transacciones.");
+        }
         const serialized = getBase64Encoder().encode(
           getTransactionEncoder().encode(signedTransaction[0])
         );
