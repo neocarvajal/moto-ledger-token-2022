@@ -66,6 +66,20 @@ export function CustomerWalletLink({
   sessionRef.current = session;
 
   useEffect(() => {
+    if (!showLinkModal && !showUnlinkModal) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousDocumentOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousDocumentOverflow;
+    };
+  }, [showLinkModal, showUnlinkModal]);
+
+  useEffect(() => {
     let active = true;
     setChecking(true);
     setLinkedWallet(null);
@@ -386,8 +400,8 @@ export function CustomerWalletLink({
       )}
 
       {showLinkModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-[#171b20]/55 p-4 backdrop-blur-md">
-          <section role="dialog" aria-modal="true" aria-labelledby="link-wallet-title" className="my-auto max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#e9ebee] bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto overscroll-contain bg-[#171b20]/55 p-4 backdrop-blur-md">
+          <section role="dialog" aria-modal="true" aria-labelledby="link-wallet-title" className="my-auto max-h-[92vh] w-full max-w-2xl touch-pan-y overflow-y-auto overscroll-contain rounded-2xl border border-[#e9ebee] bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-[#eff0f2] px-5 py-4 sm:px-6">
               <div>
                 <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">GESTIÓN DE CLIENTES</p>
