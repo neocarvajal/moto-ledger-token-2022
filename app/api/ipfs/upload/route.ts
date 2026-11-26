@@ -118,8 +118,8 @@ async function verifyDealershipOwner(
 function buildGatewayUri(cid: string) {
   const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL
     ?.trim()
-    .replace(/^https?:\\/\\//i, "")
-    .replace(/\\/+$/, "");
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
 
   if (!gateway) {
     throw new Error("NEXT_PUBLIC_GATEWAY_URL no está configurado en el servidor.");
