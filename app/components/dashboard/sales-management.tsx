@@ -193,6 +193,8 @@ export function SalesManagement({
       setSelectedCustomerAddress("");
       setCedula("");
       setCustomerName("");
+      setCustomerWalletStatus("idle");
+      setCustomerWalletAddress("");
       return;
     }
 
@@ -402,6 +404,8 @@ export function SalesManagement({
       setPrice("");
       setCustomerName("");
       setSelectedCustomerAddress("");
+      setCustomerWalletStatus("idle");
+      setCustomerWalletAddress("");
       await Promise.all([loadData(), onRegistered()]);
     } catch (error) {
       console.error(error);
