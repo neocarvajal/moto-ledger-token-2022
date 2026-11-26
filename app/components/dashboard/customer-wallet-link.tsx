@@ -7,16 +7,11 @@ import {
   createNoopSigner,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
-  getBase64Encoder,
-  getSignatureFromTransaction,
-  getTransactionDecoder,
+  type Base64EncodedWireTransaction,
   partiallySignTransactionMessageWithSigners,
   pipe,
-  sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
-  assertIsSendableTransaction,
-  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -173,17 +168,55 @@ export function CustomerWalletLink({
 
     void (async () => {
       try {
-        const transactionBytes = getBase64Encoder().encode(session.signedTransaction!);
-        const transaction = getTransactionDecoder().decode(transactionBytes);
-        assertIsSendableTransaction(transaction);
-        assertIsTransactionWithBlockhashLifetime(transaction);
-        const sendAndConfirm = sendAndConfirmTransactionFactory({
-          rpc: client.rpc,
-          rpcSubscriptions: client.rpcSubscriptions,
+        // Submit the exact signed wire transaction. Decoding it first loses the
+        // blockhash lifetime metadata required by sendAndConfirmTransactionFactory.
+        const signature = await client.rpc
+          .sendTransaction(
+            session.signedTransaction as Base64EncodedWireTransaction,
+            {
+              encoding: "base64",
+              preflightCommitment: "confirmed",
+              maxRetries: 3,
+            }
+          )
+          .send();
+
+        // sendTransaction only acknowledges RPC receipt; wait until the cluster
+        // confirms execution before marking the wallet link as completed.
+        let confirmed = false;
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          const statuses = await client.rpc
+            .getSignatureStatuses([signature])
+            .send();
+          const status = statuses.value[0];
+
+          if (status?.err) {
+            throw new Error(`La transacción fue rechazada por Solana: ${JSON.stringify(status.err)}`);
+          }
+
+          if (
+            status?.confirmationStatus === "confirmed" ||
+            status?.confirmationStatus === "finalized"
+          ) {
+            confirmed = true;
+            break;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        }
+
+        if (!confirmed) {
+          throw new Error(
+            "Solana recibió la transacción, pero todavía no confirmó su ejecución. Puedes volver a consultar el estado sin crear otra vinculación."
+          );
+        }
+
+        const completion = await fetch(`/api/wallet-link/${token}/complete`, {
+          method: "POST",
         });
-        await sendAndConfirm(transaction, { commitment: "confirmed" });
-        const signature = getSignatureFromTransaction(transaction);
-        await fetch(`/api/wallet-link/${token}/complete`, { method: "POST" });
+        if (!completion.ok) {
+          throw new Error("La transacción se confirmó, pero no se pudo cerrar la sesión de vinculación.");
+        }
         setSuccessSignature(signature);
         setLinkedWallet(session.walletAddress);
         setSession((current) => current ? { ...current, status: "completed" } : current);
