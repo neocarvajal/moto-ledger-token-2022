@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
 import { createLoyaltyMint } from "../../lib/moto-ledger/loyalty-mint";
+import { deriveProgramaFidelidadPda } from "../../lib/moto-ledger/pdas";
 
 type UploadResult = {
   imageUri: string;
@@ -23,6 +24,12 @@ type MintResult = {
   programaFidelidad: string;
   autoridadFidelidad: string;
   signature: string;
+};
+
+type ExistingLoyaltyProgram = {
+  mint: string;
+  programaFidelidad: string;
+  puntosPorVenta: bigint;
 };
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -73,6 +80,9 @@ export function LoyaltyManagement({
   const [pointsPerSale, setPointsPerSale] = useState("100");
   const [result, setResult] = useState<UploadResult | null>(null);
   const [mintResult, setMintResult] = useState<MintResult | null>(null);
+  const [existingProgram, setExistingProgram] = useState<ExistingLoyaltyProgram | null>(null);
+  const [programLoading, setProgramLoading] = useState(true);
+  const [programLoadError, setProgramLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     setName(`${nombreConcesionario} Rewards`);
@@ -81,6 +91,55 @@ export function LoyaltyManagement({
     setResult(null);
     setMintResult(null);
   }, [concesionario, nombreConcesionario]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadExistingProgram() {
+      setProgramLoading(true);
+      setProgramLoadError(null);
+      setExistingProgram(null);
+
+      try {
+        const [programaFidelidad] = await deriveProgramaFidelidadPda(
+          address(concesionario)
+        );
+        const account = await client.registro.accounts.programaFidelidad.fetch(
+          programaFidelidad
+        );
+
+        if (!cancelled) {
+          setExistingProgram({
+            mint: account.data.mint,
+            programaFidelidad,
+            puntosPorVenta: account.data.puntosPorVenta,
+          });
+        }
+      } catch (error) {
+        // A missing PDA means this dealership has not created its loyalty
+        // program on the selected cluster yet. Other errors are shown below.
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "";
+          const isMissingAccount =
+            message.toLowerCase().includes("account not found") ||
+            message.toLowerCase().includes("could not find") ||
+            message.toLowerCase().includes("does not exist");
+          if (!isMissingAccount) {
+            setProgramLoadError(
+              "No se pudo consultar el programa de fidelización en Solana. Revisa la red seleccionada e inténtalo nuevamente."
+            );
+          }
+        }
+      } finally {
+        if (!cancelled) setProgramLoading(false);
+      }
+    }
+
+    void loadExistingProgram();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, concesionario, cluster]);
 
   useEffect(() => {
     if (!image) {
@@ -265,6 +324,83 @@ export function LoyaltyManagement({
       toast.error("No se pudo copiar al portapapeles.");
     }
   };
+
+  if (programLoading) {
+    return (
+      <section className="rounded-xl border border-[#e9ebee] bg-white p-6">
+        <p className="text-[10px] font-semibold text-[#555e68]">
+          Consultando el programa de fidelización en Solana…
+        </p>
+      </section>
+    );
+  }
+
+  if (programLoadError) {
+    return (
+      <section className="rounded-xl border border-[#f1dfe0] bg-white p-6">
+        <h2 className="text-[13px] font-bold text-[#252a30]">No se pudo cargar la fidelización</h2>
+        <p className="mt-2 text-[10px] leading-relaxed text-[#95666a]">{programLoadError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setProgramLoadError(null);
+            setProgramLoading(true);
+          }}
+          className="mt-3 rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white"
+        >
+          Volver a consultar
+        </button>
+      </section>
+    );
+  }
+
+  if (existingProgram) {
+    return (
+      <section className="rounded-xl border border-[#ccebdc] bg-white p-5 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[9px] font-bold tracking-[0.16em] text-[#168451]">TOKEN-2022 / PROGRAMA ACTIVO</p>
+            <h2 className="mt-2 text-[15px] font-bold text-[#252a30]">Programa de fidelización</h2>
+            <p className="mt-1 text-[10px] text-[#858d96]">
+              Configuración recuperada directamente desde Solana.
+            </p>
+          </div>
+          <span className="rounded-full bg-[#edf8f2] px-3 py-1 text-[9px] font-semibold text-[#168451]">Activo</span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <a
+            href={`https://explorer.solana.com/address/${existingProgram.mint}?cluster=${apiCluster}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={existingProgram.mint}
+            className="rounded-lg border border-[#eff0f2] p-3 hover:border-[#e60012]"
+          >
+            <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">MINT TOKEN-2022</p>
+            <p className="mt-1 break-all font-mono text-[10px] text-[#555e68]">{existingProgram.mint}</p>
+            <p className="mt-2 text-[9px] font-semibold text-[#d90011]">Ver mint en Explorer ↗</p>
+          </a>
+          <div className="rounded-lg border border-[#eff0f2] p-3">
+            <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">PUNTOS POR VENTA</p>
+            <p className="mt-1 text-[20px] font-bold text-[#252a30]">{existingProgram.puntosPorVenta.toString()}</p>
+            <p className="mt-1 text-[9px] text-[#858d96]">Puntos configurados on-chain</p>
+          </div>
+        </div>
+
+        <a
+          href={`https://explorer.solana.com/address/${existingProgram.programaFidelidad}?cluster=${apiCluster}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={existingProgram.programaFidelidad}
+          className="mt-3 block rounded-lg bg-[#f7f8fa] p-3"
+        >
+          <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">PDA DEL PROGRAMA</p>
+          <p className="mt-1 break-all font-mono text-[10px] text-[#555e68]">{existingProgram.programaFidelidad}</p>
+          <p className="mt-2 text-[9px] font-semibold text-[#d90011]">Ver cuenta en Explorer ↗</p>
+        </a>
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-4">
