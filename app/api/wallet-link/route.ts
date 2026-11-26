@@ -17,6 +17,12 @@ export async function POST(request: Request) {
       !isSolanaAddress(body.owner) ||
       !isSolanaAddress(body.cliente) ||
       !isSolanaAddress(body.concesionario) ||
+      typeof body.clienteNombre !== "string" ||
+      !body.clienteNombre.trim() ||
+      body.clienteNombre.length > 120 ||
+      typeof body.clienteCedula !== "string" ||
+      !body.clienteCedula.trim() ||
+      body.clienteCedula.length > 32 ||
       typeof body.cluster !== "string" ||
       !CLUSTERS.includes(body.cluster as WalletLinkCluster)
     ) {
@@ -27,6 +33,8 @@ export async function POST(request: Request) {
     const session = await createWalletLinkSession(token, {
       owner: body.owner,
       cliente: body.cliente,
+      clienteNombre: body.clienteNombre.trim(),
+      clienteCedula: body.clienteCedula.trim(),
       concesionario: body.concesionario,
       cluster: body.cluster as WalletLinkCluster,
     });
