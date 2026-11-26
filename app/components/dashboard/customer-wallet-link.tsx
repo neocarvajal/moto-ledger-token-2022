@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   address,
+  assertIsTransactionWithBlockhashLifetime,
   appendTransactionMessageInstruction,
   createNoopSigner,
   createTransactionMessage,
@@ -176,7 +177,7 @@ export function CustomerWalletLink({
             {
               encoding: "base64",
               preflightCommitment: "confirmed",
-              maxRetries: 3,
+              maxRetries: 3n,
             }
           )
           .send();
