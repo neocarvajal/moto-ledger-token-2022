@@ -18,6 +18,8 @@ import { useCluster } from "../../components/cluster-context";
 type Session = {
   owner: string;
   cliente: string;
+  clienteNombre: string;
+  clienteCedula: string;
   concesionario: string;
   cluster: "devnet" | "testnet" | "mainnet" | "localnet";
   walletAddress: string | null;
@@ -70,9 +72,10 @@ export function WalletLinkClient({ token }: { token: string }) {
   }, [loadSession, cluster, setCluster]);
 
   useEffect(() => {
+    if (session?.status === "completed" || session?.status === "cancelled") return;
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [session?.status]);
 
   useEffect(() => {
     if (!session || session.status === "completed" || session.status === "cancelled") return;
@@ -170,6 +173,7 @@ export function WalletLinkClient({ token }: { token: string }) {
           <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-relaxed text-red-700">{error}</div>
         ) : session ? (
           <>
+            {session.status !== "completed" && (
             <div className="mt-5 rounded-xl border border-[#e9ebee] bg-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[10px] font-semibold text-[#68717b]">Tiempo restante de la solicitud</span>
@@ -182,6 +186,9 @@ export function WalletLinkClient({ token }: { token: string }) {
               </div>
             </div>
 
+            </div>
+            )}
+
             <div className="mt-4 space-y-3 rounded-xl bg-[#f7f8fa] p-4 text-xs">
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Concesionario</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.concesionario)}</p></div>
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Wallet del concesionario</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.owner)}</p></div>
@@ -189,7 +196,29 @@ export function WalletLinkClient({ token }: { token: string }) {
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Red</p><p className="mt-1 font-semibold capitalize text-[#424950]">{session.cluster}</p></div>
             </div>
 
-            {cluster !== session.cluster ? (
+            {session.status === "completed" ? (
+              <div role="status" aria-live="polite" className="mt-6 overflow-hidden rounded-2xl border border-[#ccebd9] bg-gradient-to-b from-[#f0fbf4] to-white p-5 text-center">
+                <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+                  <span className="absolute inset-1 rounded-full bg-[#c9f1d8] opacity-70 animate-ping" />
+                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#168354] text-4xl font-bold text-white shadow-lg animate-bounce">✓</span>
+                </div>
+                <p className="mt-4 text-[9px] font-bold tracking-[0.18em] text-[#168354]">VINCULACIÓN COMPLETADA</p>
+                <h2 className="mt-2 text-lg font-bold text-[#25332b]">¡Tu wallet ya está vinculada!</h2>
+                <p className="mt-2 text-xs leading-relaxed text-[#557064]">
+                  La wallet quedó asociada correctamente al registro del cliente:
+                </p>
+                <div className="mt-4 rounded-xl border border-[#d8eee0] bg-white p-4 text-left">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Cliente vinculado</p>
+                  <p className="mt-1 text-sm font-bold text-[#25332b]">{session.clienteNombre}</p>
+                  <p className="mt-1 text-[11px] text-[#687b70]">C.I. {session.clienteCedula}</p>
+                  <p className="mt-4 text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Wallet asociada</p>
+                  <p className="mt-1 break-all font-mono text-[10px] leading-relaxed text-[#424950]">{session.walletAddress}</p>
+                </div>
+                <p className="mt-4 text-xs font-semibold leading-relaxed text-[#39765a]">
+                  Ya puedes cerrar esta ventana. No necesitas realizar ninguna otra acción.
+                </p>
+              </div>
+            ) : cluster !== session.cluster ? (
               <p className="mt-6 rounded-lg bg-[#f7f8fa] p-3 text-xs text-[#68717b]">Preparando la conexión con {session.cluster}…</p>
             ) : session.status === "cancelled" ? (
               <p className="mt-6 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">El concesionario canceló esta solicitud. Solicita un nuevo código QR.</p>
@@ -285,15 +314,14 @@ export function WalletLinkClient({ token }: { token: string }) {
               </div>
             )}
 
-            {session.status === "completed" && (
-              <p className="mt-5 rounded-lg bg-[#f3fbf6] p-3 text-xs font-semibold text-[#168354]">La vinculación se completó correctamente.</p>
-            )}
           </>
         ) : null}
 
-        <p className="mt-7 border-t border-[#eff0f2] pt-4 text-[10px] leading-relaxed text-[#9aa1a9]">
-          La solicitud caduca automáticamente en cinco minutos. El concesionario cubre la comisión y los costes de creación de la cuenta. La firma autoriza únicamente la asociación indicada.
-        </p>
+        {session?.status !== "completed" && (
+          <p className="mt-7 border-t border-[#eff0f2] pt-4 text-[10px] leading-relaxed text-[#9aa1a9]">
+            La solicitud caduca automáticamente en cinco minutos. El concesionario cubre la comisión y los costes de creación de la cuenta. La firma autoriza únicamente la asociación indicada.
+          </p>
+        )}
       </section>
     </main>
   );
