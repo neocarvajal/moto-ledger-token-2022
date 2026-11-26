@@ -4,7 +4,7 @@ import {
   getWalletLinkSession,
   isSolanaAddress,
   updateWalletLinkSession,
-} from "../../../../../lib/wallet-link-store";
+} from "../../../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
 
