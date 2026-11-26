@@ -49,6 +49,7 @@ export function CustomerWalletLink({
   const [url, setUrl] = useState<string | null>(null);
   const [session, setSession] = useState<LinkSession | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successSignature, setSuccessSignature] = useState<string | null>(null);
   const [qrCreatedAt, setQrCreatedAt] = useState<number | null>(null);
@@ -236,10 +237,6 @@ export function CustomerWalletLink({
       toast.error("Conecta la wallet propietaria del concesionario.");
       return;
     }
-    if (!window.confirm("¿Desvincular la wallet de este cliente? Su historial, compras y puntos se conservarán.")) {
-      return;
-    }
-
     setBusy(true);
     setError(null);
     try {
@@ -263,6 +260,7 @@ export function CustomerWalletLink({
 
       setLinkedWallet(null);
       setSuccessSignature(null);
+      setShowUnlinkModal(false);
       toast.success("Wallet desvinculada. El historial del cliente se conservó.");
       if (result.context.signature) {
         console.info("Wallet unlink transaction:", result.context.signature);
@@ -338,7 +336,7 @@ export function CustomerWalletLink({
           {linkedWallet && (
             <button
               type="button"
-              onClick={() => void unlinkWallet()}
+              onClick={() => setShowUnlinkModal(true)}
               disabled={busy || checking || !connected?.signer}
               className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-[10px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
             >
@@ -396,6 +394,51 @@ export function CustomerWalletLink({
       )}
 
       {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
+
+      {showUnlinkModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#171b20]/55 p-4 backdrop-blur-[2px]"
+          onClick={() => !busy && setShowUnlinkModal(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unlink-wallet-title"
+            onClick={(event) => event.stopPropagation()}
+            className="my-auto w-full max-w-md overflow-hidden rounded-2xl border border-[#e9ebee] bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between border-b border-[#eff0f2] px-6 py-5">
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">GESTIÓN DE CLIENTES</p>
+                <h2 id="unlink-wallet-title" className="mt-1 text-[17px] font-bold text-[#252a30]">Desvincular wallet</h2>
+                <p className="mt-1 text-[10px] text-[#858d96]">Confirma que deseas retirar la asociación de esta wallet.</p>
+              </div>
+              <button type="button" onClick={() => setShowUnlinkModal(false)} disabled={busy} aria-label="Cerrar confirmación" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa] disabled:opacity-40">✕</button>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="rounded-xl border border-[#f2d5d7] bg-[#fff8f8] p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdebed] text-[17px] text-[#d90011]">!</span>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-bold text-[#30363d]">Wallet que se desvinculará</p>
+                    <p className="mt-2 break-all font-mono text-[10px] leading-relaxed text-[#68717b]">{linkedWallet}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 text-[10px] leading-relaxed text-[#68717b]">
+                <p>Se cerrará únicamente la cuenta de asociación de la wallet del cliente.</p>
+                <p className="font-semibold text-[#a33d45]">El historial del cliente, sus compras, ventas y puntos permanecerán intactos. La operación no transfiere tokens ni fondos de la wallet del cliente.</p>
+                <p>La renta recuperable de la cuenta cerrada se devolverá a la wallet propietaria del concesionario.</p>
+              </div>
+              {error && <p className="rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
+              <div className="flex flex-col-reverse gap-2 border-t border-[#eff0f2] pt-4 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setShowUnlinkModal(false)} disabled={busy} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] transition hover:bg-[#f7f8fa] disabled:opacity-50">Cancelar</button>
+                <button type="button" onClick={() => void unlinkWallet()} disabled={busy || !connected?.signer} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Procesando…" : "Sí, desvincular wallet"}</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
