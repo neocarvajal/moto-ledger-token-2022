@@ -135,7 +135,7 @@ export function CustomerWalletLink({
         (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx)
       );
 
-      const [partiallySigned] = await partiallySignTransactionMessageWithSigners(message);
+      const partiallySigned = await partiallySignTransactionMessageWithSigners(message);
       const ownerSignature = partiallySigned.signatures[ownerAddress];
       if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) {
         throw new Error("La wallet del concesionario no permite firmar parcialmente esta transacción.");
