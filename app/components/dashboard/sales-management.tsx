@@ -607,6 +607,42 @@ export function SalesManagement({
             </button>
           </div>
         </form>
+
+        {lastSaleConfirmation && (
+          <div className="mt-5 rounded-xl border border-[#bfe8d2] bg-[#f0faf5] p-4 sm:p-5" role="status" aria-live="polite">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d9f3e5] text-lg font-bold text-[#16845a]">✓</span>
+                <div>
+                  <p className="text-[12px] font-bold text-[#176b4b]">Venta registrada correctamente</p>
+                  <p className="mt-1 text-[10px] text-[#4d7664]">{lastSaleConfirmation.customerName} · {lastSaleConfirmation.motorcycle}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setLastSaleConfirmation(null)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-[#4d7664] hover:bg-[#e1f5e9]">Cerrar</button>
+            </div>
+            {lastSaleConfirmation.points !== null ? (
+              <div className="mt-4 rounded-lg border border-[#ccebdc] bg-white p-4">
+                <p className="text-[9px] font-bold tracking-[0.12em] text-[#16845a]">RECOMPENSA ACREDITADA</p>
+                <div className="mt-1 flex flex-wrap items-baseline gap-2">
+                  <p className="text-[28px] font-extrabold leading-tight text-[#176b4b]">{formatAmount(lastSaleConfirmation.points)}</p>
+                  <p className="text-[12px] font-bold text-[#4d7664]">BERA entregados</p>
+                </div>
+                {lastSaleConfirmation.wallet && (
+                  <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.wallet + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2">
+                    Wallet del cliente: {lastSaleConfirmation.wallet} ↗
+                  </a>
+                )}
+                <p className="mt-2 text-[9px] text-[#6c8b7b]">La emisión también quedó asociada permanentemente al registro de esta venta en Solana.</p>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] text-[#68717b]">La venta quedó registrada, pero no se emitieron puntos porque el cliente no tenía wallet vinculada o el programa no estaba activo.</p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-3 text-[9px] font-semibold">
+              <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.saleAddress + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="text-[#16845a] underline decoration-dotted underline-offset-2">Ver venta en Explorer ↗</a>
+              {lastSaleConfirmation.signature && <a href={"https://explorer.solana.com/tx/" + lastSaleConfirmation.signature + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="text-[#16845a] underline decoration-dotted underline-offset-2">Ver transacción ↗</a>}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-xl border border-[#e9ebee] bg-white shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
@@ -621,7 +657,7 @@ export function SalesManagement({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[780px] text-left">
               <thead className="bg-[#fafbfc] text-[9px] font-bold uppercase tracking-wide text-[#9299a1]">
-                <tr><th className="px-6 py-3">Fecha</th><th className="px-4 py-3">Cliente PDA</th><th className="px-4 py-3">Moto PDA</th><th className="px-4 py-3 text-right">Precio</th><th className="px-6 py-3 text-right">Venta PDA</th><th className="px-4 py-3 text-right">Detalle</th></tr>
+                <tr><th className="px-6 py-3">Fecha</th><th className="px-4 py-3">Cliente PDA</th><th className="px-4 py-3">Moto PDA</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">Puntos BERA</th><th className="px-6 py-3 text-right">Venta PDA</th><th className="px-4 py-3 text-right">Detalle</th></tr>
               </thead>
               <tbody className="divide-y divide-[#f0f1f3]">
                 {sales.map((sale) => (
@@ -630,6 +666,11 @@ export function SalesManagement({
                     <td className="px-4 py-3 font-mono">{shortAddress(sale.data.cliente)}</td>
                     <td className="px-4 py-3 font-mono">{shortAddress(sale.data.moto)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-[#252a30]">{formatAmount(sale.data.precioVenta)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      {sale.reward ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#edf8f2] px-2 py-1 font-bold text-[#16845a]">+{formatAmount(sale.reward.cantidad)} BERA</span>
+                      ) : <span className="text-[#a0a6ad]">—</span>}
+                    </td>
                     <td className="px-6 py-3 text-right"><a href={`https://explorer.solana.com/address/${sale.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#68717b] underline decoration-dotted underline-offset-2 hover:text-[#e60012]">{shortAddress(sale.address)} ↗</a></td>
                     <td className="px-4 py-3 text-right"><button type="button" onClick={() => void handleViewDetails(sale)} disabled={detailLoading !== null} className="whitespace-nowrap rounded-md border border-[#e2e5e8] px-2.5 py-1.5 text-[9px] font-semibold text-[#555e68] transition hover:border-[#e60012] hover:text-[#e60012] disabled:opacity-50">{detailLoading === sale.address ? "Cargando…" : "Ver detalles"}</button></td>
                   </tr>
@@ -678,6 +719,29 @@ export function SalesManagement({
                   <p className="mt-2 text-[14px] font-bold text-[#252a30]">{new Date(Number(saleDetails.sale.data.fechaVenta) * 1000).toLocaleString("es-VE")}</p>
                   <p className="mt-1 text-[10px] text-[#858d96]">Timestamp guardado on-chain</p>
                 </div>
+              </div>
+
+              <div className={saleDetails.sale.reward ? "rounded-xl border border-[#bfe8d2] bg-[#f5fcf8] p-4" : "rounded-xl border border-[#eff0f2] bg-[#fafbfc] p-4"}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[11px] font-bold text-[#252a30]">Recompensa de fidelización</h3>
+                  {saleDetails.sale.reward ? (
+                    <span className="rounded-full bg-[#dff5e8] px-2.5 py-1 text-[9px] font-bold text-[#16845a]">PUNTOS ACREDITADOS</span>
+                  ) : (
+                    <span className="rounded-full bg-[#f0f1f3] px-2.5 py-1 text-[9px] font-bold text-[#858d96]">SIN EMISIÓN</span>
+                  )}
+                </div>
+                {saleDetails.sale.reward ? (
+                  <>
+                    <p className="mt-2 text-[25px] font-extrabold text-[#176b4b]">+{formatAmount(saleDetails.sale.reward.cantidad)} BERA</p>
+                    <div className="mt-2 grid gap-2 text-[10px] text-[#68717b] sm:grid-cols-2">
+                      <p>Fecha de emisión: <strong className="text-[#252a30]">{new Date(Number(saleDetails.sale.reward.fechaEmision) * 1000).toLocaleString("es-VE")}</strong></p>
+                      <p>Wallet receptora: <a href={"https://explorer.solana.com/address/" + saleDetails.sale.reward.wallet + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[#16845a] underline decoration-dotted">{shortAddress(saleDetails.sale.reward.wallet)} ↗</a></p>
+                    </div>
+                    <p className="mt-2 break-all font-mono text-[9px] text-[#8b9690]">Wallet receptora: {saleDetails.sale.reward.wallet}</p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">Esta venta no tiene un registro de emisión de puntos asociado.</p>
+                )}
               </div>
 
               <div className="rounded-xl border border-[#eff0f2] p-4">
