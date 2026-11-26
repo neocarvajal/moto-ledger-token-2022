@@ -23,10 +23,15 @@ import {
   getVentaDiscriminatorBytes,
   type Venta,
 } from "../../lib/moto-ledger/src/generated/accounts/venta";
-import type { Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
+import {
+  getClienteDecoder,
+  getClienteDiscriminatorBytes,
+  type Cliente,
+} from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import type { Concesionario } from "../../lib/moto-ledger/src/generated/accounts/concesionario";
 
 type MotorcycleRecord = { address: string; data: Moto };
+type CustomerRecord = { address: string; data: Cliente };
 type SaleRecord = { address: string; data: Venta };
 type SaleDetails = {
   sale: SaleRecord;
@@ -64,6 +69,9 @@ export function SalesManagement({
   const connected = useConnectedWallet(client);
   const [motorcycles, setMotorcycles] = useState<MotorcycleRecord[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [selectedCustomerAddress, setSelectedCustomerAddress] = useState("");
   const [serial, setSerial] = useState("");
   const [cedula, setCedula] = useState("");
   const [price, setPrice] = useState("");
@@ -145,6 +153,55 @@ export function SalesManagement({
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const loadCustomers = useCallback(async () => {
+    if (!connected?.account.address) {
+      setCustomers([]);
+      setSelectedCustomerAddress("");
+      setCedula("");
+      setCustomerName("");
+      return;
+    }
+
+    setLoadingCustomers(true);
+    try {
+      const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
+      const discriminatorFilter = getBase58Decoder().decode(
+        getClienteDiscriminatorBytes()
+      ) as Base58EncodedBytes;
+      const results = await client.rpc
+        .getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+          encoding: "base64",
+          filters: [
+            { memcmp: { offset: 0n, bytes: discriminatorFilter, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: ownerFilter, encoding: "base58" } },
+          ],
+        })
+        .send();
+
+      const found: CustomerRecord[] = results.map((result) => ({
+        address: result.pubkey,
+        data: getClienteDecoder().decode(
+          getBase64Encoder().encode(result.account.data[0])
+        ),
+      }));
+      found.sort((a, b) => a.data.idCliente - b.data.idCliente);
+      setCustomers(found);
+      const selected = found.find((item) => item.address === selectedCustomerAddress) ?? found[0] ?? null;
+      setSelectedCustomerAddress(selected?.address ?? "");
+      setCedula(selected ? String(selected.data.cedulaCliente) : "");
+      setCustomerName(selected?.data.nombreCliente ?? "");
+    } catch (error) {
+      console.error("No se pudieron cargar los clientes para ventas:", error);
+      toast.error("No se pudieron consultar los clientes registrados en Solana.");
+    } finally {
+      setLoadingCustomers(false);
+    }
+  }, [client, connected?.account.address, selectedCustomerAddress]);
+
+  useEffect(() => {
+    void loadCustomers();
+  }, [loadCustomers]);
 
   const lookupCustomer = async (value: string) => {
     if (!connected) throw new Error("Conecta tu wallet para consultar clientes.");
@@ -242,7 +299,8 @@ export function SalesManagement({
       setCedula("");
       setPrice("");
       setCustomerName("");
-      await Promise.all([loadData(), onRegistered()]);
+      setSelectedCustomerAddress("");
+      await Promise.all([loadData(), loadCustomers(), onRegistered()]);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "No se pudo registrar la venta.");
@@ -294,12 +352,41 @@ export function SalesManagement({
           </label>
 
           <div className="sm:col-span-2">
-            <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Cliente registrado</span>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input value={cedula} onChange={(event) => { setCedula(event.target.value.replace(/[^0-9]/g, "")); setCustomerName(""); }} inputMode="numeric" maxLength={10} required placeholder="Cédula de identidad" className="min-w-0 flex-1 rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <label htmlFor="sale-registered-customer" className="block text-[10px] font-semibold text-[#555e68]">Cliente registrado</label>
+              <button type="button" onClick={() => void loadCustomers()} disabled={loadingCustomers} className="text-[10px] font-semibold text-[#68717b] hover:text-[#e60012] disabled:opacity-50">
+                {loadingCustomers ? "Actualizando…" : "Actualizar clientes"}
+              </button>
+            </div>
+            {customers.length > 0 ? (
+              <select
+                id="sale-registered-customer"
+                value={selectedCustomerAddress}
+                onChange={(event) => {
+                  const selected = customers.find((item) => item.address === event.target.value) ?? null;
+                  setSelectedCustomerAddress(selected?.address ?? "");
+                  setCedula(selected ? String(selected.data.cedulaCliente) : "");
+                  setCustomerName(selected?.data.nombreCliente ?? "");
+                }}
+                className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#252a30] outline-none focus:border-[#e60012]"
+              >
+                {customers.map((item) => (
+                  <option key={item.address} value={item.address}>
+                    {item.data.nombreCliente} · C.I. {item.data.cedulaCliente}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-lg bg-[#f7f8fa] px-3 py-3 text-[10px] text-[#858d96]">
+                {loadingCustomers ? "Consultando clientes en Solana…" : "No hay clientes registrados para esta wallet."}
+              </div>
+            )}
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input value={cedula} onChange={(event) => { setCedula(event.target.value.replace(/[^0-9]/g, "")); setCustomerName(""); setSelectedCustomerAddress(""); }} inputMode="numeric" maxLength={10} required placeholder="Cédula de identidad" className="min-w-0 flex-1 rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
               <button type="button" onClick={() => void handleCustomerLookup()} disabled={!cedula} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">Verificar cliente</button>
             </div>
             {customerName && <p className="mt-2 text-[10px] font-semibold text-[#16845a]">✓ {customerName} · Cliente verificado en Solana</p>}
+            {customers.length > 0 && <p className="mt-1 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) registrados en esta wallet.</p>}
           </div>
 
           <label className="block">
