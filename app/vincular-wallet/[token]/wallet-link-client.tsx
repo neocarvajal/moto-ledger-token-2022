@@ -111,14 +111,10 @@ export function WalletLinkClient({ token }: { token: string }) {
   }, [connected?.account.address, session, token, loadSession]);
 
   useEffect(() => {
-    if (
-      !connected?.signer ||
-      !connected.account.address ||
-      !session?.transaction ||
-      session.walletAddress !== connected.account.address ||
-      session.signedTransaction ||
-      signingRef.current
-    ) return;
+    if (!connected || !session?.transaction || session.signedTransaction || signingRef.current) return;
+    const walletAddress = connected.account.address;
+    const walletSigner = connected.signer;
+    if (!walletAddress || !walletSigner || session.walletAddress !== walletAddress) return;
 
     signingRef.current = true;
     setMessage("Revisa la solicitud en tu wallet y confirma la firma…");
@@ -127,10 +123,10 @@ export function WalletLinkClient({ token }: { token: string }) {
         const transactionBytes = getBase64Encoder().encode(session.transaction!);
         const transaction = getTransactionDecoder().decode(transactionBytes);
         const signedTransaction = await partiallySignTransactionWithSigners(
-          [connected.signer!],
+          [walletSigner],
           [transaction]
         );
-        const customerSignature = signedTransaction[0].signatures[connected.account.address];
+        const customerSignature = signedTransaction[0].signatures[walletAddress];
         if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
           throw new Error("Esta wallet no permite firmar transacciones parcialmente. Abre la solicitud desde una wallet compatible con firma de transacciones.");
         }
