@@ -5,6 +5,8 @@ export type WalletLinkCluster = "devnet" | "testnet" | "mainnet" | "localnet";
 export type WalletLinkSession = {
   owner: string;
   cliente: string;
+  clienteNombre: string;
+  clienteCedula: string;
   concesionario: string;
   cluster: WalletLinkCluster;
   walletAddress: string | null;
@@ -82,7 +84,7 @@ export function createWalletLinkToken() {
 
 export async function createWalletLinkSession(
   token: string,
-  input: Pick<WalletLinkSession, "owner" | "cliente" | "concesionario" | "cluster">
+  input: Pick<WalletLinkSession, "owner" | "cliente" | "clienteNombre" | "clienteCedula" | "concesionario" | "cluster">
 ) {
   const now = Date.now();
   const session: WalletLinkSession = {
