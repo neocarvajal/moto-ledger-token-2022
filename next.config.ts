@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
-const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const publicAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+const allowedDevOrigins = publicAppUrl
+  ? [new URL(publicAppUrl).hostname]
+  : [];
 
 const nextConfig: NextConfig = {
   allowedDevOrigins,
