@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
 import { address } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
@@ -49,6 +50,7 @@ export function LoyaltyManagement({
     `Programa de fidelización de ${nombreConcesionario} en MotoLedger.`
   );
   const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [mintBusy, setMintBusy] = useState(false);
   const [pointsPerSale, setPointsPerSale] = useState("100");
@@ -62,6 +64,17 @@ export function LoyaltyManagement({
     setResult(null);
     setMintResult(null);
   }, [concesionario, nombreConcesionario]);
+
+  useEffect(() => {
+    if (!image) {
+      setImagePreview(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(image);
+    setImagePreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [image]);
 
   const supportedCluster = cluster === "devnet" || cluster === "mainnet";
   const apiCluster = cluster === "mainnet" ? "mainnet-beta" : "devnet";
@@ -249,29 +262,69 @@ export function LoyaltyManagement({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Nombre del token</span>
-              <input value={name} onChange={(event) => { setName(event.target.value); if (!mintResult) setResult(null); }} maxLength={64} disabled={busy || !!mintResult} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Símbolo</span>
-              <input value={symbol} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); if (!mintResult) setResult(null); }} maxLength={10} disabled={busy || !!mintResult} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] uppercase outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
-            </label>
+          <div className="grid gap-5 md:grid-cols-[190px_minmax(0,1fr)]">
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold text-[#555e68]">Logo del token</p>
+                <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#d9dde2] bg-[#f7f8fa]">
+                  {imagePreview ? (
+                    <Image
+                      src={imagePreview}
+                      alt={`Logo de ${name || "token"}`}
+                      width={190}
+                      height={190}
+                      unoptimized
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <div className="px-4 text-center">
+                      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-2xl text-[#b4bbc3]">◎</span>
+                      <p className="mt-2 text-[10px] font-medium text-[#858d96]">Vista previa del logo</p>
+                      <p className="mt-1 text-[9px] text-[#a0a6ad]">Selecciona una imagen</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Imagen del programa</span>
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-2 py-2 text-[10px] text-[#555e68] file:mr-2 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-2 file:py-1.5 file:text-[9px] file:font-semibold file:text-[#d90011]" />
+                <span className="mt-1 block text-[9px] text-[#a0a6ad]">PNG, JPG o WEBP · máximo 5 MB.</span>
+                {image && <span className="mt-1 block break-all text-[9px] font-medium text-[#555e68]">{image.name} · {(image.size / 1024 / 1024).toFixed(2)} MB</span>}
+              </label>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Nombre del token</span>
+                  <input value={name} onChange={(event) => { setName(event.target.value); if (!mintResult) setResult(null); }} maxLength={64} disabled={busy || !!mintResult} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Símbolo</span>
+                  <input value={symbol} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); if (!mintResult) setResult(null); }} maxLength={10} disabled={busy || !!mintResult} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] uppercase outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Descripción</span>
+                <textarea value={description} onChange={(event) => { setDescription(event.target.value); if (!mintResult) setResult(null); }} maxLength={500} rows={5} disabled={busy || !!mintResult} className="w-full resize-y rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+                <span className="mt-1 block text-right text-[9px] text-[#a0a6ad]">{description.length}/500</span>
+              </label>
+              <div className="rounded-lg bg-[#f7f8fa] p-3">
+                <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">VISTA PREVIA DE IDENTIDAD</p>
+                <div className="mt-2 flex items-center gap-3">
+                  {imagePreview && (
+                    <Image src={imagePreview} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-lg object-cover" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] font-bold text-[#252a30]">{name || "Nombre del token"}</p>
+                    <p className="text-[10px] font-semibold tracking-wide text-[#e60012]">{symbol || "SÍMBOLO"}</p>
+                  </div>
+                </div>
+                <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#858d96]">{description || "Descripción del programa de fidelización."}</p>
+              </div>
+            </div>
           </div>
-
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Descripción</span>
-            <textarea value={description} onChange={(event) => { setDescription(event.target.value); if (!mintResult) setResult(null); }} maxLength={500} rows={3} disabled={busy || !!mintResult} className="w-full resize-y rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
-            <span className="mt-1 block text-right text-[9px] text-[#a0a6ad]">{description.length}/500</span>
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Imagen del programa</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#555e68] file:mr-3 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#d90011]" />
-            <span className="mt-1 block text-[9px] text-[#a0a6ad]">PNG, JPG o WEBP · máximo 5 MB.</span>
-            {image && <span className="mt-1 block text-[9px] font-medium text-[#555e68]">{image.name} · {(image.size / 1024 / 1024).toFixed(2)} MB</span>}
-          </label>
 
           {!supportedCluster && (
             <div className="rounded-lg border border-[#f1dfe0] bg-[#fff9f9] p-3 text-[10px] leading-relaxed text-[#95666a]">
