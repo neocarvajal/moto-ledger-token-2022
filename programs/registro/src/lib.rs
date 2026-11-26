@@ -697,6 +697,7 @@ pub mod registro {
     pub fn canjear_servicio(
         context: Context<CanjearServicio>,
         servicio_id: u8,
+        kilometraje_actual: u64,
         id_canje: u64,
     ) -> Result<()> {
         require!(id_canje > 0, Errores::IdCanjeInvalido);
@@ -708,6 +709,59 @@ pub mod registro {
             context.accounts.wallet_cliente.wallet,
             context.accounts.wallet.key(),
             Errores::WalletClienteInvalida
+        );
+        require!(
+            context.accounts.moto.vendida,
+            Errores::MotoNoVendida
+        );
+        require_keys_eq!(
+            context.accounts.venta.concesionario,
+            context.accounts.concesionario.key(),
+            Errores::VentaNoCorresponde
+        );
+        require_keys_eq!(
+            context.accounts.venta.cliente,
+            context.accounts.cliente.key(),
+            Errores::VentaNoCorresponde
+        );
+        require_keys_eq!(
+            context.accounts.venta.moto,
+            context.accounts.moto.key(),
+            Errores::VentaNoCorresponde
+        );
+        require_keys_eq!(
+            context.accounts.moto.concesionario,
+            context.accounts.concesionario.key(),
+            Errores::VentaNoCorresponde
+        );
+        require_keys_eq!(
+            context.accounts.moto.garantia,
+            context.accounts.garantia.key(),
+            Errores::GarantiaNoCorresponde
+        );
+        require_keys_eq!(
+            context.accounts.garantia.moto,
+            context.accounts.moto.key(),
+            Errores::GarantiaNoCorresponde
+        );
+        require_keys_eq!(
+            context.accounts.garantia.concesionario,
+            context.accounts.concesionario.key(),
+            Errores::GarantiaNoCorresponde
+        );
+
+        let fecha_canje = Clock::get()?.unix_timestamp;
+        require!(
+            fecha_canje >= context.accounts.garantia.fecha_inicio,
+            Errores::GarantiaNoIniciada
+        );
+        let garantia_cubre_servicio =
+            context.accounts.garantia.estado == EstadoGarantia::Activa
+            && fecha_canje <= context.accounts.garantia.fecha_vencimiento
+            && kilometraje_actual <= context.accounts.garantia.kilometraje_maximo;
+        require!(
+            !garantia_cubre_servicio,
+            Errores::CanjeDuranteGarantia
         );
 
         let servicio = context.accounts.catalogo_servicios.servicios
@@ -757,13 +811,15 @@ pub mod registro {
             puntos,
         )?;
 
-        let fecha_canje = Clock::get()?.unix_timestamp;
         context.accounts.canje_servicio.set_inner(CanjeServicio {
             concesionario: context.accounts.concesionario.key(),
             catalogo_servicios: context.accounts.catalogo_servicios.key(),
             cliente: context.accounts.cliente.key(),
             wallet: context.accounts.wallet.key(),
             mint: context.accounts.mint.key(),
+            venta: context.accounts.venta.key(),
+            moto: context.accounts.moto.key(),
+            kilometraje_actual,
             servicio_id,
             servicio_nombre: nombre_servicio.clone(),
             puntos,
@@ -1158,7 +1214,7 @@ pub struct AdministrarCatalogoServicios<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(servicio_id: u8, id_canje: u64)]
+#[instruction(servicio_id: u8, kilometraje_actual: u64, id_canje: u64)]
 pub struct CanjearServicio<'info> {
     /// The dealership owner pays the transaction fee and receipt rent, and confirms delivery.
     #[account(mut)]
@@ -1201,6 +1257,25 @@ pub struct CanjearServicio<'info> {
         bump = wallet_cliente.bump
     )]
     pub wallet_cliente: Account<'info, WalletCliente>,
+
+    #[account(
+        constraint = venta.concesionario == concesionario.key() @ Errores::VentaNoCorresponde,
+        constraint = venta.cliente == cliente.key() @ Errores::VentaNoCorresponde,
+        constraint = venta.moto == moto.key() @ Errores::VentaNoCorresponde
+    )]
+    pub venta: Account<'info, Venta>,
+
+    #[account(
+        constraint = moto.concesionario == concesionario.key() @ Errores::VentaNoCorresponde,
+        constraint = moto.garantia == garantia.key() @ Errores::GarantiaNoCorresponde
+    )]
+    pub moto: Account<'info, Moto>,
+
+    #[account(
+        constraint = garantia.moto == moto.key() @ Errores::GarantiaNoCorresponde,
+        constraint = garantia.concesionario == concesionario.key() @ Errores::GarantiaNoCorresponde
+    )]
+    pub garantia: Account<'info, Garantia>,
 
     #[account(
         mut,
@@ -1292,6 +1367,12 @@ pub enum Errores {
     SaldoInsuficiente,
     #[msg("El identificador del canje debe ser mayor a cero")]
     IdCanjeInvalido,
+    #[msg("Este servicio de fidelizacion solo puede canjearse cuando la garantia ya no cubre la motocicleta")]
+    CanjeDuranteGarantia,
+    #[msg("La garantia no corresponde a la motocicleta seleccionada")]
+    GarantiaNoCorresponde,
+    #[msg("La motocicleta debe estar registrada como vendida")]
+    MotoNoVendida,
     #[msg("Error: El contador ha alcanzado su valor máximo.")]
     ContadorInvalido,
     #[msg("El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet")]
@@ -1336,6 +1417,9 @@ pub struct CanjeServicio {
     pub cliente: Pubkey,
     pub wallet: Pubkey,
     pub mint: Pubkey,
+    pub venta: Pubkey,
+    pub moto: Pubkey,
+    pub kilometraje_actual: u64,
     pub servicio_id: u8,
     pub servicio_nombre: String,
     pub puntos: u64,
@@ -1348,7 +1432,8 @@ impl CanjeServicio {
     pub const MAX_NOMBRE: usize = 40;
     pub const LEN: usize =
         DISCRIMINATOR +
-        32 + 32 + 32 + 32 + 32 +
+        32 + 32 + 32 + 32 + 32 + 32 + 32 +
+        8 +
         1 + (4 + Self::MAX_NOMBRE) +
         8 + 8 + 8 + 1;
 }
