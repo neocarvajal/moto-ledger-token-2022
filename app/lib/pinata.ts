@@ -24,13 +24,30 @@ export async function getOrCreateDealershipGroup(dealership: string) {
   const pinata = getPinataClient();
   const groupName = `MotoLedger-${dealership}`;
 
+  console.info("[Pinata] Buscando grupo:", groupName);
+
   const existing = await pinata.groups.public
     .list()
     .name(groupName)
     .limit(100);
 
-  const exactMatch = existing.groups.find((group) => group.name === groupName);
-  if (exactMatch) return exactMatch;
+  const exactMatch = existing.groups.find(
+    (group) => group.name === groupName
+  );
 
-  return pinata.groups.public.create({ name: groupName });
+  if (exactMatch) {
+    console.info("[Pinata] Grupo encontrado:", exactMatch.id);
+    return exactMatch;
+  }
+
+  console.info("[Pinata] Creando grupo:", groupName);
+
+  const created = await pinata.groups.public.create({
+    name: groupName,
+    isPublic: true,
+  });
+
+  console.info("[Pinata] Grupo creado:", created.id);
+
+  return created;
 }
