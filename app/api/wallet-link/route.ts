@@ -4,7 +4,7 @@ import {
   createWalletLinkToken,
   isSolanaAddress,
   type WalletLinkCluster,
-} from "../../../lib/wallet-link-store";
+} from "../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
 
