@@ -120,7 +120,10 @@ export function LoyaltyManagement({
       form.set("cluster", apiCluster);
       form.set("timestamp", String(timestamp));
       form.set("nonce", nonce);
-      form.set("signature", getBase64Encoder().encode(signature));
+      const signatureBase64 = btoa(
+        Array.from(signature, (byte) => String.fromCharCode(byte)).join("")
+      );
+      form.set("signature", signatureBase64);
       form.set("image", image);
 
       const response = await fetch("/api/ipfs/upload", {
