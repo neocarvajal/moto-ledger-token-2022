@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["publicity-globe-periodic-rentals.trycloudflare.com"],
+
   experimental: {
     agentUpgrade: "security",
   },
