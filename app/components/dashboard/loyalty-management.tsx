@@ -83,6 +83,7 @@ export function LoyaltyManagement({
   const [existingProgram, setExistingProgram] = useState<ExistingLoyaltyProgram | null>(null);
   const [programLoading, setProgramLoading] = useState(true);
   const [programLoadError, setProgramLoadError] = useState<string | null>(null);
+  const [reloadProgram, setReloadProgram] = useState(0);
 
   useEffect(() => {
     setName(`${nombreConcesionario} Rewards`);
@@ -139,7 +140,7 @@ export function LoyaltyManagement({
     return () => {
       cancelled = true;
     };
-  }, [client, concesionario, cluster]);
+  }, [client, concesionario, cluster, reloadProgram]);
 
   useEffect(() => {
     if (!image) {
@@ -345,6 +346,7 @@ export function LoyaltyManagement({
           onClick={() => {
             setProgramLoadError(null);
             setProgramLoading(true);
+            setReloadProgram((value) => value + 1);
           }}
           className="mt-3 rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white"
         >
