@@ -223,8 +223,14 @@ export async function POST(request: Request) {
       description,
       image: imageUri,
     };
+    const metadataFile = new File(
+      [JSON.stringify(metadata, null, 2)],
+      `${symbol}-metadata.json`,
+      { type: "application/json" }
+    );
     const metadataResult = await pinata.upload.public
-      .json(metadata)
+      .file(metadataFile)
+      .name(`${symbol}-metadata.json`)
       .group(group.id)
       .keyvalues({
         dealership,
