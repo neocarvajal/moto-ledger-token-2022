@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateWalletLinkSession } from "../../../../../lib/wallet-link-store";
+import { updateWalletLinkSession } from "../../../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
 
