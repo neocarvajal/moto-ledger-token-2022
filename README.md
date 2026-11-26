@@ -160,6 +160,10 @@ El módulo de clientes incorpora un flujo de vinculación en dos dispositivos. D
 
 La solicitud temporal tiene una vigencia de **cinco minutos**. El QR contiene un token aleatorio de un solo uso; no incluye la cédula ni el nombre del cliente. El servidor conserva temporalmente el contexto y la transacción parcialmente firmada en Redis, pero nunca recibe ni almacena claves privadas o frases semilla. La red valida las firmas y las restricciones del programa al ejecutar la instrucción.
 
+El QR abre una página web de MotoLedger; no ejecuta una firma directamente desde la cámara. La página detecta wallets compatibles con **Wallet Standard** en el navegador. En móviles, esto normalmente requiere abrir la URL desde el navegador integrado de la wallet. Esta primera iteración no incorpora todavía WalletConnect ni enlaces profundos específicos de Phantom/Solflare, por lo que no todas las combinaciones de navegador y wallet móvil estarán disponibles. La wallet debe permitir firmar una transacción parcialmente firmada sin enviarla por su cuenta.
+
+Antes de autorizar, el dashboard muestra la dirección pública detectada para que el concesionario la confirme con el comprador. Solo después de esa confirmación se prepara y firma la transacción.
+
 ### Configuración del almacenamiento temporal
 
 El intercambio entre el dashboard y el teléfono requiere Redis. Esta implementación utiliza la API REST de **Upstash Redis**. Crea una base de datos Redis y configura estas variables en el entorno local y en Vercel:
