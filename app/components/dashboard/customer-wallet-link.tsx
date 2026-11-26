@@ -184,7 +184,8 @@ export function CustomerWalletLink({
     })();
   }, [token, session?.signedTransaction, session?.status, session?.walletAddress, client]);
 
-  const closeRequest = () => {
+  const closeRequest = async () => {
+    if (token) await fetch(`/api/wallet-link/${token}/cancel`, { method: "POST" }).catch(() => undefined);
     setToken(null);
     setUrl(null);
     setSession(null);
@@ -275,7 +276,7 @@ export function CustomerWalletLink({
             )}
             <p className="mt-2 break-all text-[9px] text-[#9aa1a9]">{url}</p>
             <p className="mt-2 text-[9px] text-[#9aa1a9]">El QR caduca en cinco minutos.</p>
-            <button type="button" onClick={closeRequest} className="mt-3 text-[9px] font-semibold text-[#737b84] underline">Cerrar solicitud</button>
+            <button type="button" onClick={() => void closeRequest()} className="mt-3 text-[9px] font-semibold text-[#737b84] underline">Cerrar solicitud</button>
           </div>
         </div>
       )}
