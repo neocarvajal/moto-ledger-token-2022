@@ -205,12 +205,9 @@ export async function POST(request: Request) {
 
     const pinata = getPinataClient();
     const group = await getOrCreateDealershipGroup(dealership);
-    const imageFile = new File([imageBytes], file.name || "loyalty-image", {
-      type: file.type,
-    });
 
     const imageResult = await pinata.upload.public
-      .file(imageFile)
+      .file(file)
       .name(`${symbol}-loyalty-image`)
       .group(group.id)
       .keyvalues({
