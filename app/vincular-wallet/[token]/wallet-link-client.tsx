@@ -53,6 +53,7 @@ export function WalletLinkClient({ token }: { token: string }) {
     const payload = (await response.json()) as Session & { error?: string };
     if (!response.ok) throw new Error(payload.error ?? "La solicitud ya no está disponible.");
     setSession(payload);
+    if (payload.status === "completed") setError(null);
     return payload;
   }, [token]);
 
@@ -185,8 +186,6 @@ export function WalletLinkClient({ token }: { token: string }) {
                 <div className="h-full rounded-full bg-[#e60012] transition-[width] duration-1000" style={{ width: `${Math.max(0, Math.min(100, ((session.expiresAt - now) / 300000) * 100))}%` }} />
               </div>
             </div>
-
-            </div>
             )}
 
             <div className="mt-4 space-y-3 rounded-xl bg-[#f7f8fa] p-4 text-xs">
@@ -199,8 +198,8 @@ export function WalletLinkClient({ token }: { token: string }) {
             {session.status === "completed" ? (
               <div role="status" aria-live="polite" className="mt-6 overflow-hidden rounded-2xl border border-[#ccebd9] bg-gradient-to-b from-[#f0fbf4] to-white p-5 text-center">
                 <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
-                  <span className="absolute inset-1 rounded-full bg-[#c9f1d8] opacity-70 animate-ping" />
-                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#168354] text-4xl font-bold text-white shadow-lg animate-bounce">✓</span>
+                  <span className="absolute inset-1 rounded-full bg-[#c9f1d8] opacity-70 animate-[ping_900ms_ease-out_1]" />
+                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#168354] text-4xl font-bold text-white shadow-lg animate-[bounce_650ms_ease-in-out_1]">✓</span>
                 </div>
                 <p className="mt-4 text-[9px] font-bold tracking-[0.18em] text-[#168354]">VINCULACIÓN COMPLETADA</p>
                 <h2 className="mt-2 text-lg font-bold text-[#25332b]">¡Tu wallet ya está vinculada!</h2>
