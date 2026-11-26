@@ -1158,6 +1158,7 @@ pub struct AdministrarCatalogoServicios<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(servicio_id: u8, id_canje: u64)]
 pub struct CanjearServicio<'info> {
     /// The dealership owner pays the transaction fee and receipt rent, and confirms delivery.
     #[account(mut)]
