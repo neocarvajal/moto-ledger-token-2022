@@ -316,7 +316,10 @@ export function CustomerWalletLink({
       setToken(payload.token);
       setQrCreatedAt(Date.now());
       setNow(Date.now());
-      setUrl(`${window.location.origin}/vincular-wallet/${payload.token}`);
+      const publicAppUrl = (
+        process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      ).replace(/\/+$/, "");
+      setUrl(`${publicAppUrl}/vincular-wallet/${payload.token}`);
       setSession(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo iniciar la vinculación.");
