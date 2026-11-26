@@ -8,7 +8,7 @@ import {
 
 export const runtime = "nodejs";
 
-const CLUSTERS: WalletLinkCluster[] = ["devnet", "testnet", "mainnet", "localnet"];
+const CLUSTERS: WalletLinkCluster[] = ["devnet", "testnet", "mainnet"];
 
 export async function POST(request: Request) {
   try {
