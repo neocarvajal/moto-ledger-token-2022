@@ -47,7 +47,6 @@ export async function getOrCreateDealershipGroup(dealership: string) {
 
     const created = await pinata.groups.public.create({
       name: groupName,
-      isPublic: true,
     });
 
     console.info("[Pinata] 4. Grupo creado:", created.id);
