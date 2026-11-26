@@ -231,6 +231,51 @@ export function CustomerWalletLink({
     })();
   }, [token, session?.signedTransaction, session?.status, session?.walletAddress, client]);
 
+  const unlinkWallet = async () => {
+    if (!connected?.signer) {
+      toast.error("Conecta la wallet propietaria del concesionario.");
+      return;
+    }
+    if (!window.confirm("¿Desvincular la wallet de este cliente? Su historial, compras y puntos se conservarán.")) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const [walletCliente] = await deriveWalletClientePda(address(cliente));
+      const existing = await client.registro.accounts.walletCliente
+        .fetch(walletCliente)
+        .catch(() => null);
+
+      if (!existing) {
+        setLinkedWallet(null);
+        toast.info("Este cliente ya no tiene una wallet vinculada.");
+        return;
+      }
+
+      const instruction = client.registro.instructions.desvincularWalletCliente({
+        owner: connected.signer,
+        cliente: address(cliente),
+        walletCliente,
+      });
+      const result = await instruction.sendTransaction();
+
+      setLinkedWallet(null);
+      setSuccessSignature(null);
+      toast.success("Wallet desvinculada. El historial del cliente se conservó.");
+      if (result.context.signature) {
+        console.info("Wallet unlink transaction:", result.context.signature);
+      }
+    } catch (cause) {
+      console.error("No se pudo desvincular la wallet:", cause);
+      setError(cause instanceof Error ? cause.message : "No se pudo desvincular la wallet.");
+      toast.error(cause instanceof Error ? cause.message : "No se pudo desvincular la wallet.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const closeRequest = async () => {
     if (token) await fetch(`/api/wallet-link/${token}/cancel`, { method: "POST" }).catch(() => undefined);
     setToken(null);
@@ -290,6 +335,16 @@ export function CustomerWalletLink({
             {checking ? "Consultando vinculación…" : linkedWallet ? "Wallet vinculada" : "Sin wallet vinculada"}
           </p>
           {linkedWallet && <p className="mt-1 break-all font-mono text-[9px] text-[#68717b]">{linkedWallet}</p>}
+          {linkedWallet && (
+            <button
+              type="button"
+              onClick={() => void unlinkWallet()}
+              disabled={busy || checking || !connected?.signer}
+              className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-[10px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              {busy ? "Procesando…" : "Desvincular wallet"}
+            </button>
+          )}
         </div>
         {!linkedWallet && totalMotos > 0 && !token && (
           <button type="button" onClick={() => void startLink()} disabled={busy || checking || !connected?.signer} className="rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:opacity-50">
