@@ -169,6 +169,7 @@ export function WalletLinkClient({ token }: { token: string }) {
           <>
             <div className="mt-6 space-y-3 rounded-xl bg-[#f7f8fa] p-4 text-xs">
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Concesionario</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.concesionario)}</p></div>
+              <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Wallet del concesionario</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.owner)}</p></div>
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Cuenta de cliente</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.cliente)}</p></div>
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Red</p><p className="mt-1 font-semibold capitalize text-[#424950]">{session.cluster}</p></div>
             </div>
