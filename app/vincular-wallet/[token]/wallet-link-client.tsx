@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  address,
   getBase64Encoder,
   getTransactionDecoder,
   getBase64EncodedWireTransaction,
@@ -123,7 +124,7 @@ export function WalletLinkClient({ token }: { token: string }) {
           throw new Error("Esta wallet solo permite firmar y enviar directamente. Necesitas una wallet que admita firma sin envío para completar la vinculación.");
         }
         const [signedTransaction] = await walletSigner.modifyAndSignTransactions([transaction]);
-        const customerSignature = signedTransaction.signatures[walletAddress];
+        const customerSignature = signedTransaction.signatures[address(walletAddress)];
         if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
           throw new Error("La wallet no devolvió la firma del comprador.");
         }
