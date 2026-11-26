@@ -4,6 +4,7 @@ import {
   getTransactionDecoder,
 } from "@solana/kit";
 import {
+  claimWalletLinkValue,
   getWalletLinkSession,
   updateWalletLinkSession,
 } from "../../../../../lib/wallet-link-store";
@@ -58,7 +59,11 @@ export async function POST(
       return NextResponse.json({ error: "Faltan las firmas requeridas para esta vinculación." }, { status: 400 });
     }
 
+    const claimed = await claimWalletLinkValue(token, "signed", body.transaction);
+    if (!claimed) return NextResponse.json({ error: "Ya se recibió otra firma para esta solicitud." }, { status: 409 });
+
     const session = await updateWalletLinkSession(token, (latest) => {
+      if (latest.signedTransaction === body.transaction) return latest;
       if (latest.status !== "waiting_customer_signature" || latest.signedTransaction) {
         throw new Error("La solicitud ya fue utilizada.");
       }
