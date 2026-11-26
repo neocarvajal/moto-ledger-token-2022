@@ -16,6 +16,7 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   assertIsSendableTransaction,
+  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -131,6 +132,10 @@ export function CustomerWalletLink({
       );
 
       const [partiallySigned] = await partiallySignTransactionMessageWithSigners(message);
+      const ownerSignature = partiallySigned.signatures[connected.account.address];
+      if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) {
+        throw new Error("La wallet del concesionario no permite firmar parcialmente esta transacción.");
+      }
       const serialized = getBase64EncodedWireTransaction(partiallySigned);
       const response = await fetch(`/api/wallet-link/${token}/transaction`, {
         method: "POST",
@@ -158,6 +163,7 @@ export function CustomerWalletLink({
         const transactionBytes = getBase64Encoder().encode(session.signedTransaction!);
         const transaction = getTransactionDecoder().decode(transactionBytes);
         assertIsSendableTransaction(transaction);
+        assertIsTransactionWithBlockhashLifetime(transaction);
         const sendAndConfirm = sendAndConfirmTransactionFactory({
           rpc: client.rpc,
           rpcSubscriptions: client.rpcSubscriptions,
