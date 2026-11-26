@@ -9,6 +9,7 @@
 export * from "./cliente";
 export * from "./concesionario";
 export * from "./garantia";
+export * from "./metadataFidelidad";
 export * from "./moto";
 export * from "./programaFidelidad";
 export * from "./puntosVenta";
