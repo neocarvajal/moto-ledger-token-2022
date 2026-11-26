@@ -268,7 +268,7 @@ export function LoyaltyManagement({
 
           <label className="block">
             <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Imagen del programa</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(event) => { setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#555e68] file:mr-3 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#d90011]" />
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#555e68] file:mr-3 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#d90011]" />
             <span className="mt-1 block text-[9px] text-[#a0a6ad]">PNG, JPG o WEBP · máximo 5 MB.</span>
             {image && <span className="mt-1 block text-[9px] font-medium text-[#555e68]">{image.name} · {(image.size / 1024 / 1024).toFixed(2)} MB</span>}
           </label>
