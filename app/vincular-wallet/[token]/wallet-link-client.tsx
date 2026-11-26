@@ -4,13 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getBase64Encoder,
   getTransactionDecoder,
-  getTransactionEncoder,
-  partiallySignTransactionWithSigners,
+  getBase64EncodedWireTransaction,
 } from "@solana/kit";
 import {
   useConnectedWallet,
   useConnect,
-  useDisconnect,
   useWallets,
 } from "@solana/kit-plugin-wallet/react";
 import { useAppClient } from "../../lib/client-provider";
@@ -38,7 +36,6 @@ export function WalletLinkClient({ token }: { token: string }) {
   const wallets = useWallets(client);
   const connected = useConnectedWallet(client);
   const { dispatchAsync: connect, isRunning: connecting } = useConnect(client);
-  const { dispatchAsync: disconnect } = useDisconnect(client);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,17 +119,15 @@ export function WalletLinkClient({ token }: { token: string }) {
       try {
         const transactionBytes = getBase64Encoder().encode(session.transaction!);
         const transaction = getTransactionDecoder().decode(transactionBytes);
-        const signedTransaction = await partiallySignTransactionWithSigners(
-          [walletSigner],
-          [transaction]
-        );
-        const customerSignature = signedTransaction[0].signatures[walletAddress];
-        if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
-          throw new Error("Esta wallet no permite firmar transacciones parcialmente. Abre la solicitud desde una wallet compatible con firma de transacciones.");
+        if (!("modifyAndSignTransactions" in walletSigner)) {
+          throw new Error("Esta wallet solo permite firmar y enviar directamente. Necesitas una wallet que admita firma sin envío para completar la vinculación.");
         }
-        const serialized = getBase64Encoder().encode(
-          getTransactionEncoder().encode(signedTransaction[0])
-        );
+        const [signedTransaction] = await walletSigner.modifyAndSignTransactions([transaction]);
+        const customerSignature = signedTransaction.signatures[walletAddress];
+        if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
+          throw new Error("La wallet no devolvió la firma del comprador.");
+        }
+        const serialized = getBase64EncodedWireTransaction(signedTransaction);
         const response = await fetch(`/api/wallet-link/${token}/signed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
