@@ -54,6 +54,7 @@ export function CustomerWalletLink({
   const [session, setSession] = useState<LinkSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successSignature, setSuccessSignature] = useState<string | null>(null);
   const [qrCreatedAt, setQrCreatedAt] = useState<number | null>(null);
@@ -288,7 +289,8 @@ export function CustomerWalletLink({
   };
 
   const closeRequest = async () => {
-    if (token) await fetch(`/api/wallet-link/${token}/cancel`, { method: "POST" }).catch(() => undefined);
+    if (token && session?.status !== "completed") await fetch(`/api/wallet-link/${token}/cancel`, { method: "POST" }).catch(() => undefined);
+    setShowLinkModal(false);
     setToken(null);
     setUrl(null);
     setSession(null);
@@ -364,7 +366,7 @@ export function CustomerWalletLink({
           )}
         </div>
         {!linkedWallet && totalMotos > 0 && !token && (
-          <button type="button" onClick={() => void startLink()} disabled={busy || checking || !connected?.signer} className="rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:opacity-50">
+          <button type="button" onClick={() => { setShowLinkModal(true); void startLink(); }} disabled={busy || checking || !connected?.signer} className="rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:opacity-50">
             {busy ? "Preparando…" : "Vincular mediante QR"}
           </button>
         )}
@@ -374,45 +376,84 @@ export function CustomerWalletLink({
         <p className="mt-3 text-[9px] leading-relaxed text-[#9299a1]">El cliente debe tener al menos una compra registrada para poder vincular una wallet.</p>
       )}
 
-      {token && url && !successSignature && (
-        <div className="mt-4 grid gap-4 border-t border-[#eff0f2] pt-4 sm:grid-cols-[148px_1fr] sm:items-center">
-          <div className="mx-auto rounded-xl border border-[#e9ebee] bg-white p-2">
-            <QRCodeSVG value={url} size={132} level="M" includeMargin />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-[#252a30]">Escanea con el teléfono del comprador</p>
-            <p className="mt-1 text-[10px] leading-relaxed text-[#737b84]">
-              El cliente abrirá esta solicitud y conectará su wallet. El concesionario preparará y firmará la transacción; después, el comprador la completará desde el teléfono.
-            </p>
-            <p className="mt-3 text-[9px] font-semibold text-[#e60012]">
-              {!session?.walletAddress ? "Esperando que el cliente conecte su wallet…" : !session.transaction ? "Verifica la dirección y autoriza la wallet del comprador." : session.status === "signed" ? "Firma recibida. Enviando a Solana…" : "Esperando la firma del cliente…"}
-            </p>
-            {session?.walletAddress && !session.transaction && (
-              <div className="mt-3 rounded-lg border border-[#f0d9b9] bg-[#fffaf2] p-3">
-                <p className="text-[9px] font-semibold text-[#9a641f]">WALLET DETECTADA · CONFIRMA CON EL COMPRADOR</p>
-                <p className="mt-1 break-all font-mono text-[10px] text-[#424950]">{session.walletAddress}</p>
-                <button type="button" onClick={() => void authorizeWallet()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">
-                  {busy ? "Preparando transacción…" : "Confirmar wallet y firmar"}
-                </button>
+      {showLinkModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-[#171b20]/55 p-4 backdrop-blur-md">
+          <section role="dialog" aria-modal="true" aria-labelledby="link-wallet-title" className="my-auto max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#e9ebee] bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[#eff0f2] px-5 py-4 sm:px-6">
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">GESTIÓN DE CLIENTES</p>
+                <h2 id="link-wallet-title" className="mt-1 text-[17px] font-bold text-[#252a30]">Vincular wallet del cliente</h2>
+                <p className="mt-1 text-[10px] text-[#858d96]">{clienteNombre} · C.I. {clienteCedula}</p>
+              </div>
+              <button type="button" onClick={() => void closeRequest()} disabled={busy || session?.status === "signed"} aria-label="Cerrar vinculación" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa] disabled:opacity-40">✕</button>
+            </div>
+            {!token || !url ? (
+              <div className="p-8 text-center">
+                <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#f2c6ca] border-t-[#e60012]" />
+                <p className="mt-4 text-[12px] font-semibold text-[#252a30]">Preparando solicitud segura…</p>
+                {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] text-red-700">{error}</p>}
+                {!busy && <button type="button" onClick={() => setShowLinkModal(false)} className="mt-4 text-[10px] font-semibold text-[#737b84] underline">Cerrar</button>}
+              </div>
+            ) : successSignature ? (
+              <div className="p-8 text-center">
+                <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-[#d8f4e4] opacity-60" />
+                  <span className="relative flex h-16 w-16 animate-bounce items-center justify-center rounded-full bg-[#e7f8ee] text-3xl font-bold text-[#168354]">✓</span>
+                </div>
+                <h3 className="mt-5 text-lg font-bold text-[#252a30]">¡Wallet vinculada correctamente!</h3>
+                <p className="mt-2 text-[11px] leading-relaxed text-[#68717b]">La wallet del cliente quedó asociada y la transacción fue confirmada en Solana.</p>
+                <div className="mx-auto mt-5 max-w-md rounded-xl border border-[#e8ecef] bg-[#fafbfc] p-4 text-left">
+                  <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">CLIENTE VINCULADO</p>
+                  <p className="mt-1 text-[12px] font-semibold text-[#252a30]">{clienteNombre}</p>
+                  <p className="mt-1 text-[10px] text-[#68717b]">C.I. {clienteCedula}</p>
+                  <p className="mt-3 break-all font-mono text-[10px] text-[#68717b]">{linkedWallet}</p>
+                </div>
+                <a className="mt-4 inline-block break-all text-[10px] font-semibold text-[#168354] underline" href={\`https://explorer.solana.com/tx/\${successSignature}?cluster=\${cluster}\`} target="_blank" rel="noopener noreferrer">Ver transacción en Solana Explorer ↗</a>
+                <p className="mt-4 text-[10px] text-[#68717b]">El proceso finalizó. Ya puedes cerrar esta ventana.</p>
+                <button type="button" onClick={() => void closeRequest()} className="mt-5 rounded-lg bg-[#252a30] px-5 py-2.5 text-[10px] font-semibold text-white">Cerrar ventana</button>
+              </div>
+            ) : (
+              <div className="grid gap-6 p-5 sm:grid-cols-[190px_1fr] sm:p-6">
+                <div className="flex flex-col items-center">
+                  <div className="rounded-xl border border-[#e9ebee] bg-white p-3 shadow-sm"><QRCodeSVG value={url} size={164} level="M" includeMargin /></div>
+                  <p className="mt-3 text-center text-[10px] font-bold text-[#252a30]">Escanea con el teléfono del comprador</p>
+                  <p className="mt-1 break-all text-center text-[9px] text-[#9aa1a9]">{url}</p>
+                  <p className={\`mt-3 text-[11px] font-bold tabular-nums \${(session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now <= 30000 ? "text-red-600" : "text-[#68717b]"}\`}>
+                    Tiempo restante: {(() => { const seconds = Math.max(0, Math.ceil(((session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now) / 1000)); return \`\${Math.floor(seconds / 60)}:\${String(seconds % 60).padStart(2, "0")}\`; })()}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] leading-relaxed text-[#737b84]">El comprador abrirá esta solicitud y conectará su wallet. El concesionario autorizará la dirección y preparará la transacción; finalmente, el comprador la firmará desde su teléfono.</p>
+                  <div className="mt-4 space-y-3">
+                    <div className={\`rounded-lg border p-3 \${!session?.walletAddress ? "border-[#e9ebee] bg-[#fafbfc]" : "border-[#ccebd9] bg-[#f3fbf6]"}\`}>
+                      <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">1 · CONEXIÓN DEL COMPRADOR</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{!session?.walletAddress ? "Esperando que el cliente escanee el QR y conecte su wallet…" : "Wallet detectada correctamente."}</p>
+                    </div>
+                    {session?.walletAddress && (
+                      <div className="rounded-lg border border-[#f0d9b9] bg-[#fffaf2] p-3">
+                        <p className="text-[9px] font-semibold text-[#9a641f]">WALLET DETECTADA · VERIFICA CON EL COMPRADOR</p>
+                        <p className="mt-2 break-all font-mono text-[10px] text-[#424950]">{session.walletAddress}</p>
+                        {!session.transaction && <button type="button" onClick={() => void authorizeWallet()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{busy ? "Preparando transacción…" : "Confirmar wallet y firmar"}</button>}
+                      </div>
+                    )}
+                    <div className={\`rounded-lg border p-3 \${session?.transaction ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}\`}>
+                      <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">2 · AUTORIZACIÓN DEL CONCESIONARIO</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session?.transaction ? "Transacción preparada y firma del concesionario aplicada." : "Pendiente de confirmar la wallet detectada."}</p>
+                    </div>
+                    <div className={\`rounded-lg border p-3 \${session?.status === "signed" ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}\`}>
+                      <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">3 · FIRMA DEL COMPRADOR Y CONFIRMACIÓN</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session?.status === "signed" ? "Firma recibida. Enviando y esperando confirmación de Solana…" : "Esperando que el comprador firme desde su wallet."}</p>
+                    </div>
+                  </div>
+                  {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
+                  {session?.status !== "signed" && <button type="button" onClick={() => void closeRequest()} className="mt-4 text-[10px] font-semibold text-[#737b84] underline">Cancelar solicitud y cerrar</button>}
+                </div>
               </div>
             )}
-            <p className="mt-2 break-all text-[9px] text-[#9aa1a9]">{url}</p>
-            <p className={`mt-2 text-[10px] font-semibold tabular-nums ${(session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now <= 30000 ? "text-red-600" : "text-[#68717b]"}`}>
-              Tiempo restante: {(() => { const seconds = Math.max(0, Math.ceil(((session?.expiresAt ?? (qrCreatedAt ?? now) + 300000) - now) / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`; })()}
-            </p>
-            {session?.status !== "signed" && <button type="button" onClick={() => void closeRequest()} className="mt-3 text-[9px] font-semibold text-[#737b84] underline">Cerrar solicitud</button>}
-          </div>
+          </section>
         </div>
       )}
-
-      {successSignature && (
-        <div className="mt-3 rounded-lg bg-[#f3fbf6] p-3">
-          <p className="text-[10px] font-semibold text-[#168354]">Vinculación confirmada en Solana.</p>
-          <a className="mt-1 inline-block break-all text-[9px] text-[#168354] underline" href={`https://explorer.solana.com/tx/${successSignature}?cluster=${cluster}`} target="_blank" rel="noopener noreferrer">Ver transacción ↗</a>
-        </div>
-      )}
-
-      {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
+      {error && !showLinkModal && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
 
       {showUnlinkModal && (
         <div
