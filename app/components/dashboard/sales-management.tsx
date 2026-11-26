@@ -84,6 +84,8 @@ export function SalesManagement({
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [selectedCustomerAddress, setSelectedCustomerAddress] = useState("");
+  const [customerWalletStatus, setCustomerWalletStatus] = useState<"idle" | "loading" | "linked" | "unlinked" | "error">("idle");
+  const [customerWalletAddress, setCustomerWalletAddress] = useState("");
   const [serial, setSerial] = useState("");
   const [cedula, setCedula] = useState("");
   const [price, setPrice] = useState("");
@@ -166,6 +168,25 @@ export function SalesManagement({
     void loadData();
   }, [loadData]);
 
+  const checkCustomerWallet = useCallback(async (customerPda: string) => {
+    setCustomerWalletStatus("loading");
+    setCustomerWalletAddress("");
+    try {
+      const [walletCliente] = await deriveWalletClientePda(address(customerPda));
+      const walletInfo = await client.rpc.getAccountInfo(walletCliente, { encoding: "base64" }).send();
+      if (!walletInfo.value) {
+        setCustomerWalletStatus("unlinked");
+        return;
+      }
+      const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
+      setCustomerWalletAddress(linkedWallet.data.wallet);
+      setCustomerWalletStatus("linked");
+    } catch (error) {
+      console.error("No se pudo consultar la wallet vinculada del cliente:", error);
+      setCustomerWalletStatus("error");
+    }
+  }, [client]);
+
   const loadCustomers = useCallback(async () => {
     if (!connected?.account.address) {
       setCustomers([]);
@@ -203,13 +224,18 @@ export function SalesManagement({
       setSelectedCustomerAddress(selected?.address ?? "");
       setCedula(selected ? String(selected.data.cedulaCliente) : "");
       setCustomerName(selected?.data.nombreCliente ?? "");
+      if (selected) void checkCustomerWallet(selected.address);
+      else {
+        setCustomerWalletStatus("idle");
+        setCustomerWalletAddress("");
+      }
     } catch (error) {
       console.error("No se pudieron cargar los clientes para ventas:", error);
       toast.error("No se pudieron consultar los clientes registrados del concesionario en Solana.");
     } finally {
       setLoadingCustomers(false);
     }
-  }, [client, connected?.account.address]);
+  }, [checkCustomerWallet, client, connected?.account.address]);
 
   useEffect(() => {
     void loadCustomers();
@@ -229,7 +255,9 @@ export function SalesManagement({
 
   const handleCustomerLookup = async () => {
     try {
-      await lookupCustomer(cedula);
+      const { pda } = await lookupCustomer(cedula);
+      setSelectedCustomerAddress(pda);
+      void checkCustomerWallet(pda);
     } catch (error) {
       setCustomerName("");
       toast.error(error instanceof Error ? error.message : "No se encontró el cliente.");
@@ -441,6 +469,11 @@ export function SalesManagement({
                   setSelectedCustomerAddress(selected?.address ?? "");
                   setCedula(selected ? String(selected.data.cedulaCliente) : "");
                   setCustomerName(selected?.data.nombreCliente ?? "");
+                  if (selected) void checkCustomerWallet(selected.address);
+                  else {
+                    setCustomerWalletStatus("idle");
+                    setCustomerWalletAddress("");
+                  }
                 }}
                 className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#252a30] outline-none focus:border-[#e60012]"
               >
@@ -457,10 +490,32 @@ export function SalesManagement({
               </div>
             )}
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-              <input value={cedula} onChange={(event) => { setCedula(event.target.value.replace(/[^0-9]/g, "")); setCustomerName(""); setSelectedCustomerAddress(""); }} inputMode="numeric" maxLength={10} required placeholder="Cédula de identidad" className="min-w-0 flex-1 rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
+              <input value={cedula} onChange={(event) => { setCedula(event.target.value.replace(/[^0-9]/g, "")); setCustomerName(""); setSelectedCustomerAddress(""); setCustomerWalletStatus("idle"); setCustomerWalletAddress(""); }} inputMode="numeric" maxLength={10} required placeholder="Cédula de identidad" className="min-w-0 flex-1 rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
               <button type="button" onClick={() => void handleCustomerLookup()} disabled={!cedula} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">Verificar cliente</button>
             </div>
             {customerName && <p className="mt-2 text-[10px] font-semibold text-[#16845a]">✓ {customerName} · Cliente verificado en Solana</p>}
+            {customerName && (
+              <div className={`mt-3 flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between ${customerWalletStatus === "linked" ? "border-[#ccebdc] bg-[#f0faf5]" : customerWalletStatus === "unlinked" ? "border-[#f2dfb8] bg-[#fffaf0]" : "border-[#e8eaed] bg-[#f8f9fa]"}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${customerWalletStatus === "linked" ? "bg-[#16845a]" : customerWalletStatus === "unlinked" ? "bg-[#c58a20]" : "bg-[#9aa1a9]"}`} />
+                  <span className="text-[10px] font-semibold text-[#454d56]">
+                    {customerWalletStatus === "loading" ? "Consultando wallet del cliente…" :
+                      customerWalletStatus === "linked" ? "Wallet configurada" :
+                      customerWalletStatus === "unlinked" ? "Wallet no configurada" :
+                      customerWalletStatus === "error" ? "No se pudo consultar el estado de la wallet" :
+                      "Estado de wallet pendiente de consulta"}
+                  </span>
+                </div>
+                {customerWalletStatus === "linked" && customerWalletAddress && (
+                  <a href={`https://explorer.solana.com/address/${customerWalletAddress}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2 hover:text-[#116b49]">
+                    {shortAddress(customerWalletAddress)} ↗
+                  </a>
+                )}
+                {customerWalletStatus === "unlinked" && (
+                  <span className="text-[9px] text-[#8b6a2c]">La venta podrá registrarse, pero no recibirá puntos.</span>
+                )}
+              </div>
+            )}
             {customers.length > 0 && <p className="mt-1 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) registrados en este concesionario.</p>}
           </div>
 
