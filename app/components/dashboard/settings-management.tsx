@@ -6,7 +6,7 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
-import type { Concesionario } from "../../lib/moto-ledger/generated/src/generated/accounts/concesionario";
+import type { Concesionario } from "../../lib/moto-ledger/src/generated/accounts/concesionario";
 
 const U64_MAX = 18_446_744_073_709_551_615n;
 

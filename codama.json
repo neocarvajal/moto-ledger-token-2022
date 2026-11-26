@@ -5,7 +5,7 @@
         "js": {
             "from": "@codama/renderers-js",
             "args": [
-                "app/lib/moto-ledger/generated"
+                "app/lib/moto-ledger"
             ]
         }
     }

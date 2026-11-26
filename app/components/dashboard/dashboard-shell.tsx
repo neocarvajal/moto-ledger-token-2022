@@ -11,6 +11,7 @@ const navigation = [
   { id: "overview", label: "Resumen", icon: "◫", group: "GESTIÓN" },
   { id: "customers", label: "Clientes", icon: "♙" },
   { id: "sales", label: "Ventas", icon: "↗" },
+  { id: "loyalty", label: "Fidelización", icon: "✦", group: "GESTIÓN" },
   { id: "services", label: "Servicios", icon: "⚙" },
   { id: "warranties", label: "Garantías", icon: "◇", group: "POSVENTA", disabled: true },
   { id: "claims", label: "Reclamaciones", icon: "▤" },
@@ -33,6 +34,10 @@ const pageCopy: Record<string, { title: string; description: string }> = {
   services: {
     title: "Servicios",
     description: "Mantenimientos, reparaciones y trabajos realizados.",
+  },
+  loyalty: {
+    title: "Fidelización",
+    description: "Metadata IPFS y configuración del programa de puntos Token-2022.",
   },
   warranties: {
     title: "Garantías",
@@ -283,8 +288,8 @@ export function DashboardShell() {
             <NetworkStatusBadge />
           </div>
 
-          <div className={active === "overview" || active === "customers" || active === "sales" || active === "services" || active === "settings" ? "" : "hidden"}><DealershipWorkspace activeModule={active} /></div>
-          {active !== "overview" && active !== "customers" && active !== "sales" && active !== "services" && active !== "settings" && <EmptySection title={page.title} />}
+          <div className={active === "overview" || active === "customers" || active === "sales" || active === "services" || active === "loyalty" || active === "settings" ? "" : "hidden"}><DealershipWorkspace activeModule={active} /></div>
+          {active !== "overview" && active !== "customers" && active !== "sales" && active !== "services" && active !== "loyalty" && active !== "settings" && <EmptySection title={page.title} />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#e9ebee] pt-4 text-[9px] text-[#a0a6ad]">
             <span>MOTOLEDGER · GESTIÓN DE CONCESIONARIOS</span>

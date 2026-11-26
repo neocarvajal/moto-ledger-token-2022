@@ -12,19 +12,19 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { deriveClientePda, deriveVentaPda } from "../../lib/moto-ledger/pdas";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/generated/src/generated/programs";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import {
   getMotoDecoder,
   getMotoDiscriminatorBytes,
   type Moto,
-} from "../../lib/moto-ledger/generated/src/generated/accounts/moto";
+} from "../../lib/moto-ledger/src/generated/accounts/moto";
 import {
   getVentaDecoder,
   getVentaDiscriminatorBytes,
   type Venta,
-} from "../../lib/moto-ledger/generated/src/generated/accounts/venta";
-import type { Cliente } from "../../lib/moto-ledger/generated/src/generated/accounts/cliente";
-import type { Concesionario } from "../../lib/moto-ledger/generated/src/generated/accounts/concesionario";
+} from "../../lib/moto-ledger/src/generated/accounts/venta";
+import type { Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
+import type { Concesionario } from "../../lib/moto-ledger/src/generated/accounts/concesionario";
 
 type MotorcycleRecord = { address: string; data: Moto };
 type SaleRecord = { address: string; data: Venta };

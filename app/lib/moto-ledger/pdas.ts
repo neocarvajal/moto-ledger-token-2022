@@ -6,7 +6,11 @@ import {
   getUtf8Encoder,
   type Address,
 } from "@solana/kit";
-import { REGISTRO_PROGRAM_ADDRESS } from "./generated/src/generated/programs";
+import {
+  findAssociatedTokenPda,
+  TOKEN_2022_PROGRAM_ADDRESS,
+} from "@solana-program/token-2022";
+import { REGISTRO_PROGRAM_ADDRESS } from "./src/generated/programs";
 
 const utf8 = getUtf8Encoder();
 const addressEncoder = getAddressEncoder();
@@ -71,5 +75,49 @@ export async function deriveServicioPda(moto: Address, currentServices: bigint) 
       key(moto),
       getU64Encoder().encode(currentServices),
     ],
+  });
+}
+
+/** PDA that stores the loyalty configuration for a dealership. */
+export async function deriveProgramaFidelidadPda(concesionario: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("programa_fidelidad"), key(concesionario)],
+  });
+}
+
+/** Mint authority PDA used to sign Token-2022 MintTo CPIs. */
+export async function deriveAutoridadFidelidadPda(concesionario: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("autoridad_fidelidad"), key(concesionario)],
+  });
+}
+
+/** One customer-to-wallet association per MotoLedger customer account. */
+export async function deriveWalletClientePda(cliente: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("wallet_cliente"), key(cliente)],
+  });
+}
+
+/** One issuance record per sale, preventing duplicate loyalty rewards. */
+export async function derivePuntosVentaPda(venta: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("puntos_venta"), key(venta)],
+  });
+}
+
+/**
+ * Derive the buyer's ATA using Token-2022. The token program is part of the
+ * associated-token address seeds, so the base SPL Token address is incorrect.
+ */
+export async function deriveToken2022Ata(owner: Address, mint: Address) {
+  return findAssociatedTokenPda({
+    owner,
+    mint,
+    tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
   });
 }

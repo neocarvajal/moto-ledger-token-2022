@@ -47,12 +47,33 @@ export const REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA = 0x177d; // 6013
 export const REGISTRO_ERROR__MOTO_VENDIDA = 0x177e; // 6014
 /** MotoConHistorial: No se puede eliminar una moto que tiene historial de servicios o reclamaciones */
 export const REGISTRO_ERROR__MOTO_CON_HISTORIAL = 0x177f; // 6015
+/** PuntosInvalidos: La cantidad de puntos debe ser mayor a cero */
+export const REGISTRO_ERROR__PUNTOS_INVALIDOS = 0x1780; // 6016
+/** MintNoTransferible: El mint debe tener activa la extension NonTransferable de Token-2022 */
+export const REGISTRO_ERROR__MINT_NO_TRANSFERIBLE = 0x1781; // 6017
+/** Token2022Requerido: Esta operacion requiere el programa Token-2022 */
+export const REGISTRO_ERROR__TOKEN2022_REQUERIDO = 0x1782; // 6018
+/** DecimalesMintInvalidos: El mint de fidelizacion debe tener cero decimales */
+export const REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS = 0x1783; // 6019
+/** AutoridadMintInvalida: La autoridad del mint no coincide con la PDA del programa */
+export const REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA = 0x1784; // 6020
+/** MintInvalido: El mint no coincide con el configurado para este concesionario */
+export const REGISTRO_ERROR__MINT_INVALIDO = 0x1785; // 6021
+/** VentaNoCorresponde: La venta no corresponde al concesionario o al cliente indicados */
+export const REGISTRO_ERROR__VENTA_NO_CORRESPONDE = 0x1786; // 6022
+/** WalletClienteInvalida: La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens */
+export const REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA = 0x1787; // 6023
 /** ContadorInvalido: Error: El contador ha alcanzado su valor máximo. */
-export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1780; // 6016
+export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1788; // 6024
+/** ClienteSinCompras: El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet */
+export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1789; // 6025
 
 export type RegistroError =
+  | typeof REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA
   | typeof REGISTRO_ERROR__CEDULA_INVALIDA
+  | typeof REGISTRO_ERROR__CLIENTE_SIN_COMPRAS
   | typeof REGISTRO_ERROR__CONTADOR_INVALIDO
+  | typeof REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS
   | typeof REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA
   | typeof REGISTRO_ERROR__DESCRIPCION_SERVICIO_INVALIDA
   | typeof REGISTRO_ERROR__DURACION_GARANTIA_INVALIDA
@@ -61,19 +82,28 @@ export type RegistroError =
   | typeof REGISTRO_ERROR__GARANTIA_VENCIDA
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO
+  | typeof REGISTRO_ERROR__MINT_INVALIDO
+  | typeof REGISTRO_ERROR__MINT_NO_TRANSFERIBLE
   | typeof REGISTRO_ERROR__MOTO_CON_HISTORIAL
   | typeof REGISTRO_ERROR__MOTO_VENDIDA
   | typeof REGISTRO_ERROR__NIV_INVALIDO
   | typeof REGISTRO_ERROR__NOMBRE_CLIENTE_INVALIDO
   | typeof REGISTRO_ERROR__PLACA_INVALIDA
   | typeof REGISTRO_ERROR__PRECIO_VENTA_INVALIDO
-  | typeof REGISTRO_ERROR__UNAUTHORIZED;
+  | typeof REGISTRO_ERROR__PUNTOS_INVALIDOS
+  | typeof REGISTRO_ERROR__TOKEN2022_REQUERIDO
+  | typeof REGISTRO_ERROR__UNAUTHORIZED
+  | typeof REGISTRO_ERROR__VENTA_NO_CORRESPONDE
+  | typeof REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA;
 
 let registroErrorMessages: Record<RegistroError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
   registroErrorMessages = {
+    [REGISTRO_ERROR__AUTORIDAD_MINT_INVALIDA]: `La autoridad del mint no coincide con la PDA del programa`,
     [REGISTRO_ERROR__CEDULA_INVALIDA]: `La cedula del cliente debe ser mayor a cero`,
+    [REGISTRO_ERROR__CLIENTE_SIN_COMPRAS]: `El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet`,
     [REGISTRO_ERROR__CONTADOR_INVALIDO]: `Error: El contador ha alcanzado su valor máximo.`,
+    [REGISTRO_ERROR__DECIMALES_MINT_INVALIDOS]: `El mint de fidelizacion debe tener cero decimales`,
     [REGISTRO_ERROR__DESCRIPCION_RECLAMACION_INVALIDA]: `La descripcion de la reclamacion no puede superar los 100 caracteres`,
     [REGISTRO_ERROR__DESCRIPCION_SERVICIO_INVALIDA]: `La descripcion del servicio no puede superar los 100 caracteres`,
     [REGISTRO_ERROR__DURACION_GARANTIA_INVALIDA]: `La duracion de la garantia debe ser mayor a cero`,
@@ -82,13 +112,19 @@ if (process.env["NODE_ENV"] !== "production") {
     [REGISTRO_ERROR__GARANTIA_VENCIDA]: `La garantia ha vencido`,
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO]: `El kilometraje supera el limite de la garantia`,
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO]: `El kilometraje maximo debe ser mayor a cero`,
+    [REGISTRO_ERROR__MINT_INVALIDO]: `El mint no coincide con el configurado para este concesionario`,
+    [REGISTRO_ERROR__MINT_NO_TRANSFERIBLE]: `El mint debe tener activa la extension NonTransferable de Token-2022`,
     [REGISTRO_ERROR__MOTO_CON_HISTORIAL]: `No se puede eliminar una moto que tiene historial de servicios o reclamaciones`,
     [REGISTRO_ERROR__MOTO_VENDIDA]: `No se puede eliminar una moto que ya fue vendida`,
     [REGISTRO_ERROR__NIV_INVALIDO]: `Error, el serial N.I.V debe tener una longitud de 17 caracteres`,
     [REGISTRO_ERROR__NOMBRE_CLIENTE_INVALIDO]: `El nombre del cliente no puede superar los 50 caracteres`,
     [REGISTRO_ERROR__PLACA_INVALIDA]: `Error, la placa debe tener una longitud de 7 caracteres`,
     [REGISTRO_ERROR__PRECIO_VENTA_INVALIDO]: `El precio de venta debe ser mayor a cero`,
+    [REGISTRO_ERROR__PUNTOS_INVALIDOS]: `La cantidad de puntos debe ser mayor a cero`,
+    [REGISTRO_ERROR__TOKEN2022_REQUERIDO]: `Esta operacion requiere el programa Token-2022`,
     [REGISTRO_ERROR__UNAUTHORIZED]: `No tienes autorizacion para realizar esta operacion`,
+    [REGISTRO_ERROR__VENTA_NO_CORRESPONDE]: `La venta no corresponde al concesionario o al cliente indicados`,
+    [REGISTRO_ERROR__WALLET_CLIENTE_INVALIDA]: `La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens`,
   };
 }
 

@@ -11,14 +11,14 @@ import {
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/generated/src/generated/programs";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { deriveGarantiaPda } from "../../lib/moto-ledger/pdas";
 import {
   getMotoDecoder,
   getMotoDiscriminatorBytes,
   type Moto,
-} from "../../lib/moto-ledger/generated/src/generated/accounts/moto";
+} from "../../lib/moto-ledger/src/generated/accounts/moto";
 
 type MotorcycleRecord = { address: Address; data: Moto };
 

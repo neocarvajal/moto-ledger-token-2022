@@ -15,19 +15,19 @@ import {
   deriveGarantiaPda,
   deriveServicioPda,
 } from "../../lib/moto-ledger/pdas";
-import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/generated/src/generated/programs";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import {
   getMotoDecoder,
   getMotoDiscriminatorBytes,
   type Moto,
-} from "../../lib/moto-ledger/generated/src/generated/accounts/moto";
+} from "../../lib/moto-ledger/src/generated/accounts/moto";
 import {
   getServicioDecoder,
   getServicioDiscriminatorBytes,
   type Servicio,
-} from "../../lib/moto-ledger/generated/src/generated/accounts/servicio";
-import { TipoServicio } from "../../lib/moto-ledger/generated/src/generated/types/tipoServicio";
-import { EstadoGarantia } from "../../lib/moto-ledger/generated/src/generated/types/estadoGarantia";
+} from "../../lib/moto-ledger/src/generated/accounts/servicio";
+import { TipoServicio } from "../../lib/moto-ledger/src/generated/types/tipoServicio";
+import { EstadoGarantia } from "../../lib/moto-ledger/src/generated/types/estadoGarantia";
 
 type MotorcycleRecord = { address: string; data: Moto };
 type ServiceRecord = { address: string; data: Servicio; motorcycle?: Moto };

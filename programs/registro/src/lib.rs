@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{self, Mint, MintTo, TokenAccount, TokenInterface};
+use anchor_spl::token_2022::spl_token_2022::extension::{BaseStateWithExtensions, ExtensionType, StateWithExtensions};
 
 declare_id!("64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj");
 
@@ -436,60 +438,343 @@ pub mod registro {
         Ok(())
     }
 
+
+    pub fn configurar_programa_fidelidad(context: Context<ConfigurarProgramaFidelidad>, nombre_concesionario: String, puntos_por_venta: u64) -> Result<()> {
+        require!(puntos_por_venta > 0, Errores::PuntosInvalidos);
+        require_keys_eq!(context.accounts.token_program.key(), anchor_spl::token_2022::ID, Errores::Token2022Requerido);
+        require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
+        
+        let mint_account_info = context.accounts.mint.to_account_info();
+        let mint_data = mint_account_info.try_borrow_data()?;
+        let mint_state = StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(&mint_data,)?;
+        let mint_extensions = mint_state.get_extension_types()?;
+
+        require!(mint_extensions.contains(&ExtensionType::NonTransferable), Errores::MintNoTransferible);
+        drop(mint_data);
+        require_keys_eq!(context.accounts.mint.mint_authority.unwrap_or_default(), context.accounts.autoridad_fidelidad.key(), Errores::AutoridadMintInvalida);
+        
+        context.accounts.programa_fidelidad.set_inner(ProgramaFidelidad {
+            concesionario: context.accounts.concesionario.key(),
+            mint: context.accounts.mint.key(),
+            puntos_por_venta,
+            bump: context.bumps.programa_fidelidad,
+        });
+
+        msg!("Programa de fidelizacion configurado para {}", nombre_concesionario);
+        
+        Ok(())
+    }
+
+    pub fn actualizar_puntos_fidelidad(context: Context<ActualizarPuntosFidelidad>, puntos_por_venta: u64) -> Result<()> {
+        require!(puntos_por_venta > 0, Errores::PuntosInvalidos);
+        context.accounts.programa_fidelidad.puntos_por_venta = puntos_por_venta;
+        Ok(())
+    }
+
+    pub fn vincular_wallet_cliente(context: Context<VincularWalletCliente>) -> Result<()> {
+        require!(
+            context.accounts.cliente.total_motos_cliente > 0,
+            Errores::ClienteSinCompras
+        );
+
+        context.accounts.wallet_cliente.set_inner(WalletCliente {
+            cliente: context.accounts.cliente.key(),
+            wallet: context.accounts.wallet.key(),
+            bump: context.bumps.wallet_cliente,
+        });
+        Ok(())
+    }
+
+    pub fn otorgar_puntos(context: Context<OtorgarPuntos>) -> Result<()> {
+        let cantidad = context.accounts.programa_fidelidad.puntos_por_venta;
+        require!(cantidad > 0, Errores::PuntosInvalidos);
+        require_keys_eq!(context.accounts.venta.concesionario, context.accounts.concesionario.key(), Errores::VentaNoCorresponde);
+        require_keys_eq!(context.accounts.venta.cliente, context.accounts.cliente.key(), Errores::VentaNoCorresponde);
+        require_keys_eq!(context.accounts.wallet_cliente.wallet, context.accounts.token_account.owner, Errores::WalletClienteInvalida);
+        require_keys_eq!(context.accounts.mint.key(), context.accounts.programa_fidelidad.mint, Errores::MintInvalido);
+        require_keys_eq!(context.accounts.token_program.key(), anchor_spl::token_2022::ID, Errores::Token2022Requerido);
+        require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
+        require_keys_eq!(context.accounts.mint.mint_authority.unwrap_or_default(), context.accounts.autoridad_fidelidad.key(), Errores::AutoridadMintInvalida);
+
+        let concession = context.accounts.concesionario.key();
+        let bump = [context.bumps.autoridad_fidelidad];
+        let seeds: &[&[u8]] = &[b"autoridad_fidelidad", concession.as_ref(), &bump];
+        token_interface::mint_to(
+            CpiContext::new_with_signer(
+                context.accounts.token_program.to_account_info(),
+                MintTo {
+                    mint: context.accounts.mint.to_account_info(),
+                    to: context.accounts.token_account.to_account_info(),
+                    authority: context.accounts.autoridad_fidelidad.to_account_info(),
+                },
+                &[seeds],
+            ),
+            cantidad,
+        )?;
+
+        context.accounts.puntos_venta.set_inner(PuntosVenta {
+            venta: context.accounts.venta.key(),
+            cliente: context.accounts.cliente.key(),
+            wallet: context.accounts.wallet_cliente.wallet,
+            cantidad,
+            fecha_emision: Clock::get()?.unix_timestamp,
+            bump: context.bumps.puntos_venta,
+        });
+        Ok(())
+    }
+
+}
+
+
+#[account]
+pub struct ProgramaFidelidad { 
+    pub concesionario: Pubkey, 
+    pub mint: Pubkey, 
+    pub puntos_por_venta: u64, 
+    pub bump: u8 
+}
+
+impl ProgramaFidelidad { 
+    pub const LEN: usize = 
+    DISCRIMINATOR + 
+    32 + 
+    32 + 
+    8 + 
+    1; 
+}
+
+#[account]
+pub struct WalletCliente { 
+    pub cliente: Pubkey, 
+    pub wallet: Pubkey, 
+    pub bump: u8 
+}
+
+impl WalletCliente { 
+    pub const LEN: usize = 
+    DISCRIMINATOR + 
+    32 + 
+    32 + 
+    1; 
+}
+
+#[account]
+pub struct PuntosVenta {
+     pub venta: Pubkey, 
+     pub cliente: Pubkey, 
+     pub wallet: Pubkey, 
+     pub cantidad: u64, 
+     pub fecha_emision: i64, 
+     pub bump: u8 
+}
+
+impl PuntosVenta { 
+    pub const LEN: usize = 
+    DISCRIMINATOR + 
+    32 + 
+    32 + 
+    32 + 
+    8 + 
+    8 + 
+    1; 
+}
+
+#[derive(Accounts)]
+#[instruction(nombre_concesionario: String)]
+pub struct ConfigurarProgramaFidelidad<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(
+        mut,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", nombre_concesionario.as_bytes(), owner.key().as_ref()], 
+        bump, 
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        init, 
+        payer = owner, 
+        space = ProgramaFidelidad::LEN, 
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
+    pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+    
+    /// CHECK: PDA que actua como autoridad del mint.
+    #[account(
+        seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
+    pub autoridad_fidelidad: UncheckedAccount<'info>,
+
+    pub mint: InterfaceAccount<'info, Mint>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ActualizarPuntosFidelidad<'info> {
+    pub owner: Signer<'info>,
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()], 
+        bump, 
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+    
+    #[account(
+        mut,
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()], 
+        bump, 
+    )]
+    pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+}
+
+#[derive(Accounts)]
+pub struct VincularWalletCliente<'info> {
+    pub owner: Signer<'info>,
+    
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    
+    #[account(
+        constraint = cliente.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()], 
+        bump
+    )]
+    pub cliente: Account<'info, Cliente>,
+
+    #[account(
+        init, 
+        payer = wallet, 
+        space = WalletCliente::LEN, 
+        seeds = [b"wallet_cliente", cliente.key().as_ref()], 
+        bump
+    )]
+    pub wallet_cliente: Account<'info, WalletCliente>,
+    
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct OtorgarPuntos<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()], 
+        bump
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+    
+    #[account(
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
+    pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+    
+    pub venta: Account<'info, Venta>,
+    
+    pub cliente: Account<'info, Cliente>,
+    
+    #[account(
+        has_one = cliente,
+        seeds = [b"wallet_cliente", cliente.key().as_ref()], 
+        bump
+    )]
+    pub wallet_cliente: Account<'info, WalletCliente>,
+    
+    #[account(
+        init, 
+        payer = owner, 
+        space = PuntosVenta::LEN, 
+        seeds = [b"puntos_venta", venta.key().as_ref()], 
+        bump
+    )]
+    pub puntos_venta: Account<'info, PuntosVenta>,
+    
+    /// CHECK: PDA validada por sus seeds; firma el CPI de mint_to.
+    #[account(
+        seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()], 
+        bump
+    )]
+    pub autoridad_fidelidad: UncheckedAccount<'info>,
+    
+    #[account(
+        mut, 
+        address = programa_fidelidad.mint
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
+    
+    #[account(
+        mut, 
+        constraint = token_account.mint == mint.key(), 
+        constraint = token_account.owner == wallet_cliente.wallet
+    )]
+    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
 }
 
 #[error_code]
 pub enum Errores {
     #[msg("Error, el serial N.I.V debe tener una longitud de 17 caracteres")]
     NivInvalido,
-
     #[msg("Error, la placa debe tener una longitud de 7 caracteres")]
     PlacaInvalida,
-
     #[msg("No tienes autorizacion para realizar esta operacion")]
     Unauthorized,
-
     #[msg("La duracion de la garantia debe ser mayor a cero")]
     DuracionGarantiaInvalida,
-
     #[msg("El kilometraje maximo debe ser mayor a cero")]
     KilometrajeGarantiaInvalido,
-
     #[msg("El nombre del cliente no puede superar los 50 caracteres")]
     NombreClienteInvalido,
-
     #[msg("La cedula del cliente debe ser mayor a cero")]
     CedulaInvalida,
-
     #[msg("El precio de venta debe ser mayor a cero")]
     PrecioVentaInvalido,
-
     #[msg("La descripcion del servicio no puede superar los 100 caracteres")]
     DescripcionServicioInvalida,
-
     #[msg("La garantia no se encuentra activa")]
     GarantiaNoActiva,
-
     #[msg("La garantia aun no ha comenzado")]
     GarantiaNoIniciada,
-
     #[msg("La garantia ha vencido")]
     GarantiaVencida,
-
     #[msg("El kilometraje supera el limite de la garantia")]
     KilometrajeGarantiaExcedido,
-
     #[msg("La descripcion de la reclamacion no puede superar los 100 caracteres")]
     DescripcionReclamacionInvalida,
-
     #[msg("No se puede eliminar una moto que ya fue vendida")]
     MotoVendida,
-
     #[msg("No se puede eliminar una moto que tiene historial de servicios o reclamaciones")]
     MotoConHistorial,
-
+    #[msg("La cantidad de puntos debe ser mayor a cero")]
+    PuntosInvalidos,
+    #[msg("El mint debe tener activa la extension NonTransferable de Token-2022")]
+    MintNoTransferible,
+    #[msg("Esta operacion requiere el programa Token-2022")]
+    Token2022Requerido,
+    #[msg("El mint de fidelizacion debe tener cero decimales")]
+    DecimalesMintInvalidos,
+    #[msg("La autoridad del mint no coincide con la PDA del programa")]
+    AutoridadMintInvalida,
+    #[msg("El mint no coincide con el configurado para este concesionario")]
+    MintInvalido,
+    #[msg("La venta no corresponde al concesionario o al cliente indicados")]
+    VentaNoCorresponde,
+    #[msg("La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens")]
+    WalletClienteInvalida,
     #[msg("Error: El contador ha alcanzado su valor máximo.")]
     ContadorInvalido,
+    #[msg("El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet")]
+    ClienteSinCompras,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
