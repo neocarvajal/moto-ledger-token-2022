@@ -49,7 +49,7 @@ function toGatewayUrl(uri: string, cid: string) {
     ? uri.slice("ipfs://".length)
     : uri.replace(/^\/?ipfs\//i, "");
 
-  return \`https://\${gateway}/ipfs/\${path || cid}\`;
+  return "https://" + gateway + "/ipfs/" + (path || cid);
 }
 export function LoyaltyManagement({
   concesionario,
