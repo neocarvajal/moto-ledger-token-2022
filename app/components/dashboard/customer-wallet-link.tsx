@@ -33,10 +33,14 @@ type LinkSession = {
 
 export function CustomerWalletLink({
   cliente,
+  clienteNombre,
+  clienteCedula,
   concesionario,
   totalMotos,
 }: {
   cliente: string;
+  clienteNombre: string;
+  clienteCedula: string;
   concesionario: string;
   totalMotos: number;
 }) {
@@ -307,6 +311,8 @@ export function CustomerWalletLink({
         body: JSON.stringify({
           owner: connected.account.address,
           cliente,
+          clienteNombre,
+          clienteCedula,
           concesionario,
           cluster,
         }),
