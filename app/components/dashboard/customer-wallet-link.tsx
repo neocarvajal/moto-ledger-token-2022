@@ -98,8 +98,12 @@ export function CustomerWalletLink({
   }, [token, session?.status]);
 
   const authorizeWallet = async () => {
-    if (!token || !session?.walletAddress || !connected?.signer || !connected.account.address) return;
-    if (connected.account.address !== session.owner || session.concesionario !== concesionario) {
+    if (!token || !session || !connected) return;
+    const buyerAddress = session.walletAddress;
+    const ownerAddress = connected.account.address;
+    const ownerSigner = connected.signer;
+    if (!buyerAddress || !ownerAddress || !ownerSigner) return;
+    if (ownerAddress !== session.owner || session.concesionario !== concesionario) {
       setError("La wallet conectada o el concesionario no coinciden con la solicitud.");
       return;
     }
@@ -114,8 +118,8 @@ export function CustomerWalletLink({
       if (existing) throw new Error("Este cliente ya tiene una wallet vinculada.");
 
       const instruction = client.registro.instructions.vincularWalletCliente({
-        owner: connected.signer,
-        wallet: createNoopSigner(address(session.walletAddress)),
+        owner: ownerSigner,
+        wallet: createNoopSigner(address(buyerAddress)),
         cliente: address(cliente),
         walletCliente,
       });
@@ -126,13 +130,13 @@ export function CustomerWalletLink({
 
       const message = pipe(
         createTransactionMessage({ version: 0 }),
-        (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
+        (tx) => setTransactionMessageFeePayerSigner(ownerSigner, tx),
         (tx) => appendTransactionMessageInstruction(instruction, tx),
         (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx)
       );
 
       const [partiallySigned] = await partiallySignTransactionMessageWithSigners(message);
-      const ownerSignature = partiallySigned.signatures[connected.account.address];
+      const ownerSignature = partiallySigned.signatures[ownerAddress];
       if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) {
         throw new Error("La wallet del concesionario no permite firmar parcialmente esta transacción.");
       }
