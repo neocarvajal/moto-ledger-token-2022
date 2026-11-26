@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWalletLinkSession } from "../../../../lib/wallet-link-store";
+import { getWalletLinkSession } from "../../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
