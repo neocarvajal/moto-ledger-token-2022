@@ -237,7 +237,6 @@ export async function POST(request: Request) {
     const metadataResult = await pinata.upload.public
       .file(metadataFile)
       .name(`${symbol}-metadata.json`)
-      .group(group.id)
       .keyvalues({
         dealership,
         cluster,
