@@ -88,3 +88,25 @@ El código ahora importa `anchor-spl` con soporte para `token_2022` y usa sus in
 ## Alcance que no se presupone
 
 No se considerará implementada la recuperación de tokens mientras no exista una instrucción real que la ejecute. Tampoco se afirmará que hay emisión, consulta de saldo o transacciones Devnet hasta completar y verificar esas operaciones.
+
+
+## Metadata del mint mediante IPFS
+
+La imagen y el JSON descriptivo del programa de fidelización se almacenarán en IPFS mediante Pinata. El endpoint de Next.js `POST /api/ipfs/upload` realiza ambas subidas y devuelve `imageUri` y `metadataUri` con formato `ipfs://<CID>`. El JSON contiene `name`, `symbol`, `description` e `image`; la URI del JSON será la que se asocie a la extensión `TokenMetadata` del mint Token-2022.
+
+La variable `PINATA_JWT` se configura en el entorno del servidor (por ejemplo, Vercel) y nunca debe exponerse mediante una variable `NEXT_PUBLIC_*`.
+
+Antes de subir, el endpoint exige una firma Ed25519 de la wallet y verifica en la red seleccionada que la cuenta indicada sea una cuenta `Concesionario` del programa MotoLedger y que su campo `owner` coincida con la wallet firmante. El mensaje firmado tiene este formato exacto, con saltos de línea:
+
+```text
+MotoLedger IPFS metadata upload
+wallet:<WALLET>
+dealership:<PDA_CONCESIONARIO>
+cluster:<devnet|mainnet-beta>
+timestamp:<UNIX_MILLISECONDS>
+nonce:<HEX_ALEATORIO>
+```
+
+El timestamp debe estar dentro de una ventana de cinco minutos y el nonce debe ser hexadecimal de 32 a 64 caracteres. El formulario debe enviar esos campos, la firma codificada en Base64 y el archivo bajo el campo `image`. Se aceptan imágenes PNG, JPEG y WEBP de hasta 5 MB. El endpoint devuelve error si falta `PINATA_JWT`, si la firma no es válida o si la wallet no es propietaria del concesionario.
+
+La firma prueba el control de la wallet y la consulta RPC comprueba la propiedad on-chain; ninguna de las dos sustituye la validación de permisos que hace el programa al configurar el mint. La integración del formulario cliente y la inicialización de `MetadataPointer`/`TokenMetadata` en el mint son pasos separados: la subida IPFS por sí sola no crea ni modifica un token.
