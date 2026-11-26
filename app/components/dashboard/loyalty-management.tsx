@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { address, getBase64Encoder } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
@@ -43,6 +43,13 @@ export function LoyaltyManagement({
   const [image, setImage] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
+
+  useEffect(() => {
+    setName(`${nombreConcesionario} Rewards`);
+    setDescription(`Programa de fidelización de ${nombreConcesionario} en MotoLedger.`);
+    setImage(null);
+    setResult(null);
+  }, [concesionario, nombreConcesionario]);
 
   const supportedCluster = cluster === "devnet" || cluster === "mainnet";
   const apiCluster = cluster === "mainnet" ? "mainnet-beta" : "devnet";
