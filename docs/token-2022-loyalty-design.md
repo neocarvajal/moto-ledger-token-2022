@@ -94,7 +94,7 @@ No se considerará implementada la recuperación de tokens mientras no exista un
 
 La imagen y el JSON descriptivo del programa de fidelización se almacenarán en IPFS mediante Pinata. El endpoint de Next.js `POST /api/ipfs/upload` realiza ambas subidas y devuelve `imageUri` y `metadataUri` con formato `ipfs://<CID>`. El JSON contiene `name`, `symbol`, `description` e `image`; la URI del JSON será la que se asocie a la extensión `TokenMetadata` del mint Token-2022.
 
-La variable `PINATA_JWT` se configura en el entorno del servidor (por ejemplo, Vercel) y nunca debe exponerse mediante una variable `NEXT_PUBLIC_*`.
+La variable `PINATA_JWT` se configura en el entorno del servidor (por ejemplo, Vercel) y nunca debe exponerse mediante una variable `NEXT_PUBLIC_*`. La integración utiliza el SDK oficial `pinata` (PinataSDK), inicializado en un módulo server-only. También puede configurarse `NEXT_PUBLIC_GATEWAY_URL` con el dominio del gateway para resolver contenido desde la aplicación.
 
 Antes de subir, el endpoint exige una firma Ed25519 de la wallet y verifica en la red seleccionada que la cuenta indicada sea una cuenta `Concesionario` del programa MotoLedger y que su campo `owner` coincida con la wallet firmante. El mensaje firmado tiene este formato exacto, con saltos de línea:
 
@@ -110,3 +110,20 @@ nonce:<HEX_ALEATORIO>
 El timestamp debe estar dentro de una ventana de cinco minutos y el nonce debe ser hexadecimal de 32 a 64 caracteres. El formulario debe enviar esos campos, la firma codificada en Base64 y el archivo bajo el campo `image`. Se aceptan imágenes PNG, JPEG y WEBP de hasta 5 MB. El endpoint devuelve error si falta `PINATA_JWT`, si la firma no es válida o si la wallet no es propietaria del concesionario.
 
 La firma prueba el control de la wallet y la consulta RPC comprueba la propiedad on-chain; ninguna de las dos sustituye la validación de permisos que hace el programa al configurar el mint. La integración del formulario cliente y la inicialización de `MetadataPointer`/`TokenMetadata` en el mint son pasos separados: la subida IPFS por sí sola no crea ni modifica un token.
+
+
+### Organización de archivos por concesionario en Pinata
+
+Decidí utilizar los grupos públicos de Pinata para mantener juntos los recursos IPFS de cada concesionario. El grupo se identifica con un nombre determinista basado en la PDA: `MotoLedger-<PDA_CONCESIONARIO>`. Antes de crear uno nuevo, el servidor busca un grupo con ese nombre exacto y reutiliza su `id`; de esta manera no necesito una base de datos adicional para resolver el grupo en cada subida.
+
+La imagen y el JSON de metadata se suben al mismo grupo público. Cada archivo incluye los siguientes `keyvalues` para facilitar su búsqueda y administración:
+
+- `dealership`: PDA del concesionario.
+- `cluster`: `devnet` o `mainnet-beta`.
+- `category`: `loyalty-image` o `loyalty-token-metadata`.
+
+El endpoint devuelve también `groupId`, además de los CID y las URI IPFS. Los grupos son una herramienta de organización y administración de Pinata; no crean carpetas dentro de IPFS ni modifican el contenido direccionado por los CID.
+
+La búsqueda y creación del grupo se realiza en el servidor. Si dos primeras subidas del mismo concesionario ocurren simultáneamente, Pinata podría recibir dos intentos de creación antes de que cualquiera vea el grupo recién creado. Si en el futuro necesito garantizar unicidad estricta bajo concurrencia, guardaré el `groupId` en una base de datos con una restricción única por PDA de concesionario.
+
+El endpoint comprueba también la firma, la propiedad on-chain y la firma binaria del archivo (PNG, JPEG o WEBP), además del MIME type y el límite de 5 MB. El nonce todavía no tiene almacenamiento persistente anti-replay: la ventana temporal limita su vigencia, pero no impide reutilizar una misma solicitud firmada dentro de esos cinco minutos. Esa protección queda pendiente antes de considerar el endpoint listo para producción.
