@@ -37,7 +37,8 @@ export function WalletLinkClient({ token }: { token: string }) {
   const { cluster, setCluster } = useCluster();
   const wallets = useWallets(client);
   const connected = useConnectedWallet(client);
-  const { dispatchAsync: connect, isRunning: connecting } = useConnect(client);\n  const { dispatchAsync: disconnect } = useDisconnect(client);
+  const { dispatchAsync: connect, isRunning: connecting } = useConnect(client);
+  const { dispatchAsync: disconnect } = useDisconnect(client);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
