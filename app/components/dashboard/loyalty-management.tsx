@@ -252,23 +252,23 @@ export function LoyaltyManagement({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Nombre del token</span>
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={64} disabled={busy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+              <input value={name} onChange={(event) => { setName(event.target.value); if (!mintResult) setResult(null); }} maxLength={64} disabled={busy || !!mintResult} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Símbolo</span>
-              <input value={symbol} onChange={(event) => setSymbol(event.target.value.toUpperCase())} maxLength={10} disabled={busy} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] uppercase outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+              <input value={symbol} onChange={(event) => { setSymbol(event.target.value.toUpperCase()); if (!mintResult) setResult(null); }} maxLength={10} disabled={busy || !!mintResult} required className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] uppercase outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
             </label>
           </div>
 
           <label className="block">
             <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Descripción</span>
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} rows={3} disabled={busy} className="w-full resize-y rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
+            <textarea value={description} onChange={(event) => { setDescription(event.target.value); if (!mintResult) setResult(null); }} maxLength={500} rows={3} disabled={busy || !!mintResult} className="w-full resize-y rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]" />
             <span className="mt-1 block text-right text-[9px] text-[#a0a6ad]">{description.length}/500</span>
           </label>
 
           <label className="block">
             <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Imagen del programa</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(event) => setImage(event.target.files?.[0] ?? null)} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#555e68] file:mr-3 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#d90011]" />
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(event) => { setImage(event.target.files?.[0] ?? null); if (!mintResult) setResult(null); }} disabled={busy || !!mintResult} className="block w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#555e68] file:mr-3 file:rounded-md file:border-0 file:bg-[#fff0f1] file:px-3 file:py-1.5 file:text-[10px] file:font-semibold file:text-[#d90011]" />
             <span className="mt-1 block text-[9px] text-[#a0a6ad]">PNG, JPG o WEBP · máximo 5 MB.</span>
             {image && <span className="mt-1 block text-[9px] font-medium text-[#555e68]">{image.name} · {(image.size / 1024 / 1024).toFixed(2)} MB</span>}
           </label>
@@ -283,8 +283,8 @@ export function LoyaltyManagement({
             <p className="max-w-md text-[9px] leading-relaxed text-[#9299a1]">
               La wallet firmará un mensaje de autorización, no una transacción. La firma no mueve fondos ni crea el mint.
             </p>
-            <button type="submit" disabled={busy || !supportedCluster || !connected?.signer} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
-              {busy ? "Subiendo a Pinata…" : "Firmar y subir metadata"}
+            <button type="submit" disabled={busy || !!mintResult || !!result || !supportedCluster || !connected?.signer} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
+              {busy ? "Subiendo a Pinata…" : result ? "Metadata subida" : "Firmar y subir metadata"}
             </button>
           </div>
         </form>
