@@ -118,6 +118,19 @@ export function LoyaltyManagement({
         const [programaFidelidad] = await deriveProgramaFidelidadPda(
           address(concesionario)
         );
+        const programInfo = await client.rpc
+          .getAccountInfo(programaFidelidad, { encoding: "base64" })
+          .send();
+
+        // A dealership without a loyalty PDA is a valid first-time state.
+        if (!programInfo.value) {
+          if (!cancelled) {
+            setExistingProgram(null);
+            setProgramLoadError(null);
+          }
+          return;
+        }
+
         const account = await client.registro.accounts.programaFidelidad.fetch(
           programaFidelidad
         );
@@ -142,7 +155,19 @@ export function LoyaltyManagement({
 
         let imageUri: string | null = null;
         try {
-          const metadataResponse = await fetch(metadataUri, { cache: "no-store" });
+          const metadataCid = metadataUri.startsWith("ipfs://")
+            ? metadataUri.slice("ipfs://".length).split("/")[0]
+            : new URL(metadataUri).pathname.match(/\/ipfs\/([^/]+)/)?.[1];
+
+          if (!metadataCid) {
+            throw new Error("La URI on-chain no contiene un CID IPFS válido.");
+          }
+
+          // Fetch through our server to avoid browser CORS restrictions on public IPFS gateways.
+          const metadataResponse = await fetch(
+            `/api/ipfs/metadata?cid=${encodeURIComponent(metadataCid)}`,
+            { cache: "no-store" }
+          );
           if (metadataResponse.ok) {
             const metadataJson = (await metadataResponse.json()) as {
               image?: string;
@@ -187,6 +212,7 @@ export function LoyaltyManagement({
             message.toLowerCase().includes("could not find") ||
             message.toLowerCase().includes("does not exist");
           if (!isMissingAccount) {
+            console.error("Error al consultar la fidelización:", error);
             setProgramLoadError(
               "No se pudo consultar el programa de fidelización en Solana. Revisa la red seleccionada e inténtalo nuevamente."
             );
