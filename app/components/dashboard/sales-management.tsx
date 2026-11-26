@@ -655,7 +655,7 @@ export function SalesManagement({
         </div>
         {sales.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[780px] text-left">
+            <table className="w-full min-w-[900px] text-left">
               <thead className="bg-[#fafbfc] text-[9px] font-bold uppercase tracking-wide text-[#9299a1]">
                 <tr><th className="px-6 py-3">Fecha</th><th className="px-4 py-3">Cliente PDA</th><th className="px-4 py-3">Moto PDA</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">Puntos BERA</th><th className="px-6 py-3 text-right">Venta PDA</th><th className="px-4 py-3 text-right">Detalle</th></tr>
               </thead>
@@ -669,7 +669,7 @@ export function SalesManagement({
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       {sale.reward ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#edf8f2] px-2 py-1 font-bold text-[#16845a]">+{formatAmount(sale.reward.cantidad)} BERA</span>
-                      ) : <span className="text-[#a0a6ad]">—</span>}
+                      ) : <span className="text-[#a0a6ad]">No emitidos</span>}
                     </td>
                     <td className="px-6 py-3 text-right"><a href={`https://explorer.solana.com/address/${sale.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#68717b] underline decoration-dotted underline-offset-2 hover:text-[#e60012]">{shortAddress(sale.address)} ↗</a></td>
                     <td className="px-4 py-3 text-right"><button type="button" onClick={() => void handleViewDetails(sale)} disabled={detailLoading !== null} className="whitespace-nowrap rounded-md border border-[#e2e5e8] px-2.5 py-1.5 text-[9px] font-semibold text-[#555e68] transition hover:border-[#e60012] hover:text-[#e60012] disabled:opacity-50">{detailLoading === sale.address ? "Cargando…" : "Ver detalles"}</button></td>
