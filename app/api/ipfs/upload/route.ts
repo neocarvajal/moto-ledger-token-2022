@@ -115,6 +115,19 @@ async function verifyDealershipOwner(
   return discriminatorMatches && ownerMatches;
 }
 
+function buildGatewayUri(cid: string) {
+  const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL
+    ?.trim()
+    .replace(/^https?:\\/\\//i, "")
+    .replace(/\\/+$/, "");
+
+  if (!gateway) {
+    throw new Error("NEXT_PUBLIC_GATEWAY_URL no está configurado en el servidor.");
+  }
+
+  return `https://${gateway}/ipfs/${cid}`;
+}
+
 function hasValidImageSignature(bytes: Buffer, mimeType: string) {
   if (mimeType === "image/png") {
     return bytes.subarray(0, 8).equals(
@@ -220,7 +233,7 @@ export async function POST(request: Request) {
       });
     console.info("[Pinata] Imagen subida:", imageResult.cid);
 
-    const imageUri = `ipfs://${imageResult.cid}`;
+    const imageUri = buildGatewayUri(imageResult.cid);
     const metadata = {
       name,
       symbol,
@@ -246,7 +259,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       imageUri,
-      metadataUri: `ipfs://${metadataResult.cid}`,
+      metadataUri: buildGatewayUri(metadataResult.cid),
       imageCid: imageResult.cid,
       metadataCid: metadataResult.cid,
       imageFileId: imageResult.id,
