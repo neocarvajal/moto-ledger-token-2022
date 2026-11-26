@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["alliance-truth-baker-wallpaper.trycloudflare.com"],
+
   experimental: {
     agentUpgrade: "security",
   },
