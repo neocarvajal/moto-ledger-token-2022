@@ -28,6 +28,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "@solana-mobile/wallet-standard-mobile": "^0.7.0",
     "@solana-program/memo": "^0.15.0",
     "@solana-program/system": "^0.14.0",
     "@solana-program/token": "^0.17.0",
