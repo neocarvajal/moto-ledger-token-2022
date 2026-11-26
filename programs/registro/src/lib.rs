@@ -543,6 +543,13 @@ pub mod registro {
         Ok(())
     }
 
+    /// Removes the wallet association for a customer without deleting customer history.
+    pub fn desvincular_wallet_cliente(
+        _context: Context<DesvincularWalletCliente>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     pub fn otorgar_puntos(context: Context<OtorgarPuntos>) -> Result<()> {
         let cantidad = context.accounts.programa_fidelidad.puntos_por_venta;
         require!(cantidad > 0, Errores::PuntosInvalidos);
@@ -821,6 +828,32 @@ pub struct VincularWalletCliente<'info> {
     pub wallet_cliente: Account<'info, WalletCliente>,
     
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct DesvincularWalletCliente<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        constraint = cliente.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [
+            b"cliente",
+            owner.key().as_ref(),
+            cliente.cedula_cliente.to_le_bytes().as_ref()
+        ],
+        bump
+    )]
+    pub cliente: Account<'info, Cliente>,
+
+    #[account(
+        mut,
+        close = owner,
+        has_one = cliente,
+        seeds = [b"wallet_cliente", cliente.key().as_ref()],
+        bump
+    )]
+    pub wallet_cliente: Account<'info, WalletCliente>,
 }
 
 #[derive(Accounts)]
