@@ -465,6 +465,64 @@ pub mod registro {
         Ok(())
     }
 
+    /// Registers the IPFS CIDs for an existing loyalty program.
+    /// This uses a separate PDA to preserve the layout of ProgramaFidelidad accounts
+    /// that may already exist on Devnet or Mainnet.
+    pub fn registrar_metadata_fidelidad(
+        context: Context<RegistrarMetadataFidelidad>,
+        metadata_cid: String,
+        image_cid: String,
+    ) -> Result<()> {
+        validar_cid(&metadata_cid)?;
+        validar_cid(&image_cid)?;
+
+        require_keys_eq!(
+            *context.accounts.mint.to_account_info().owner,
+            anchor_spl::token_2022::ID,
+            Errores::Token2022Requerido
+        );
+        require_keys_eq!(
+            context.accounts.mint.mint_authority.unwrap_or_default(),
+            context.accounts.autoridad_fidelidad.key(),
+            Errores::AutoridadMintInvalida
+        );
+
+        context.accounts.metadata_fidelidad.set_inner(MetadataFidelidad {
+            programa_fidelidad: context.accounts.programa_fidelidad.key(),
+            metadata_cid,
+            image_cid,
+            bump: context.bumps.metadata_fidelidad,
+        });
+
+        Ok(())
+    }
+
+    /// Updates the IPFS CIDs without changing the loyalty program or mint.
+    pub fn actualizar_metadata_fidelidad(
+        context: Context<ActualizarMetadataFidelidad>,
+        metadata_cid: String,
+        image_cid: String,
+    ) -> Result<()> {
+        validar_cid(&metadata_cid)?;
+        validar_cid(&image_cid)?;
+
+        require_keys_eq!(
+            *context.accounts.mint.to_account_info().owner,
+            anchor_spl::token_2022::ID,
+            Errores::Token2022Requerido
+        );
+        require_keys_eq!(
+            context.accounts.mint.mint_authority.unwrap_or_default(),
+            context.accounts.autoridad_fidelidad.key(),
+            Errores::AutoridadMintInvalida
+        );
+
+        context.accounts.metadata_fidelidad.metadata_cid = metadata_cid;
+        context.accounts.metadata_fidelidad.image_cid = image_cid;
+
+        Ok(())
+    }
+
     pub fn actualizar_puntos_fidelidad(context: Context<ActualizarPuntosFidelidad>, puntos_por_venta: u64) -> Result<()> {
         require!(puntos_por_venta > 0, Errores::PuntosInvalidos);
         context.accounts.programa_fidelidad.puntos_por_venta = puntos_por_venta;
@@ -543,6 +601,35 @@ impl ProgramaFidelidad {
     1; 
 }
 
+/// IPFS references associated with a dealership's loyalty program.
+#[account]
+pub struct MetadataFidelidad {
+    pub programa_fidelidad: Pubkey,
+    pub metadata_cid: String,
+    pub image_cid: String,
+    pub bump: u8,
+}
+
+impl MetadataFidelidad {
+    pub const MAX_CID_LENGTH: usize = 100;
+    pub const LEN: usize =
+        DISCRIMINATOR +
+        32 +
+        (4 + Self::MAX_CID_LENGTH) +
+        (4 + Self::MAX_CID_LENGTH) +
+        1;
+}
+
+fn validar_cid(cid: &str) -> Result<()> {
+    require!(
+        !cid.is_empty()
+            && cid.len() <= MetadataFidelidad::MAX_CID_LENGTH
+            && cid.bytes().all(|character| character.is_ascii_alphanumeric()),
+        Errores::MetadataCidInvalido
+    );
+    Ok(())
+}
+
 #[account]
 pub struct WalletCliente { 
     pub cliente: Pubkey, 
@@ -611,6 +698,84 @@ pub struct ConfigurarProgramaFidelidad<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RegistrarMetadataFidelidad<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()],
+        bump
+    )]
+    pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = MetadataFidelidad::LEN,
+        seeds = [b"metadata_fidelidad", programa_fidelidad.key().as_ref()],
+        bump
+    )]
+    pub metadata_fidelidad: Account<'info, MetadataFidelidad>,
+
+    /// CHECK: PDA validated as the mint authority for this dealership.
+    #[account(
+        seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()],
+        bump
+    )]
+    pub autoridad_fidelidad: UncheckedAccount<'info>,
+
+    #[account(address = programa_fidelidad.mint)]
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ActualizarMetadataFidelidad<'info> {
+    pub owner: Signer<'info>,
+
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()],
+        bump
+    )]
+    pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+
+    #[account(
+        mut,
+        has_one = programa_fidelidad,
+        seeds = [b"metadata_fidelidad", programa_fidelidad.key().as_ref()],
+        bump = metadata_fidelidad.bump
+    )]
+    pub metadata_fidelidad: Account<'info, MetadataFidelidad>,
+
+    /// CHECK: PDA validated as the mint authority for this dealership.
+    #[account(
+        seeds = [b"autoridad_fidelidad", concesionario.key().as_ref()],
+        bump
+    )]
+    pub autoridad_fidelidad: UncheckedAccount<'info>,
+
+    #[account(address = programa_fidelidad.mint)]
+    pub mint: InterfaceAccount<'info, Mint>,
 }
 
 #[derive(Accounts)]
@@ -775,6 +940,8 @@ pub enum Errores {
     ContadorInvalido,
     #[msg("El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet")]
     ClienteSinCompras,
+    #[msg("El CID debe contener entre 1 y 100 caracteres alfanuméricos")]
+    MetadataCidInvalido,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
