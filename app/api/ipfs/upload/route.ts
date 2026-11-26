@@ -1,5 +1,6 @@
 import { createPublicKey, verify } from "node:crypto";
 import { NextResponse } from "next/server";
+import { getOrCreateDealershipGroup, getPinataClient } from "@/app/lib/pinata";
 
 export const runtime = "nodejs";
 
@@ -114,26 +115,23 @@ async function verifyDealershipOwner(
   return discriminatorMatches && ownerMatches;
 }
 
-async function pinataRequest(path: string, body: BodyInit, contentType?: string) {
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) throw new Error("PINATA_JWT no está configurado en el servidor.");
-
-  const headers = new Headers({ Authorization: `Bearer ${jwt}` });
-  if (contentType) headers.set("Content-Type", contentType);
-
-  const response = await fetch(`https://api.pinata.cloud/pinning/${path}`, {
-    method: "POST",
-    headers,
-    body,
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    console.error("Pinata upload failed:", response.status);
-    throw new Error("Pinata no pudo almacenar el contenido.");
+function hasValidImageSignature(bytes: Buffer, mimeType: string) {
+  if (mimeType === "image/png") {
+    return bytes.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    );
   }
-
-  return (await response.json()) as { IpfsHash?: string };
+  if (mimeType === "image/jpeg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (mimeType === "image/webp") {
+    return (
+      bytes.length >= 12 &&
+      bytes.toString("ascii", 0, 4) === "RIFF" &&
+      bytes.toString("ascii", 8, 12) === "WEBP"
+    );
+  }
+  return false;
 }
 
 export async function POST(request: Request) {
@@ -200,38 +198,60 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La wallet firmante no es propietaria de este concesionario." }, { status: 403 });
     }
 
-    const imageForm = new FormData();
-    imageForm.append("file", file, file.name || "loyalty-image");
-    imageForm.append("pinataMetadata", JSON.stringify({ name: `${symbol}-loyalty-image` }));
-    const imageResult = await pinataRequest("pinFileToIPFS", imageForm);
-    if (!imageResult.IpfsHash) throw new Error("Pinata no devolvió el CID de la imagen.");
+    const imageBytes = Buffer.from(await file.arrayBuffer());
+    if (!hasValidImageSignature(imageBytes, file.type)) {
+      return NextResponse.json({ error: "El contenido del archivo no coincide con el formato de imagen declarado." }, { status: 400 });
+    }
 
-    const imageUri = `ipfs://${imageResult.IpfsHash}`;
+    const pinata = getPinataClient();
+    const group = await getOrCreateDealershipGroup(dealership);
+    const imageFile = new File([imageBytes], file.name || "loyalty-image", {
+      type: file.type,
+    });
+
+    const imageResult = await pinata.upload.public
+      .file(imageFile)
+      .name(`${symbol}-loyalty-image`)
+      .group(group.id)
+      .keyvalues({
+        dealership,
+        cluster,
+        category: "loyalty-image",
+      });
+
+    const imageUri = `ipfs://${imageResult.cid}`;
     const metadata = {
       name,
       symbol,
       description,
       image: imageUri,
     };
-    const metadataResult = await pinataRequest(
-      "pinJSONToIPFS",
-      JSON.stringify(metadata),
-      "application/json"
-    );
-    if (!metadataResult.IpfsHash) throw new Error("Pinata no devolvió el CID de la metadata.");
+    const metadataResult = await pinata.upload.public
+      .json(metadata)
+      .group(group.id)
+      .keyvalues({
+        dealership,
+        cluster,
+        category: "loyalty-token-metadata",
+      });
 
     return NextResponse.json({
       imageUri,
-      metadataUri: `ipfs://${metadataResult.IpfsHash}`,
-      imageCid: imageResult.IpfsHash,
-      metadataCid: metadataResult.IpfsHash,
+      metadataUri: `ipfs://${metadataResult.cid}`,
+      imageCid: imageResult.cid,
+      metadataCid: metadataResult.cid,
+      groupId: group.id,
     });
   } catch (error) {
     console.error("IPFS metadata upload error:", error);
     const message =
-      error instanceof Error && error.message.includes("PINATA_JWT")
+      error instanceof Error && messageIncludesPinataJwt(error.message)
         ? "El servicio IPFS no está configurado en el servidor."
         : "No se pudo subir la metadata a IPFS.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function messageIncludesPinataJwt(message: string) {
+  return message.includes("PINATA_JWT");
 }
