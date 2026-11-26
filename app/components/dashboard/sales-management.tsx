@@ -352,49 +352,49 @@ export function SalesManagement({
       let reconciledOnChain = false;
 
       try {
-      if (walletInfo.value && loyaltyInfo.value) {
-        const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
-        const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
-        const customerWallet = linkedWallet.data.wallet;
-        const mint = loyaltyProgram.data.mint;
-        const [tokenAccount] = await deriveToken2022Ata(customerWallet, mint);
+        if (walletInfo.value && loyaltyInfo.value) {
+          const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
+          const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
+          const customerWallet = linkedWallet.data.wallet;
+          const mint = loyaltyProgram.data.mint;
+          const [tokenAccount] = await deriveToken2022Ata(customerWallet, mint);
 
-        // Idempotent creation is safe whether the customer's Token-2022
-        // ATA already exists or needs to be created. The dealership pays rent.
-        const createAtaInstruction =
-          await getCreateAssociatedTokenIdempotentInstructionAsync({
-            payer: connected.signer,
+          // Idempotent creation is safe whether the customer's Token-2022
+          // ATA already exists or needs to be created. The dealership pays rent.
+          const createAtaInstruction =
+            await getCreateAssociatedTokenIdempotentInstructionAsync({
+              payer: connected.signer,
+              mint,
+              owner: customerWallet,
+              tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+            });
+
+          const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealerAddress);
+          const rewardInstruction = client.registro.instructions.otorgarPuntos({
+            owner: connected.signer,
+            concesionario: dealerAddress,
+            programaFidelidad,
+            venta,
+            cliente,
+            walletCliente,
+            puntosVenta,
+            autoridadFidelidad,
             mint,
-            owner: customerWallet,
+            tokenAccount,
             tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
           });
 
-        const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealerAddress);
-        const rewardInstruction = client.registro.instructions.otorgarPuntos({
-          owner: connected.signer,
-          concesionario: dealerAddress,
-          programaFidelidad,
-          venta,
-          cliente,
-          walletCliente,
-          puntosVenta,
-          autoridadFidelidad,
-          mint,
-          tokenAccount,
-          tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
-        });
-
-        // ATA creation (when needed), sale registration and reward issuance
-        // are submitted atomically: any failure rolls back all three operations.
-        result = await client.sendTransaction([
-          createAtaInstruction,
-          saleInstruction,
-          rewardInstruction,
-        ]);
-        awardedPoints = loyaltyProgram.data.puntosPorVenta;
-      } else {
-        result = await saleInstruction.sendTransaction();
-      }
+          // ATA creation (when needed), sale registration and reward issuance
+          // are submitted atomically: any failure rolls back all three operations.
+          result = await client.sendTransaction([
+            createAtaInstruction,
+            saleInstruction,
+            rewardInstruction,
+          ]);
+          awardedPoints = loyaltyProgram.data.puntosPorVenta;
+        } else {
+          result = await saleInstruction.sendTransaction();
+        }
       } catch (sendError) {
         // Some wallet extensions can report "Cancelled" after the transaction
         // was already broadcast. Reconcile against the sale and reward PDAs
@@ -403,16 +403,20 @@ export function SalesManagement({
           if (attempt > 0) {
             await new Promise((resolve) => setTimeout(resolve, 700));
           }
-          const [saleInfo, rewardInfo] = await Promise.all([
-            client.rpc.getAccountInfo(venta, { encoding: "base64" }).send(),
-            client.rpc.getAccountInfo(puntosVenta, { encoding: "base64" }).send(),
-          ]);
-          if (saleInfo.value) {
-            reconciledOnChain = true;
-            awardedPoints = rewardInfo.value && walletInfo.value && loyaltyInfo.value
-              ? (await client.registro.accounts.programaFidelidad.fetch(programaFidelidad)).data.puntosPorVenta
-              : null;
-            break;
+          try {
+            const [saleInfo, rewardInfo] = await Promise.all([
+              client.rpc.getAccountInfo(venta, { encoding: "base64" }).send(),
+              client.rpc.getAccountInfo(puntosVenta, { encoding: "base64" }).send(),
+            ]);
+            if (saleInfo.value) {
+              reconciledOnChain = true;
+              awardedPoints = rewardInfo.value && walletInfo.value && loyaltyInfo.value
+                ? (await client.registro.accounts.programaFidelidad.fetch(programaFidelidad)).data.puntosPorVenta
+                : null;
+              break;
+            }
+          } catch (reconciliationError) {
+            console.warn("No se pudo reconciliar todavía el resultado de la venta:", reconciliationError);
           }
         }
         if (!reconciledOnChain) throw sendError;
