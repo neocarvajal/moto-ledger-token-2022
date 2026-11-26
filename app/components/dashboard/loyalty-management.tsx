@@ -12,6 +12,8 @@ type UploadResult = {
   metadataUri: string;
   imageCid: string;
   metadataCid: string;
+  imageFileId: string;
+  metadataFileId: string;
   groupId: string;
 };
 
@@ -219,6 +221,8 @@ export function LoyaltyManagement({
               { label: "URI de imagen", value: result.imageUri },
               { label: "CID de metadata", value: result.metadataCid },
               { label: "CID de imagen", value: result.imageCid },
+              { label: "ID de archivo de metadata (Pinata)", value: result.metadataFileId },
+              { label: "ID de archivo de imagen (Pinata)", value: result.imageFileId },
               { label: "Grupo Pinata", value: result.groupId },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-[#eff0f2] p-3">
