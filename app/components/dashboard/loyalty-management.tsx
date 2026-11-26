@@ -33,6 +33,22 @@ function createNonce() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function toGatewayUrl(uri: string, cid: string) {
+  if (/^https?:\\/\\//i.test(uri)) return uri;
+
+  const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL
+    ?.trim()
+    .replace(/^https?:\\/\\//i, "")
+    .replace(/\\/+$/, "");
+
+  if (!gateway) {
+    throw new Error("No se pudo generar el enlace público. Revisa NEXT_PUBLIC_GATEWAY_URL.");
+  }
+
+  const path = uri.replace(/^ipfs:\/\//i, "").replace(/^\\/?ipfs\\//i, "") || cid;
+  return `https://${gateway}/ipfs/${path}`;
+}
+
 export function LoyaltyManagement({
   concesionario,
   nombreConcesionario,
@@ -159,7 +175,13 @@ export function LoyaltyManagement({
         throw new Error("error" in payload && payload.error ? payload.error : "No se pudo subir la metadata.");
       }
 
-      setResult(payload as UploadResult);
+      const uploaded = payload as UploadResult;
+      const usableResult: UploadResult = {
+        ...uploaded,
+        imageUri: toGatewayUrl(uploaded.imageUri, uploaded.imageCid),
+        metadataUri: toGatewayUrl(uploaded.metadataUri, uploaded.metadataCid),
+      };
+      setResult(usableResult);
       toast.success("Imagen y metadata subidas correctamente a IPFS.");
     } catch (error) {
       console.error("No se pudo cargar la metadata de fidelización:", error);
@@ -351,23 +373,51 @@ export function LoyaltyManagement({
               <p className="text-[9px] text-[#858d96]">Los dos archivos están almacenados públicamente en IPFS.</p>
             </div>
           </div>
-          <div className="mt-4 space-y-3">
-            {[
-              { label: "URI de metadata", value: result.metadataUri },
-              { label: "URI de imagen", value: result.imageUri },
-              { label: "CID de metadata", value: result.metadataCid },
-              { label: "CID de imagen", value: result.imageCid },
-              { label: "ID de archivo de metadata (Pinata)", value: result.metadataFileId },
-              { label: "ID de archivo de imagen (Pinata)", value: result.imageFileId },
-            ].map((item) => (
-              <div key={item.label} className="rounded-lg border border-[#eff0f2] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">{item.label.toUpperCase()}</p>
-                  <button type="button" onClick={() => void copyValue(item.value, item.label)} className="shrink-0 text-[9px] font-semibold text-[#d90011] hover:underline">Copiar</button>
-                </div>
-                <p className="mt-1 break-all font-mono text-[10px] text-[#555e68]">{item.value}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-[#eff0f2] p-3">
+              <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">IMAGEN PUBLICADA</p>
+              <a
+                href={result.imageUri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 block overflow-hidden rounded-lg bg-[#f7f8fa]"
+                aria-label="Abrir imagen del programa en una pestaña nueva"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={result.imageUri}
+                  alt={`Imagen del programa ${name}`}
+                  className="h-40 w-full object-contain"
+                />
+              </a>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <a href={result.imageUri} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-[#d90011] underline decoration-dotted underline-offset-2">
+                  Abrir imagen ↗
+                </a>
+                <button type="button" onClick={() => void copyValue(result.imageUri, "Enlace de imagen")} className="text-[9px] font-semibold text-[#d90011] hover:underline">
+                  Copiar enlace
+                </button>
               </div>
-            ))}
+            </div>
+
+            <div className="flex flex-col rounded-lg border border-[#eff0f2] p-3">
+              <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">METADATA JSON</p>
+              <div className="mt-2 flex flex-1 flex-col justify-center rounded-lg bg-[#f7f8fa] p-4">
+                <span className="text-3xl text-[#a0a6ad]">{ }</span>
+                <p className="mt-2 text-[11px] font-semibold text-[#252a30]">Datos públicos del token</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">
+                  Incluye el nombre, símbolo, descripción y el enlace público de la imagen.
+                </p>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <a href={result.metadataUri} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-[#d90011] underline decoration-dotted underline-offset-2">
+                  Abrir metadata JSON ↗
+                </a>
+                <button type="button" onClick={() => void copyValue(result.metadataUri, "Enlace de metadata")} className="text-[9px] font-semibold text-[#d90011] hover:underline">
+                  Copiar enlace
+                </button>
+              </div>
+            </div>
           </div>
           <p className="mt-4 text-[9px] leading-relaxed text-[#9299a1]">
             La metadata está lista para asociarse al mint Token-2022 de este concesionario.
