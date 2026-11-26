@@ -208,7 +208,7 @@ export function WalletLinkClient({ token }: { token: string }) {
         ) : null}
 
         <p className="mt-7 border-t border-[#eff0f2] pt-4 text-[10px] leading-relaxed text-[#9aa1a9]">
-          La solicitud caduca automáticamente en cinco minutos. La firma autoriza únicamente la vinculación de esta wallet a la cuenta indicada.
+          La solicitud caduca automáticamente en cinco minutos. La wallet del comprador debe disponer de SOL para cubrir la creación de su cuenta de vinculación. La firma autoriza únicamente la asociación indicada.
         </p>
       </section>
     </main>
