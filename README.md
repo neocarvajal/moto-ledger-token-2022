@@ -154,6 +154,27 @@ Abre [http://localhost:3000](http://localhost:3000), conecta tu wallet y selecci
 
 Puedes obtener SOL de prueba desde el [faucet oficial de Solana](https://faucet.solana.com/).
 
+## Vinculación de wallet del cliente mediante QR
+
+El módulo de clientes incorpora un flujo de vinculación en dos dispositivos. Desde la ficha del cliente, el owner genera un QR temporal; el comprador lo escanea, abre la página móvil de MotoLedger y conecta su propia wallet. La aplicación prepara una única transacción para `vincular_wallet_cliente`: el owner la firma desde el dashboard y el comprador completa la firma desde su teléfono. La transacción se envía a Solana cuando están presentes ambas firmas.
+
+La solicitud temporal tiene una vigencia de **cinco minutos**. El QR contiene un token aleatorio de un solo uso; no incluye la cédula ni el nombre del cliente. El servidor conserva temporalmente el contexto y la transacción parcialmente firmada en Redis, pero nunca recibe ni almacena claves privadas o frases semilla. La red valida las firmas y las restricciones del programa al ejecutar la instrucción.
+
+### Configuración del almacenamiento temporal
+
+El intercambio entre el dashboard y el teléfono requiere Redis. Esta implementación utiliza la API REST de **Upstash Redis**. Crea una base de datos Redis y configura estas variables en el entorno local y en Vercel:
+
+```env
+UPSTASH_REDIS_REST_URL=https://<tu-base-de-datos>.upstash.io
+UPSTASH_REDIS_REST_TOKEN=<tu-token-rest>
+```
+
+Puedes tomar ambos valores desde la sección REST API de tu base de datos Upstash. No agregues el token al prefijo `NEXT_PUBLIC_`: debe permanecer como variable privada del servidor. Si estas variables no están configuradas, la API de vinculación responderá que el almacenamiento temporal no está disponible.
+
+El flujo QR requiere una red pública (Devnet, Testnet o Mainnet) accesible desde el teléfono. La cuenta de vinculación se crea con la wallet del comprador como pagadora de la renta; el owner paga la comisión de la transacción. Por eso, el comprador debe disponer de SOL en la red seleccionada para cubrir la renta de la nueva cuenta.
+
+**Estado:** el flujo de coordinación, la página móvil, el QR local y los endpoints temporales están incorporados en la rama de desarrollo. Antes de integrarlo en `main`, todavía debo ejecutar build/typecheck y completar una prueba real de extremo a extremo con dos wallets y Redis configurado.
+
 ## Pruebas
 
 Las pruebas unitarias y de interfaz se ejecutan sin conectarse a la blockchain:
