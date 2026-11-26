@@ -114,7 +114,7 @@ La firma prueba el control de la wallet y la consulta RPC comprueba la propiedad
 
 ### Organización de archivos por concesionario en Pinata
 
-Decidí utilizar los grupos públicos de Pinata para mantener juntos los recursos IPFS de cada concesionario. El grupo se identifica con un nombre determinista basado en la PDA: `MotoLedger-<PDA_CONCESIONARIO>`. Antes de crear uno nuevo, el servidor busca un grupo con ese nombre exacto y reutiliza su `id`; de esta manera no necesito una base de datos adicional para resolver el grupo en cada subida.
+Decidí utilizar los grupos de archivos de Pinata para mantener juntos los recursos IPFS de cada concesionario. La API del SDK para administrar estos grupos se expone bajo `pinata.groups.public`, mientras que el contenido se sube mediante `pinata.upload.public`. El grupo se identifica con un nombre determinista basado en la PDA: `MotoLedger-<PDA_CONCESIONARIO>`. Antes de crear uno nuevo, el servidor busca un grupo con ese nombre exacto y reutiliza su `id`; de esta manera no necesito una base de datos adicional para resolver el grupo en cada subida.
 
 La imagen y el JSON de metadata se suben al mismo grupo público. Cada archivo incluye los siguientes `keyvalues` para facilitar su búsqueda y administración:
 
@@ -122,8 +122,19 @@ La imagen y el JSON de metadata se suben al mismo grupo público. Cada archivo i
 - `cluster`: `devnet` o `mainnet-beta`.
 - `category`: `loyalty-image` o `loyalty-token-metadata`.
 
-El endpoint devuelve también `groupId`, además de los CID y las URI IPFS. Los grupos son una herramienta de organización y administración de Pinata; no crean carpetas dentro de IPFS ni modifican el contenido direccionado por los CID.
+El endpoint devuelve también `groupId`, además de los CID, las URI IPFS y los identificadores internos de archivo de Pinata (`imageFileId` y `metadataFileId`). Los identificadores internos permiten administrar o retirar archivos mediante la API de Pinata; no sustituyen al CID que se utiliza en la URI IPFS. Los grupos son una herramienta de organización y administración de Pinata; no crean carpetas dentro de IPFS ni modifican el contenido direccionado por los CID.
 
 La búsqueda y creación del grupo se realiza en el servidor. Si dos primeras subidas del mismo concesionario ocurren simultáneamente, Pinata podría recibir dos intentos de creación antes de que cualquiera vea el grupo recién creado. Si en el futuro necesito garantizar unicidad estricta bajo concurrencia, guardaré el `groupId` en una base de datos con una restricción única por PDA de concesionario.
 
 El endpoint comprueba también la firma, la propiedad on-chain y la firma binaria del archivo (PNG, JPEG o WEBP), además del MIME type y el límite de 5 MB. El nonce todavía no tiene almacenamiento persistente anti-replay: la ventana temporal limita su vigencia, pero no impide reutilizar una misma solicitud firmada dentro de esos cinco minutos. Esa protección queda pendiente antes de considerar el endpoint listo para producción.
+
+
+### Módulo de Fidelización: subida desde el dashboard
+
+El módulo `Fidelización` permite preparar el nombre, símbolo, descripción e imagen del token. Antes de enviar el archivo, la aplicación consulta la cuenta del concesionario y confirma que su propietario coincide con la wallet conectada. Luego solicita a la wallet una firma de mensaje sin transacción y envía el mensaje firmado junto con el archivo a `POST /api/ipfs/upload`.
+
+El mensaje firmado conserva exactamente el formato validado por el endpoint. El cliente convierte la firma a Base64 y envía los datos mediante `FormData`. El dashboard muestra y permite copiar las URI IPFS, los CID, los identificadores de archivo de Pinata y el identificador del grupo.
+
+La subida no crea el mint ni inicializa `MetadataPointer` o `TokenMetadata`. La URI devuelta queda preparada para una siguiente operación on-chain. La selección de red se limita a Devnet y Mainnet, que son las redes admitidas por la validación RPC del endpoint.
+
+La versión del SDK declarada en el proyecto es `pinata@^2.5.6`. El lockfile registra la versión publicada `2.5.6`; no se debe inventar un número de versión ni un integrity hash para el paquete. Si se modifica la dependencia, se debe regenerar el lockfile con `npm install`.
