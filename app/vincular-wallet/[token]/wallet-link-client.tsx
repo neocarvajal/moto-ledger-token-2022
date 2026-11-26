@@ -114,42 +114,42 @@ export function WalletLinkClient({ token }: { token: string }) {
       });
   }, [connected?.account.address, session, token, loadSession]);
 
-  useEffect(() => {
+  const signTransaction = async () => {
     if (!connected || !session?.transaction || session.signedTransaction || signingRef.current) return;
     const walletAddress = connected.account.address;
     const walletSigner = connected.signer;
     if (!walletAddress || !walletSigner || session.walletAddress !== walletAddress) return;
 
     signingRef.current = true;
-    setMessage("Revisa la solicitud en tu wallet y confirma la firma…");
-    void (async () => {
-      try {
-        const transactionBytes = getBase64Encoder().encode(session.transaction!);
-        const transaction = getTransactionDecoder().decode(transactionBytes);
-        if (!("modifyAndSignTransactions" in walletSigner)) {
-          throw new Error("Esta wallet solo permite firmar y enviar directamente. Necesitas una wallet que admita firma sin envío para completar la vinculación.");
-        }
-        const [signedTransaction] = await walletSigner.modifyAndSignTransactions([transaction]);
-        const customerSignature = signedTransaction.signatures[address(walletAddress)];
-        if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
-          throw new Error("La wallet no devolvió la firma del comprador.");
-        }
-        const serialized = getBase64EncodedWireTransaction(signedTransaction);
-        const response = await fetch(`/api/wallet-link/${token}/signed`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transaction: serialized }),
-        });
-        const payload = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "No se pudo enviar la firma.");
-        setMessage("Firma enviada. El concesionario finalizará la vinculación en Solana.");
-        await loadSession();
-      } catch (cause) {
-        signingRef.current = false;
-        setError(cause instanceof Error ? cause.message : "No se pudo firmar la transacción.");
+    setError(null);
+    setMessage("Abriendo la solicitud de firma en tu wallet…");
+    try {
+      const transactionBytes = getBase64Encoder().encode(session.transaction);
+      const transaction = getTransactionDecoder().decode(transactionBytes);
+      if (!("modifyAndSignTransactions" in walletSigner)) {
+        throw new Error("Esta wallet no permite firmar esta transacción sin enviarla. Necesitas una wallet compatible con firma de transacciones.");
       }
-    })();
-  }, [connected, session, token, loadSession]);
+      const [signedTransaction] = await walletSigner.modifyAndSignTransactions([transaction]);
+      const customerSignature = signedTransaction.signatures[address(walletAddress)];
+      if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
+        throw new Error("La wallet no devolvió la firma del comprador.");
+      }
+      const serialized = getBase64EncodedWireTransaction(signedTransaction);
+      const response = await fetch(`/api/wallet-link/${token}/signed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction: serialized }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "No se pudo enviar la firma.");
+      setMessage("Firma enviada. El concesionario finalizará la vinculación en Solana.");
+      await loadSession();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo firmar la transacción.");
+    } finally {
+      signingRef.current = false;
+    }
+  };
 
   if (loading) {
     return <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] p-5"><p className="text-sm text-[#68717b]">Cargando solicitud…</p></main>;
@@ -222,6 +222,16 @@ export function WalletLinkClient({ token }: { token: string }) {
                 <p className="text-[9px] font-bold tracking-wide text-[#168354]">WALLET CONECTADA</p>
                 <p className="mt-2 break-all font-mono text-[11px] text-[#424950]">{connected.account.address}</p>
                 <p className="mt-3 text-xs leading-relaxed text-[#68717b]">{message}</p>
+                {session.transaction && !session.signedTransaction && session.status !== "completed" && (
+                  <button
+                    type="button"
+                    onClick={() => void signTransaction()}
+                    disabled={signingRef.current || session.expiresAt <= now}
+                    className="mt-4 w-full rounded-xl bg-[#e60012] px-4 py-3 text-xs font-bold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Firmar vinculación en Solflare
+                  </button>
+                )}
               </div>
             )}
 
