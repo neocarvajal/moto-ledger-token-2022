@@ -55,6 +55,7 @@ export function CustomerWalletLink({
   const [busy, setBusy] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successSignature, setSuccessSignature] = useState<string | null>(null);
   const [qrCreatedAt, setQrCreatedAt] = useState<number | null>(null);
@@ -408,14 +409,14 @@ export function CustomerWalletLink({
                 <h2 id="link-wallet-title" className="mt-1 text-[17px] font-bold text-[#252a30]">Vincular wallet del cliente</h2>
                 <p className="mt-1 text-[10px] text-[#858d96]">{clienteNombre} · C.I. {clienteCedula}</p>
               </div>
-              <button type="button" onClick={() => void closeRequest()} aria-label="Cerrar vinculación" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa] disabled:opacity-40">✕</button>
+              <button type="button" onClick={() => successSignature ? void closeRequest() : setShowCancelConfirm(true)} aria-label={successSignature ? "Cerrar ventana" : "Solicitar cancelación"} className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa] disabled:opacity-40">✕</button>
             </div>
             {!token || !url ? (
               <div className="p-8 text-center">
                 <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#f2c6ca] border-t-[#e60012]" />
                 <p className="mt-4 text-[12px] font-semibold text-[#252a30]">Preparando solicitud segura…</p>
                 {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] text-red-700">{error}</p>}
-                <button type="button" onClick={() => void closeRequest()} className="mt-4 text-[10px] font-semibold text-[#737b84] underline">Cancelar proceso y cerrar</button>
+                <button type="button" onClick={() => setShowCancelConfirm(true)} className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-[10px] font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100">Cancelar proceso y cerrar</button>
               </div>
             ) : successSignature ? (
               <div className="p-8 text-center">
@@ -469,11 +470,56 @@ export function CustomerWalletLink({
                     </div>
                   </div>
                   {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
-                  <button type="button" onClick={() => void closeRequest()} className="mt-4 rounded-lg border border-[#e2e5e8] px-4 py-2 text-[10px] font-semibold text-[#68717b] hover:bg-[#f7f8fa]">Cancelar proceso y cerrar</button>
+                  <button type="button" onClick={() => setShowCancelConfirm(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-[10px] font-bold text-red-700 shadow-sm transition hover:border-red-300 hover:bg-red-100"> <span aria-hidden="true">!</span> Cancelar proceso y cerrar</button>
                 </div>
               </div>
             )}
           </section>
+          {showCancelConfirm && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#171b20]/65 p-4 backdrop-blur-sm">
+              <section
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="cancel-wallet-link-title"
+                aria-describedby="cancel-wallet-link-description"
+                className="w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl"
+              >
+                <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-xl font-bold text-red-700" aria-hidden="true">!</span>
+                    <div>
+                      <p className="text-[9px] font-bold tracking-[0.16em] text-red-700">CONFIRMACIÓN REQUERIDA</p>
+                      <h3 id="cancel-wallet-link-title" className="mt-1 text-[16px] font-bold text-[#252a30]">¿Cancelar la vinculación?</h3>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3 p-5">
+                  <p id="cancel-wallet-link-description" className="text-[11px] leading-relaxed text-[#535c66]">
+                    Se cerrará esta solicitud y el QR dejará de estar disponible. Tendrás que generar uno nuevo para iniciar otra vinculación.
+                  </p>
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] leading-relaxed text-amber-800">
+                    Si la transacción ya fue enviada a Solana, cerrar esta ventana no puede revertirla ni cancelar su ejecución en la blockchain.
+                  </p>
+                  <div className="flex flex-col-reverse gap-2 border-t border-[#eff0f2] pt-4 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelConfirm(false)}
+                      className="rounded-lg border border-[#dfe3e7] px-4 py-2.5 text-[10px] font-semibold text-[#4e5863] transition hover:bg-[#f7f8fa]"
+                    >
+                      No, continuar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowCancelConfirm(false); void closeRequest(); }}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-[10px] font-bold text-white shadow-md shadow-red-600/20 transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    >
+                      <span aria-hidden="true">!</span> Sí, cancelar solicitud
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
         </div>
       )}
       {error && !showLinkModal && <p className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] leading-relaxed text-red-700">{error}</p>}
