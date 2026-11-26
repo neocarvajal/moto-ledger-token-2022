@@ -8,7 +8,10 @@ import {
   type Base58EncodedBytes,
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
-import { TOKEN_2022_PROGRAM_ADDRESS } from "@solana-program/token-2022";
+import {
+  getCreateAssociatedTokenInstructionAsync,
+  TOKEN_2022_PROGRAM_ADDRESS,
+} from "@solana-program/token-2022";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
@@ -313,7 +316,7 @@ export function SalesManagement({
         client.rpc.getAccountInfo(programaFidelidad, { encoding: "base64" }).send(),
       ]);
 
-      let result;
+      let result: { context: { signature: string } };
       let awardedPoints: bigint | null = null;
 
       if (walletInfo.value && loyaltyInfo.value) {
@@ -329,14 +332,14 @@ export function SalesManagement({
           .getAccountInfo(tokenAccount, { encoding: "base64" })
           .send();
 
-        if (!tokenAccountInfo.value) {
-          await client.associatedToken.instructions.createAssociatedToken({
-            payer: connected.signer,
-            mint,
-            owner: customerWallet,
-            tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
-          }).sendTransaction();
-        }
+        const createAtaInstruction = !tokenAccountInfo.value
+          ? await getCreateAssociatedTokenInstructionAsync({
+              payer: connected.signer,
+              mint,
+              owner: customerWallet,
+              tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+            })
+          : null;
 
         const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealerAddress);
         const [puntosVenta] = await derivePuntosVentaPda(venta);
@@ -354,9 +357,12 @@ export function SalesManagement({
           tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
         });
 
-        // Both instructions are submitted as one atomic Solana transaction:
-        // if reward issuance fails, the sale registration is rolled back too.
-        result = await client.sendTransaction([saleInstruction, rewardInstruction]);
+        // ATA creation (when needed), sale registration and reward issuance
+        // are submitted atomically: any failure rolls back all three operations.
+        const instructions = createAtaInstruction
+          ? [createAtaInstruction, saleInstruction, rewardInstruction]
+          : [saleInstruction, rewardInstruction];
+        result = await client.sendTransaction(instructions);
         awardedPoints = loyaltyProgram.data.puntosPorVenta;
       } else {
         result = await saleInstruction.sendTransaction();
