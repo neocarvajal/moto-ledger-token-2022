@@ -244,7 +244,7 @@ export function CustomerWalletLink({
           <div>
             <p className="text-[11px] font-bold text-[#252a30]">Escanea con el teléfono del comprador</p>
             <p className="mt-1 text-[10px] leading-relaxed text-[#737b84]">
-              El cliente abrirá esta solicitud, conectará su wallet y firmará la vinculación. La wallet del concesionario ya autorizó la misma transacción.
+              El cliente abrirá esta solicitud y conectará su wallet. El concesionario preparará y firmará la transacción; después, el comprador la completará desde el teléfono.
             </p>
             <p className="mt-3 text-[9px] font-semibold text-[#e60012]">
               {!session?.walletAddress ? "Esperando que el cliente conecte su wallet…" : !session.transaction ? "Wallet recibida. Preparando transacción…" : session.status === "signed" ? "Firma recibida. Enviando a Solana…" : "Esperando la firma del cliente…"}
