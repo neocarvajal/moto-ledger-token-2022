@@ -12,8 +12,8 @@ import {
   useConnect,
   useWallets,
 } from "@solana/kit-plugin-wallet/react";
-import { useAppClient } from "../../../lib/client-provider";
-import { useCluster } from "../../../components/cluster-context";
+import { useAppClient } from "../../lib/client-provider";
+import { useCluster } from "../../components/cluster-context";
 
 type Session = {
   owner: string;
@@ -36,7 +36,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   const { cluster, setCluster } = useCluster();
   const wallets = useWallets(client);
   const connected = useConnectedWallet(client);
-  const { dispatchAsync: connect, isRunning: connecting } = useConnect(client);
+  const { dispatchAsync: connect, isRunning: connecting } = useConnect(client);\n  const { dispatchAsync: disconnect } = useDisconnect(client);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
