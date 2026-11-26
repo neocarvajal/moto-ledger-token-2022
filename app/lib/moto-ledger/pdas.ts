@@ -118,6 +118,26 @@ export async function derivePuntosVentaPda(venta: Address) {
   });
 }
 
+/** One initial or customized redemption catalog per dealership. */
+export async function deriveCatalogoServiciosPda(concesionario: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("catalogo_servicios"), key(concesionario)],
+  });
+}
+
+/** Unique immutable service redemption receipt per customer and redemption nonce. */
+export async function deriveCanjeServicioPda(cliente: Address, idCanje: bigint) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [
+      seed("canje_servicio"),
+      key(cliente),
+      getU64Encoder().encode(idCanje),
+    ],
+  });
+}
+
 /**
  * Derive the buyer's ATA using Token-2022. The token program is part of the
  * associated-token address seeds, so the base SPL Token address is incorrect.
