@@ -16,7 +16,6 @@ type UploadResult = {
   metadataCid: string;
   imageFileId: string;
   metadataFileId: string;
-  groupId: string;
 };
 
 type MintResult = {
@@ -161,7 +160,7 @@ export function LoyaltyManagement({
       }
 
       setResult(payload as UploadResult);
-      toast.success("Imagen y metadata subidas al grupo IPFS del concesionario.");
+      toast.success("Imagen y metadata subidas correctamente a IPFS.");
     } catch (error) {
       console.error("No se pudo cargar la metadata de fidelización:", error);
       toast.error(
@@ -250,7 +249,7 @@ export function LoyaltyManagement({
           <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">FIDELIZACIÓN / METADATA DEL TOKEN</p>
           <h2 className="mt-2 text-[15px] font-bold text-[#252a30]">Identidad del programa de puntos</h2>
           <p className="mt-1 text-[10px] leading-relaxed text-[#858d96]">
-            Prepara la imagen y los metadatos públicos del token de fidelización. Los archivos se guardan juntos en el grupo Pinata de este concesionario.
+            Prepara la imagen y los metadatos públicos del token de fidelización. Los archivos se almacenan en IPFS mediante Pinata.
           </p>
         </div>
 
@@ -349,7 +348,7 @@ export function LoyaltyManagement({
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#edf8f2] text-[#168451]">✓</span>
             <div>
               <h3 className="text-[13px] font-bold text-[#252a30]">Metadata almacenada en IPFS</h3>
-              <p className="text-[9px] text-[#858d96]">Ambos archivos pertenecen al grupo de este concesionario.</p>
+              <p className="text-[9px] text-[#858d96]">Los dos archivos están almacenados públicamente en IPFS.</p>
             </div>
           </div>
           <div className="mt-4 space-y-3">
@@ -360,7 +359,6 @@ export function LoyaltyManagement({
               { label: "CID de imagen", value: result.imageCid },
               { label: "ID de archivo de metadata (Pinata)", value: result.metadataFileId },
               { label: "ID de archivo de imagen (Pinata)", value: result.imageFileId },
-              { label: "Grupo Pinata", value: result.groupId },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-[#eff0f2] p-3">
                 <div className="flex items-center justify-between gap-2">
