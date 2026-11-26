@@ -260,7 +260,7 @@ export function CustomerManagement({
               <div className="rounded-lg bg-white p-3"><p className="text-[9px] text-[#9299a1]">Concesionario</p><p className="mt-1 truncate text-[11px] font-semibold text-[#252a30]">{nombreConcesionario}</p></div>
             </div>
             <p className="mt-3 text-[9px] text-[#9299a1]">PDA: <a href={`https://explorer.solana.com/address/${customer.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[#68717b] underline decoration-dotted underline-offset-2 transition hover:text-[#e60012]">{customer.address} ↗</a></p>
-            <CustomerWalletLink cliente={customer.address} concesionario={concesionario} totalMotos={Number(customer.data.totalMotosCliente)} />
+            <CustomerWalletLink cliente={customer.address} clienteNombre={customer.data.nombreCliente} clienteCedula={String(customer.data.cedulaCliente)} concesionario={concesionario} totalMotos={Number(customer.data.totalMotosCliente)} />
           </div>
         ) : (
           <div className="mt-5 flex min-h-[170px] flex-col items-center justify-center rounded-lg bg-[#f7f8fa] px-5 text-center">
