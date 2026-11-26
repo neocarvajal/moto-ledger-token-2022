@@ -41,6 +41,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("Cargando solicitud segura…");
+  const [now, setNow] = useState(() => Date.now());
   const signingRef = useRef(false);
   const walletSentRef = useRef(false);
 
@@ -66,6 +67,11 @@ export function WalletLinkClient({ token }: { token: string }) {
       });
     return () => { active = false; };
   }, [loadSession, cluster, setCluster]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!session || session.status === "completed" || session.status === "cancelled") return;
@@ -163,7 +169,19 @@ export function WalletLinkClient({ token }: { token: string }) {
           <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-xs leading-relaxed text-red-700">{error}</div>
         ) : session ? (
           <>
-            <div className="mt-6 space-y-3 rounded-xl bg-[#f7f8fa] p-4 text-xs">
+            <div className="mt-5 rounded-xl border border-[#e9ebee] bg-white p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[10px] font-semibold text-[#68717b]">Tiempo restante de la solicitud</span>
+                <span className={`font-mono text-sm font-bold tabular-nums ${session.expiresAt - now <= 30000 ? "text-red-600" : "text-[#252a30]"}`}>
+                  {(() => { const seconds = Math.max(0, Math.ceil((session.expiresAt - now) / 1000)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`; })()}
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#eff0f2]">
+                <div className="h-full rounded-full bg-[#e60012] transition-[width] duration-1000" style={{ width: `${Math.max(0, Math.min(100, ((session.expiresAt - now) / 300000) * 100))}%` }} />
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3 rounded-xl bg-[#f7f8fa] p-4 text-xs">
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Concesionario</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.concesionario)}</p></div>
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Wallet del concesionario</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.owner)}</p></div>
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Cuenta de cliente</p><p className="mt-1 break-all font-mono text-[#424950]">{shortAddress(session.cliente)}</p></div>
@@ -214,7 +232,7 @@ export function WalletLinkClient({ token }: { token: string }) {
         ) : null}
 
         <p className="mt-7 border-t border-[#eff0f2] pt-4 text-[10px] leading-relaxed text-[#9aa1a9]">
-          La solicitud caduca automáticamente en cinco minutos. La wallet del comprador debe disponer de SOL para cubrir la creación de su cuenta de vinculación. La firma autoriza únicamente la asociación indicada.
+          La solicitud caduca automáticamente en cinco minutos. El concesionario cubre la comisión y los costes de creación de la cuenta. La firma autoriza únicamente la asociación indicada.
         </p>
       </section>
     </main>
