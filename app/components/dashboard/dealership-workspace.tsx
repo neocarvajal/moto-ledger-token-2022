@@ -322,6 +322,7 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
       {dealership && activeModule === "loyalty" && (
         <div className="xl:col-span-2">
           <LoyaltyManagement
+            key={`${dealership.address}:${activeModule}`}
             concesionario={dealership.address}
             nombreConcesionario={dealership.data.nombreConcesionario}
           />
