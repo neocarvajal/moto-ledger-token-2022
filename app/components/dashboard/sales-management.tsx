@@ -193,7 +193,7 @@ export function SalesManagement({
       setCustomerName(selected?.data.nombreCliente ?? "");
     } catch (error) {
       console.error("No se pudieron cargar los clientes para ventas:", error);
-      toast.error("No se pudieron consultar los clientes registrados en Solana.");
+      toast.error("No se pudieron consultar los clientes registrados del concesionario en Solana.");
     } finally {
       setLoadingCustomers(false);
     }
@@ -379,7 +379,7 @@ export function SalesManagement({
               </select>
             ) : (
               <div className="rounded-lg bg-[#f7f8fa] px-3 py-3 text-[10px] text-[#858d96]">
-                {loadingCustomers ? "Consultando clientes en Solana…" : "No hay clientes registrados para esta wallet."}
+                {loadingCustomers ? "Consultando clientes en Solana…" : "No hay clientes registrados para este concesionario."}
               </div>
             )}
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -387,7 +387,7 @@ export function SalesManagement({
               <button type="button" onClick={() => void handleCustomerLookup()} disabled={!cedula} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">Verificar cliente</button>
             </div>
             {customerName && <p className="mt-2 text-[10px] font-semibold text-[#16845a]">✓ {customerName} · Cliente verificado en Solana</p>}
-            {customers.length > 0 && <p className="mt-1 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) registrados en esta wallet.</p>}
+            {customers.length > 0 && <p className="mt-1 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) registrados en este concesionario.</p>}
           </div>
 
           <label className="block">
