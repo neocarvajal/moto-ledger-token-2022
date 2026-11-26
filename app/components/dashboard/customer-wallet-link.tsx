@@ -80,10 +80,10 @@ export function CustomerWalletLink({
   }, [client, cliente]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || session?.status === "completed" || session?.status === "cancelled") return;
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
-  }, [token]);
+  }, [token, session?.status]);
 
   useEffect(() => {
     if (!token || session?.status === "completed" || session?.status === "cancelled") return;
