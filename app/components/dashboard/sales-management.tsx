@@ -346,9 +346,12 @@ export function SalesManagement({
         client.rpc.getAccountInfo(programaFidelidad, { encoding: "base64" }).send(),
       ]);
 
-      let result: { context: { signature: string } };
+      const [puntosVenta] = await derivePuntosVentaPda(venta);
+      let result: { context: { signature: string } } | null = null;
       let awardedPoints: bigint | null = null;
+      let reconciledOnChain = false;
 
+      try {
       if (walletInfo.value && loyaltyInfo.value) {
         const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
         const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
@@ -367,7 +370,6 @@ export function SalesManagement({
           });
 
         const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealerAddress);
-        const [puntosVenta] = await derivePuntosVentaPda(venta);
         const rewardInstruction = client.registro.instructions.otorgarPuntos({
           owner: connected.signer,
           concesionario: dealerAddress,
@@ -393,13 +395,43 @@ export function SalesManagement({
       } else {
         result = await saleInstruction.sendTransaction();
       }
+      } catch (sendError) {
+        // Some wallet extensions can report "Cancelled" after the transaction
+        // was already broadcast. Reconcile against the sale and reward PDAs
+        // before showing an error or allowing the user to retry.
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          if (attempt > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+          }
+          const [saleInfo, rewardInfo] = await Promise.all([
+            client.rpc.getAccountInfo(venta, { encoding: "base64" }).send(),
+            client.rpc.getAccountInfo(puntosVenta, { encoding: "base64" }).send(),
+          ]);
+          if (saleInfo.value) {
+            reconciledOnChain = true;
+            awardedPoints = rewardInfo.value && walletInfo.value && loyaltyInfo.value
+              ? (await client.registro.accounts.programaFidelidad.fetch(programaFidelidad)).data.puntosPorVenta
+              : null;
+            break;
+          }
+        }
+        if (!reconciledOnChain) throw sendError;
+      }
 
-      notifyTransactionSuccess(
-        awardedPoints === null
-          ? "Venta registrada correctamente en Solana."
-          : `Venta registrada y ${formatAmount(awardedPoints)} puntos de fidelización emitidos.`,
-        result.context.signature
-      );
+      if (result) {
+        notifyTransactionSuccess(
+          awardedPoints === null
+            ? "Venta registrada correctamente en Solana."
+            : `Venta registrada y ${formatAmount(awardedPoints)} puntos de fidelización emitidos.`,
+          result.context.signature
+        );
+      } else {
+        toast.success(
+          awardedPoints === null
+            ? "Venta confirmada en Solana. La wallet no devolvió la firma, pero el registro ya existe."
+            : `Venta confirmada y ${formatAmount(awardedPoints)} puntos emitidos. La wallet no devolvió la firma, pero ambas cuentas existen en Solana.`
+        );
+      }
       setCedula("");
       setPrice("");
       setCustomerName("");
@@ -444,9 +476,9 @@ export function SalesManagement({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4 border-t border-[#eff0f2] pt-5 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-x-5 gap-y-5 border-t border-[#eff0f2] pt-6 sm:grid-cols-2">
           <label className="block sm:col-span-2">
-            <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Moto disponible</span>
+            <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#555e68]">1. Moto disponible</span>
             <select value={serial} onChange={(event) => setSerial(event.target.value)} required className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]">
               {availableMotorcycles.length === 0 ? <option value="">No hay unidades disponibles</option> : availableMotorcycles.map((item) => (
                 <option key={item.address} value={item.data.serial}>
@@ -457,9 +489,9 @@ export function SalesManagement({
             {availableMotorcycles.length === 0 && <span className="mt-1 block text-[9px] text-[#a0a6ad]">Registra una moto antes de crear una venta.</span>}
           </label>
 
-          <div className="sm:col-span-2">
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <label htmlFor="sale-registered-customer" className="block text-[10px] font-semibold text-[#555e68]">Cliente registrado</label>
+          <div className="rounded-xl border border-[#edf0f2] bg-[#fcfcfd] p-4 sm:col-span-2">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label htmlFor="sale-registered-customer" className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#555e68]">2. Cliente registrado</label>
               <button type="button" onClick={() => void loadCustomers()} disabled={loadingCustomers} className="text-[10px] font-semibold text-[#68717b] hover:text-[#e60012] disabled:opacity-50">
                 {loadingCustomers ? "Actualizando…" : "Actualizar clientes"}
               </button>
@@ -523,13 +555,14 @@ export function SalesManagement({
             {customers.length > 0 && <p className="mt-1 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) registrados en este concesionario.</p>}
           </div>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Precio de venta</span>
+          <label className="block sm:col-span-2">
+            <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#555e68]">3. Precio de venta</span>
             <input value={price} onChange={(event) => setPrice(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" required placeholder="Ej. 2500" className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
             <span className="mt-1 block text-[9px] text-[#9aa1a9]">Monto entero registrado en la cuenta on-chain, sin decimales.</span>
           </label>
-          <div className="flex items-end">
-            <button type="submit" disabled={busy || loading || availableMotorcycles.length === 0} className="w-full rounded-lg bg-[#e60012] px-4 py-2.5 text-[11px] font-semibold text-white transition hover:bg-[#c90010] disabled:opacity-50">
+          <div className="flex flex-col-reverse gap-3 border-t border-[#eff0f2] pt-5 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[9px] leading-relaxed text-[#9299a1]">La operación se registra en Solana. Si el cliente tiene wallet vinculada y el programa está activo, también se emitirán sus puntos.</p>
+            <button type="submit" disabled={busy || loading || availableMotorcycles.length === 0} className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-lg bg-[#e60012] px-7 py-3 text-[11px] font-bold text-white shadow-[0_4px_12px_rgba(230,0,18,0.16)] transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[210px]">
               {busy ? "Registrando venta…" : "Confirmar venta"}
             </button>
           </div>
