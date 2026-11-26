@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertWalletAvailableForDealership } from "../../../../../lib/wallet-link-validation";
+import { assertWalletAvailableForDealership } from "../../../../lib/wallet-link-validation";
 import { address, getBase64Encoder, getTransactionDecoder } from "@solana/kit";
 import { claimWalletLinkValue, getWalletLinkSession, updateWalletLinkSession } from "../../../../lib/wallet-link-store";
 
