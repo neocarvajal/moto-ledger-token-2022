@@ -55,7 +55,7 @@ export async function POST(
     const session = await updateWalletLinkSession(token, (latest) => {
       if (latest.status === "completed") return latest;
       if (latest.status !== "signed") throw new Error("La solicitud ya no está lista para completarse.");
-      return { ...latest, status: "completed" };
+      return { ...latest, status: "completed", expiresAt: Date.now() + 10 * 60 * 1000 };
     });
     if (!session) return NextResponse.json({ error: "La solicitud expiró." }, { status: 404 });
     return NextResponse.json({ status: session.status, signature });
