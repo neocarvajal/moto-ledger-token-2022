@@ -44,6 +44,7 @@ export function ServiceCatalogManagement({
   const [busy, setBusy] = useState(false);
   const [missing, setMissing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<ServiceForm>(EMPTY_FORM);
 
   const loadCatalog = useCallback(async () => {
@@ -111,6 +112,7 @@ export function ServiceCatalogManagement({
 
   const startEditing = (service: CatalogService) => {
     setEditingId(service.id);
+    setFormOpen(true);
     setForm({
       nombre: service.nombre,
       descripcion: service.descripcion,
@@ -121,6 +123,7 @@ export function ServiceCatalogManagement({
 
   const resetForm = () => {
     setEditingId(null);
+    setFormOpen(false);
     setForm(EMPTY_FORM);
   };
 
@@ -217,7 +220,7 @@ export function ServiceCatalogManagement({
             <p className="text-[10px] text-[#858d96]">{services.length} de {MAX_SERVICES} servicios configurados</p>
             <button
               type="button"
-              onClick={() => { resetForm(); setEditingId(null); }}
+              onClick={() => { resetForm(); setFormOpen(true); }}
               disabled={busy || services.length >= MAX_SERVICES || !connected?.signer}
               className="rounded-lg bg-[#252a30] px-3 py-2 text-[9px] font-semibold text-white hover:bg-[#111418] disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -245,7 +248,7 @@ export function ServiceCatalogManagement({
             ))}
           </div>
 
-          {(editingId !== null || form.nombre !== "" || form.descripcion !== "" || form.puntos !== "") && (
+          {formOpen && (
             <form onSubmit={(event) => void submitService(event)} className="mt-4 rounded-lg border border-[#e2e5e8] bg-[#fafbfc] p-4">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-[11px] font-bold text-[#252a30]">{editingId === null ? "Nuevo servicio" : "Editar servicio"}</h4>
