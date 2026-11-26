@@ -10,6 +10,7 @@ import {
 import {
   useConnectedWallet,
   useConnect,
+  useDisconnect,
   useWallets,
 } from "@solana/kit-plugin-wallet/react";
 import { useAppClient } from "../../lib/client-provider";
