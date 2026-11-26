@@ -187,7 +187,7 @@ export function SalesManagement({
       }));
       found.sort((a, b) => a.data.idCliente - b.data.idCliente);
       setCustomers(found);
-      const selected = found.find((item) => item.address === selectedCustomerAddress) ?? found[0] ?? null;
+      const selected = found[0] ?? null;
       setSelectedCustomerAddress(selected?.address ?? "");
       setCedula(selected ? String(selected.data.cedulaCliente) : "");
       setCustomerName(selected?.data.nombreCliente ?? "");
@@ -197,7 +197,7 @@ export function SalesManagement({
     } finally {
       setLoadingCustomers(false);
     }
-  }, [client, connected?.account.address, selectedCustomerAddress]);
+  }, [client, connected?.account.address]);
 
   useEffect(() => {
     void loadCustomers();
@@ -300,7 +300,7 @@ export function SalesManagement({
       setPrice("");
       setCustomerName("");
       setSelectedCustomerAddress("");
-      await Promise.all([loadData(), loadCustomers(), onRegistered()]);
+      await Promise.all([loadData(), onRegistered()]);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "No se pudo registrar la venta.");
@@ -370,6 +370,7 @@ export function SalesManagement({
                 }}
                 className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] text-[#252a30] outline-none focus:border-[#e60012]"
               >
+                <option value="">Selecciona un cliente registrado</option>
                 {customers.map((item) => (
                   <option key={item.address} value={item.address}>
                     {item.data.nombreCliente} · C.I. {item.data.cedulaCliente}
