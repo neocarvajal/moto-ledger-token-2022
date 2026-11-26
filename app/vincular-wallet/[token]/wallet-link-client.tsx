@@ -174,7 +174,11 @@ export function WalletLinkClient({ token }: { token: string }) {
               <div><p className="text-[9px] font-semibold uppercase tracking-wide text-[#9299a1]">Red</p><p className="mt-1 font-semibold capitalize text-[#424950]">{session.cluster}</p></div>
             </div>
 
-            {!connected ? (
+            {cluster !== session.cluster ? (
+              <p className="mt-6 rounded-lg bg-[#f7f8fa] p-3 text-xs text-[#68717b]">Preparando la conexión con {session.cluster}…</p>
+            ) : session.status === "cancelled" ? (
+              <p className="mt-6 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">El concesionario canceló esta solicitud. Solicita un nuevo código QR.</p>
+            ) : !connected ? (
               <div className="mt-6">
                 <p className="mb-3 text-xs font-semibold text-[#424950]">Selecciona tu wallet</p>
                 {wallets.length ? (
