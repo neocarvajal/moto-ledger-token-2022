@@ -73,7 +73,7 @@ export async function createWalletLinkSession(
     createdAt: now,
     expiresAt: now + SESSION_TTL_SECONDS * 1000,
   };
-  const result = await redisCommand<string>("SET", redisKey(token), JSON.stringify(session), "EX", SESSION_TTL_SECONDS, "NX");
+  const result = await redisCommand<string>("SET", redisKey(token), JSON.stringify(session), "EX", String(SESSION_TTL_SECONDS), "NX");
   if (result !== "OK") throw new Error("No se pudo crear la solicitud temporal.");
   return session;
 }
@@ -84,6 +84,22 @@ export async function getWalletLinkSession(token: string) {
   const session = JSON.parse(raw) as WalletLinkSession;
   if (session.expiresAt <= Date.now()) return null;
   return session;
+}
+
+
+export async function claimWalletLinkValue(
+  token: string,
+  step: "wallet" | "transaction" | "signed",
+  value: string
+) {
+  const session = await getWalletLinkSession(token);
+  if (!session) return false;
+  const key = redisKey(token) + ":" + step;
+  const ttl = Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1000));
+  const result = await redisCommand<string>("SET", key, value, "EX", String(ttl), "NX");
+  if (result === "OK") return true;
+  const existing = await redisCommand<string | null>("GET", key);
+  return existing === value;
 }
 
 export async function updateWalletLinkSession(
