@@ -28,22 +28,43 @@ function redisConfig() {
   return { url, token };
 }
 
+
 async function redisCommand<T>(...command: (string | number)[]): Promise<T> {
   const { url, token } = redisConfig();
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(command),
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error("No se pudo acceder al almacenamiento temporal.");
-  const payload = (await response.json()) as { result?: T; error?: string };
-  if (payload.error) throw new Error("Error en el almacenamiento temporal.");
+
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(command),
+      cache: "no-store",
+    });
+  } catch (error) {
+    console.error("Upstash connection error:", error);
+    throw new Error("No se pudo conectar con Upstash Redis.");
+  }
+
+  const payload = (await response.json()) as {
+    result?: T;
+    error?: string;
+  };
+
+  if (!response.ok || payload.error) {
+    console.error("Upstash Redis response:", {
+      status: response.status,
+      error: payload.error,
+    });
+    throw new Error("Upstash Redis rechazó la operación.");
+  }
+
   return payload.result as T;
 }
+
 
 function redisKey(token: string) {
   if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Solicitud de vinculación inválida.");
