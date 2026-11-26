@@ -34,21 +34,23 @@ function createNonce() {
 }
 
 function toGatewayUrl(uri: string, cid: string) {
-  if (/^https?:\\/\\//i.test(uri)) return uri;
+  if (uri.startsWith("https://") || uri.startsWith("http://")) return uri;
 
   const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL
     ?.trim()
-    .replace(/^https?:\\/\\//i, "")
-    .replace(/\\/+$/, "");
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
 
   if (!gateway) {
     throw new Error("No se pudo generar el enlace público. Revisa NEXT_PUBLIC_GATEWAY_URL.");
   }
 
-  const path = uri.replace(/^ipfs:\/\//i, "").replace(/^\\/?ipfs\\//i, "") || cid;
-  return `https://${gateway}/ipfs/${path}`;
-}
+  const path = uri.startsWith("ipfs://")
+    ? uri.slice("ipfs://".length)
+    : uri.replace(/^\/?ipfs\//i, "");
 
+  return \`https://\${gateway}/ipfs/\${path || cid}\`;
+}
 export function LoyaltyManagement({
   concesionario,
   nombreConcesionario,
@@ -403,7 +405,7 @@ export function LoyaltyManagement({
             <div className="flex flex-col rounded-lg border border-[#eff0f2] p-3">
               <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">METADATA JSON</p>
               <div className="mt-2 flex flex-1 flex-col justify-center rounded-lg bg-[#f7f8fa] p-4">
-                <span className="text-3xl text-[#a0a6ad]">{ }</span>
+                <span className="text-3xl text-[#a0a6ad]">{"{}"}</span>
                 <p className="mt-2 text-[11px] font-semibold text-[#252a30]">Datos públicos del token</p>
                 <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">
                   Incluye el nombre, símbolo, descripción y el enlace público de la imagen.
