@@ -25,6 +25,8 @@ import { useCluster } from "../cluster-context";
 import { deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
 
 type LinkSession = {
+  owner: string;
+  concesionario: string;
   walletAddress: string | null;
   transaction: string | null;
   signedTransaction: string | null;
@@ -94,58 +96,56 @@ export function CustomerWalletLink({
     };
   }, [token, session?.status]);
 
-  useEffect(() => {
-    if (
-      !token ||
-      !session?.walletAddress ||
-      session.transaction ||
-      session.status !== "waiting_transaction" ||
-      !connected?.signer ||
-      buildingRef.current
-    ) return;
+  const authorizeWallet = async () => {
+    if (!token || !session?.walletAddress || !connected?.signer || !connected.account.address) return;
+    if (connected.account.address !== session.owner || session.concesionario !== concesionario) {
+      setError("La wallet conectada o el concesionario no coinciden con la solicitud.");
+      return;
+    }
+    if (buildingRef.current) return;
 
     buildingRef.current = true;
     setBusy(true);
     setError(null);
+    try {
+      const [walletCliente] = await deriveWalletClientePda(address(cliente));
+      const existing = await client.registro.accounts.walletCliente.fetch(walletCliente).catch(() => null);
+      if (existing) throw new Error("Este cliente ya tiene una wallet vinculada.");
 
-    void (async () => {
-      try {
-        const [walletCliente] = await deriveWalletClientePda(address(cliente));
-        const instruction = client.registro.instructions.vincularWalletCliente({
-          owner: connected.signer!,
-          wallet: createNoopSigner(address(session.walletAddress!)),
-          cliente: address(cliente),
-          walletCliente,
-        });
+      const instruction = client.registro.instructions.vincularWalletCliente({
+        owner: connected.signer,
+        wallet: createNoopSigner(address(session.walletAddress)),
+        cliente: address(cliente),
+        walletCliente,
+      });
 
-        const latestBlockhash = await client.rpc
-          .getLatestBlockhash({ commitment: "confirmed" })
-          .send();
+      const latestBlockhash = await client.rpc
+        .getLatestBlockhash({ commitment: "confirmed" })
+        .send();
 
-        const message = pipe(
-          createTransactionMessage({ version: 0 }),
-          (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
-          (tx) => appendTransactionMessageInstruction(instruction, tx),
-          (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx)
-        );
+      const message = pipe(
+        createTransactionMessage({ version: 0 }),
+        (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
+        (tx) => appendTransactionMessageInstruction(instruction, tx),
+        (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx)
+      );
 
-        const [partiallySigned] = await partiallySignTransactionMessageWithSigners(message);
-        const serialized = getBase64EncodedWireTransaction(partiallySigned);
-        const response = await fetch(`/api/wallet-link/${token}/transaction`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transaction: serialized }),
-        });
-        const payload = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "No se pudo preparar la transacción.");
-      } catch (cause) {
-        buildingRef.current = false;
-        setError(cause instanceof Error ? cause.message : "No se pudo preparar la transacción.");
-      } finally {
-        setBusy(false);
-      }
-    })();
-  }, [token, session?.walletAddress, session?.transaction, session?.status, connected?.signer, cliente, client]);
+      const [partiallySigned] = await partiallySignTransactionMessageWithSigners(message);
+      const serialized = getBase64EncodedWireTransaction(partiallySigned);
+      const response = await fetch(`/api/wallet-link/${token}/transaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction: serialized }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "No se pudo preparar la transacción.");
+    } catch (cause) {
+      buildingRef.current = false;
+      setError(cause instanceof Error ? cause.message : "No se pudo preparar la transacción.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!token || !session?.signedTransaction || session.status !== "signed" || sendingRef.current) return;
@@ -247,8 +247,17 @@ export function CustomerWalletLink({
               El cliente abrirá esta solicitud y conectará su wallet. El concesionario preparará y firmará la transacción; después, el comprador la completará desde el teléfono.
             </p>
             <p className="mt-3 text-[9px] font-semibold text-[#e60012]">
-              {!session?.walletAddress ? "Esperando que el cliente conecte su wallet…" : !session.transaction ? "Wallet recibida. Preparando transacción…" : session.status === "signed" ? "Firma recibida. Enviando a Solana…" : "Esperando la firma del cliente…"}
+              {!session?.walletAddress ? "Esperando que el cliente conecte su wallet…" : !session.transaction ? "Verifica la dirección y autoriza la wallet del comprador." : session.status === "signed" ? "Firma recibida. Enviando a Solana…" : "Esperando la firma del cliente…"}
             </p>
+            {session?.walletAddress && !session.transaction && (
+              <div className="mt-3 rounded-lg border border-[#f0d9b9] bg-[#fffaf2] p-3">
+                <p className="text-[9px] font-semibold text-[#9a641f]">WALLET DETECTADA · CONFIRMA CON EL COMPRADOR</p>
+                <p className="mt-1 break-all font-mono text-[10px] text-[#424950]">{session.walletAddress}</p>
+                <button type="button" onClick={() => void authorizeWallet()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">
+                  {busy ? "Preparando transacción…" : "Confirmar wallet y firmar"}
+                </button>
+              </div>
+            )}
             <p className="mt-2 break-all text-[9px] text-[#9aa1a9]">{url}</p>
             <p className="mt-2 text-[9px] text-[#9aa1a9]">El QR caduca en cinco minutos.</p>
           </div>
