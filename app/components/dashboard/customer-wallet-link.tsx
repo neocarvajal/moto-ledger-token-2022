@@ -60,6 +60,8 @@ export function CustomerWalletLink({
   const [now, setNow] = useState(() => Date.now());
   const buildingRef = useRef(false);
   const sendingRef = useRef(false);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
 
   useEffect(() => {
     let active = true;
@@ -80,10 +82,17 @@ export function CustomerWalletLink({
   }, [client, cliente]);
 
   useEffect(() => {
-    if (!token || session?.status === "completed" || session?.status === "cancelled") return;
-    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    if (!token) return;
+    const interval = window.setInterval(() => {
+      const status = sessionRef.current?.status;
+      if (status === "completed" || status === "cancelled") {
+        window.clearInterval(interval);
+        return;
+      }
+      setNow(Date.now());
+    }, 1000);
     return () => window.clearInterval(interval);
-  }, [token, session?.status]);
+  }, [token]);
 
   useEffect(() => {
     if (!token || session?.status === "completed" || session?.status === "cancelled") return;
