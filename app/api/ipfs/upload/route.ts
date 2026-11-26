@@ -1,10 +1,10 @@
 import { createPublicKey, verify } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getOrCreateDealershipGroup, getPinataClient } from "@/app/lib/pinata";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../../../app/lib/moto-ledger/src/generated/programs/registro";
 
 export const runtime = "nodejs";
 
-const REGISTRO_PROGRAM_ID = "64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj";
 const CONCESIONARIO_DISCRIMINATOR = Buffer.from([
   218, 52, 45, 199, 219, 127, 159, 179,
 ]);
@@ -101,7 +101,7 @@ async function verifyDealershipOwner(
   if (payload.error) throw new Error("La consulta de propiedad en Solana falló.");
 
   const account = payload.result?.value;
-  if (!account || account.owner !== REGISTRO_PROGRAM_ID || !account.data?.[0]) {
+  if (!account || account.owner !== REGISTRO_PROGRAM_ADDRESS || !account.data?.[0]) {
     return false;
   }
 
