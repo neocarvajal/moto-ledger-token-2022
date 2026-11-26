@@ -1,6 +1,6 @@
 import { createPublicKey, verify } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getOrCreateDealershipGroup, getPinataClient } from "@/app/lib/pinata";
+import { getPinataClient } from "@/app/lib/pinata";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../../../app/lib/moto-ledger/src/generated/programs/registro";
 
 export const runtime = "nodejs";
@@ -208,17 +208,11 @@ export async function POST(request: Request) {
     pinataStage = "inicialización del cliente";
     const pinata = getPinataClient();
 
-    pinataStage = "consulta o creación del grupo";
-    console.info("[Pinata] 1. Consultando o creando grupo...");
-    const group = await getOrCreateDealershipGroup(dealership);
-    console.info("[Pinata] 4. Grupo listo:", group.id);
-
     pinataStage = "subida de imagen";
     console.info("[Pinata] 5. Subiendo imagen...");
     const imageResult = await pinata.upload.public
       .file(file)
       .name(`${symbol}-loyalty-image`)
-      .group(group.id)
       .keyvalues({
         dealership,
         cluster,
@@ -258,7 +252,6 @@ export async function POST(request: Request) {
       metadataCid: metadataResult.cid,
       imageFileId: imageResult.id,
       metadataFileId: metadataResult.id,
-      groupId: group.id,
     });
   } catch (error) {
     console.error(`[Pinata] Error durante ${pinataStage}:`, error);
