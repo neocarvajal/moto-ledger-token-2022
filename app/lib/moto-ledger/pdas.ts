@@ -86,6 +86,14 @@ export async function deriveProgramaFidelidadPda(concesionario: Address) {
   });
 }
 
+/** IPFS metadata references PDA for a loyalty program. */
+export async function deriveMetadataFidelidadPda(programaFidelidad: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("metadata_fidelidad"), key(programaFidelidad)],
+  });
+}
+
 /** Mint authority PDA used to sign Token-2022 MintTo CPIs. */
 export async function deriveAutoridadFidelidadPda(concesionario: Address) {
   return getProgramDerivedAddress({
