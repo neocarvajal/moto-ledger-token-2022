@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
-import { updateWalletLinkSession } from "../../../../../lib/wallet-link-store";
+import {
+  getBase64Encoder,
+  getTransactionDecoder,
+} from "@solana/kit";
+import {
+  getWalletLinkSession,
+  updateWalletLinkSession,
+} from "../../../../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
+
+function sameBytes(left: Uint8Array, right: Uint8Array) {
+  return left.length === right.length && left.every((byte, index) => byte === right[index]);
+}
 
 export async function POST(
   request: Request,
@@ -19,12 +30,40 @@ export async function POST(
       return NextResponse.json({ error: "Transacción firmada inválida." }, { status: 400 });
     }
 
-    const session = await updateWalletLinkSession(token, (current) => {
-      if (current.status !== "waiting_customer_signature" || !current.transaction || current.signedTransaction) {
-        throw new Error("La solicitud no está esperando la firma del comprador.");
+    const current = await getWalletLinkSession(token);
+    if (!current || current.status !== "waiting_customer_signature" || !current.transaction || !current.walletAddress) {
+      return NextResponse.json({ error: "La solicitud no está esperando la firma del comprador." }, { status: 409 });
+    }
+
+    const decoder = getTransactionDecoder();
+    const encoder = getBase64Encoder();
+    const original = decoder.decode(encoder.encode(current.transaction));
+    const submitted = decoder.decode(encoder.encode(body.transaction));
+
+    if (!sameBytes(original.messageBytes, submitted.messageBytes)) {
+      return NextResponse.json({ error: "La transacción firmada no coincide con la que autorizó el concesionario." }, { status: 400 });
+    }
+
+    const ownerSignature = original.signatures[current.owner];
+    const submittedOwnerSignature = submitted.signatures[current.owner];
+    const customerSignature = submitted.signatures[current.walletAddress];
+
+    if (
+      !ownerSignature ||
+      !submittedOwnerSignature ||
+      !sameBytes(ownerSignature, submittedOwnerSignature) ||
+      !customerSignature ||
+      customerSignature.every((byte) => byte === 0)
+    ) {
+      return NextResponse.json({ error: "Faltan las firmas requeridas para esta vinculación." }, { status: 400 });
+    }
+
+    const session = await updateWalletLinkSession(token, (latest) => {
+      if (latest.status !== "waiting_customer_signature" || latest.signedTransaction) {
+        throw new Error("La solicitud ya fue utilizada.");
       }
       return {
-        ...current,
+        ...latest,
         signedTransaction: body.transaction as string,
         status: "signed",
       };
