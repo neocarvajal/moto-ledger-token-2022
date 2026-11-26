@@ -42,6 +42,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("Cargando solicitud segura…");
   const [now, setNow] = useState(() => Date.now());
+  const [walletSelectionConfirmed, setWalletSelectionConfirmed] = useState(false);
   const signingRef = useRef(false);
   const walletSentRef = useRef(false);
 
@@ -94,7 +95,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   }, [session?.status, session?.expiresAt, loadSession]);
 
   useEffect(() => {
-    if (!connected?.account.address || !session || session.walletAddress || walletSentRef.current) return;
+    if (!walletSelectionConfirmed || !connected?.account.address || !session || session.walletAddress || walletSentRef.current) return;
     walletSentRef.current = true;
     setMessage("Registrando la dirección de tu wallet…");
     void fetch(`/api/wallet-link/${token}/wallet`, {
@@ -112,7 +113,7 @@ export function WalletLinkClient({ token }: { token: string }) {
         walletSentRef.current = false;
         setError(cause instanceof Error ? cause.message : "No se pudo registrar la wallet.");
       });
-  }, [connected?.account.address, session, token, loadSession]);
+  }, [walletSelectionConfirmed, connected?.account.address, session, token, loadSession]);
 
   const signTransaction = async () => {
     if (!connected || !session?.transaction || session.signedTransaction || signingRef.current) return;
@@ -198,7 +199,13 @@ export function WalletLinkClient({ token }: { token: string }) {
                 {wallets.length ? (
                   <div className="space-y-2">
                     {wallets.map((wallet) => (
-                      <button key={wallet.name} type="button" disabled={connecting} onClick={() => void connect(wallet).catch((cause) => setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet."))} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] transition hover:border-[#e60012] disabled:opacity-50">
+                      <button key={wallet.name} type="button" disabled={connecting} onClick={() => {
+                        setWalletSelectionConfirmed(true);
+                        void connect(wallet).catch((cause) => {
+                          setWalletSelectionConfirmed(false);
+                          setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet.");
+                        });
+                      }} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] transition hover:border-[#e60012] disabled:opacity-50">
                         {wallet.icon && (
                           // eslint-disable-next-line @next/next/no-img-element -- Wallet Standard icons are data URIs.
                           <img src={wallet.icon} alt="" className="h-6 w-6 rounded-md" />
@@ -217,6 +224,38 @@ export function WalletLinkClient({ token }: { token: string }) {
               <p className="mt-6 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
                 Esta solicitud está asociada a otra dirección. Desconecta la wallet actual y conecta {shortAddress(session.walletAddress)}.
               </p>
+            ) : !walletSelectionConfirmed ? (
+              <div className="mt-6 rounded-xl border border-[#e2e5e8] bg-white p-4">
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const detectedWallet = wallets.find((wallet) =>
+                      wallet.accounts.some((account) => account.address === connected.account.address)
+                    );
+                    return (
+                      <>
+                        {detectedWallet?.icon && (
+                          // eslint-disable-next-line @next/next/no-img-element -- Wallet Standard icons are data URIs.
+                          <img src={detectedWallet.icon} alt="" className="h-9 w-9 rounded-lg" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#30363d]">{detectedWallet?.name ?? "Wallet detectada"}</p>
+                          <p className="mt-1 break-all font-mono text-[10px] text-[#68717b]">{connected.account.address}</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-[#68717b]">
+                  Detectamos una autorización anterior de esta wallet. Confirma si deseas utilizarla para esta vinculación.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setWalletSelectionConfirmed(true)}
+                  className="mt-4 w-full rounded-xl bg-[#e60012] px-4 py-3 text-xs font-bold text-white transition hover:bg-[#c90010]"
+                >
+                  Continuar con esta wallet
+                </button>
+              </div>
             ) : (
               <div className="mt-6 rounded-xl border border-[#d7eee2] bg-[#f3fbf6] p-4">
                 <p className="text-[9px] font-bold tracking-wide text-[#168354]">WALLET CONECTADA</p>
