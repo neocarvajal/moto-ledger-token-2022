@@ -260,6 +260,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       imageUri,
       metadataUri: buildGatewayUri(metadataResult.cid),
+      metadata,
       imageCid: imageResult.cid,
       metadataCid: metadataResult.cid,
       imageFileId: imageResult.id,
