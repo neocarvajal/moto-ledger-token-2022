@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  address,
   getBase64Encoder,
   getTransactionDecoder,
 } from "@solana/kit";
@@ -45,9 +46,9 @@ export async function POST(
       return NextResponse.json({ error: "La transacción firmada no coincide con la que autorizó el concesionario." }, { status: 400 });
     }
 
-    const ownerSignature = original.signatures[current.owner];
-    const submittedOwnerSignature = submitted.signatures[current.owner];
-    const customerSignature = submitted.signatures[current.walletAddress];
+    const ownerSignature = original.signatures[address(current.owner)];
+    const submittedOwnerSignature = submitted.signatures[address(current.owner)];
+    const customerSignature = submitted.signatures[address(current.walletAddress)];
 
     if (
       !ownerSignature ||
