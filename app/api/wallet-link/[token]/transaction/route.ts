@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBase64Encoder, getTransactionDecoder } from "@solana/kit";
-import { claimWalletLinkValue, getWalletLinkSession, updateWalletLinkSession } from "../../../../../lib/wallet-link-store";
+import { claimWalletLinkValue, getWalletLinkSession, updateWalletLinkSession } from "../../../../lib/wallet-link-store";
 
 export const runtime = "nodejs";
 
