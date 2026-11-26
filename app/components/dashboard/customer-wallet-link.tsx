@@ -179,6 +179,10 @@ export function CustomerWalletLink({
   }, [token, session?.signedTransaction, session?.status, session?.walletAddress, client]);
 
   const startLink = async () => {
+    if (cluster === "localnet") {
+      toast.error("La vinculación por QR requiere una red pública accesible desde el teléfono.");
+      return;
+    }
     if (!connected?.signer || !connected.account.address) {
       toast.error("Conecta la wallet propietaria del concesionario.");
       return;
