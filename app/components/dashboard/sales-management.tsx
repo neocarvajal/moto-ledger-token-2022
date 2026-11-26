@@ -45,7 +45,7 @@ import type { PuntosVenta } from "../../lib/moto-ledger/src/generated/accounts/p
 
 type MotorcycleRecord = { address: string; data: Moto };
 type CustomerRecord = { address: string; data: Cliente };
-type SaleRecord = { address: string; data: Venta; reward?: PuntosVenta };
+type SaleRecord = { address: string; data: Venta; reward?: PuntosVenta; rewardStatus?: "issued" | "none" | "unavailable" };
 type SaleConfirmation = {
   points: bigint | null;
   wallet: string | null;
@@ -164,12 +164,12 @@ export function SalesManagement({
         try {
           const [rewardPda] = await derivePuntosVentaPda(address(sale.address));
           const rewardInfo = await client.rpc.getAccountInfo(rewardPda, { encoding: "base64" }).send();
-          if (!rewardInfo.value) return sale;
+          if (!rewardInfo.value) return { ...sale, rewardStatus: "none" as const };
           const reward = await client.registro.accounts.puntosVenta.fetch(rewardPda);
-          return { ...sale, reward: reward.data };
+          return { ...sale, reward: reward.data, rewardStatus: "issued" as const };
         } catch (error) {
           console.warn("No se pudo consultar el comprobante de puntos de la venta:", sale.address, error);
-          return sale;
+          return { ...sale, rewardStatus: "unavailable" as const };
         }
       }));
 
@@ -635,7 +635,7 @@ export function SalesManagement({
                 <p className="mt-2 text-[9px] text-[#6c8b7b]">La emisión también quedó asociada permanentemente al registro de esta venta en Solana.</p>
               </div>
             ) : (
-              <p className="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] text-[#68717b]">La venta quedó registrada, pero no se emitieron puntos porque el cliente no tenía wallet vinculada o el programa no estaba activo.</p>
+              <p className="mt-3 rounded-lg bg-white px-3 py-2 text-[10px] text-[#68717b]">La venta quedó registrada, pero no se encontró un comprobante de emisión de puntos para esta operación.</p>
             )}
             <div className="mt-3 flex flex-wrap gap-3 text-[9px] font-semibold">
               <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.saleAddress + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="text-[#16845a] underline decoration-dotted underline-offset-2">Ver venta en Explorer ↗</a>
@@ -669,7 +669,7 @@ export function SalesManagement({
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       {sale.reward ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#edf8f2] px-2 py-1 font-bold text-[#16845a]">+{formatAmount(sale.reward.cantidad)} BERA</span>
-                      ) : <span className="text-[#a0a6ad]">No emitidos</span>}
+                      ) : <span className="text-[#a0a6ad]">{sale.rewardStatus === "none" ? "No emitidos" : "No verificado"}</span>}
                     </td>
                     <td className="px-6 py-3 text-right"><a href={`https://explorer.solana.com/address/${sale.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#68717b] underline decoration-dotted underline-offset-2 hover:text-[#e60012]">{shortAddress(sale.address)} ↗</a></td>
                     <td className="px-4 py-3 text-right"><button type="button" onClick={() => void handleViewDetails(sale)} disabled={detailLoading !== null} className="whitespace-nowrap rounded-md border border-[#e2e5e8] px-2.5 py-1.5 text-[9px] font-semibold text-[#555e68] transition hover:border-[#e60012] hover:text-[#e60012] disabled:opacity-50">{detailLoading === sale.address ? "Cargando…" : "Ver detalles"}</button></td>
@@ -727,7 +727,7 @@ export function SalesManagement({
                   {saleDetails.sale.reward ? (
                     <span className="rounded-full bg-[#dff5e8] px-2.5 py-1 text-[9px] font-bold text-[#16845a]">PUNTOS ACREDITADOS</span>
                   ) : (
-                    <span className="rounded-full bg-[#f0f1f3] px-2.5 py-1 text-[9px] font-bold text-[#858d96]">SIN EMISIÓN</span>
+                    <span className="rounded-full bg-[#f0f1f3] px-2.5 py-1 text-[9px] font-bold text-[#858d96]">{saleDetails.sale.rewardStatus === "none" ? "SIN EMISIÓN" : "NO VERIFICADO"}</span>
                   )}
                 </div>
                 {saleDetails.sale.reward ? (
@@ -740,7 +740,7 @@ export function SalesManagement({
                     <p className="mt-2 break-all font-mono text-[9px] text-[#8b9690]">Wallet receptora: {saleDetails.sale.reward.wallet}</p>
                   </>
                 ) : (
-                  <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">Esta venta no tiene un registro de emisión de puntos asociado.</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">{saleDetails.sale.rewardStatus === "none" ? "Esta venta no tiene un registro de emisión de puntos asociado." : "No se pudo verificar el registro de puntos en este momento. Actualiza el historial para volver a consultar."}</p>
                 )}
               </div>
 
