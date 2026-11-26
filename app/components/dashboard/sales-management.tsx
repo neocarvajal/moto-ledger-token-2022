@@ -9,7 +9,7 @@ import {
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import {
-  getCreateAssociatedTokenInstructionAsync,
+  getCreateAssociatedTokenIdempotentInstructionAsync,
   TOKEN_2022_PROGRAM_ADDRESS,
 } from "@solana-program/token-2022";
 import { toast } from "sonner";
@@ -326,20 +326,15 @@ export function SalesManagement({
         const mint = loyaltyProgram.data.mint;
         const [tokenAccount] = await deriveToken2022Ata(customerWallet, mint);
 
-        // Create the customer's Token-2022 ATA when it does not exist.
-        // The dealership wallet pays the refundable rent and transaction fee.
-        const tokenAccountInfo = await client.rpc
-          .getAccountInfo(tokenAccount, { encoding: "base64" })
-          .send();
-
-        const createAtaInstruction = !tokenAccountInfo.value
-          ? await getCreateAssociatedTokenInstructionAsync({
-              payer: connected.signer,
-              mint,
-              owner: customerWallet,
-              tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
-            })
-          : null;
+        // Idempotent creation is safe whether the customer's Token-2022
+        // ATA already exists or needs to be created. The dealership pays rent.
+        const createAtaInstruction =
+          await getCreateAssociatedTokenIdempotentInstructionAsync({
+            payer: connected.signer,
+            mint,
+            owner: customerWallet,
+            tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+          });
 
         const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealerAddress);
         const [puntosVenta] = await derivePuntosVentaPda(venta);
@@ -359,10 +354,11 @@ export function SalesManagement({
 
         // ATA creation (when needed), sale registration and reward issuance
         // are submitted atomically: any failure rolls back all three operations.
-        const instructions = createAtaInstruction
-          ? [createAtaInstruction, saleInstruction, rewardInstruction]
-          : [saleInstruction, rewardInstruction];
-        result = await client.sendTransaction(instructions);
+        result = await client.sendTransaction([
+          createAtaInstruction,
+          saleInstruction,
+          rewardInstruction,
+        ]);
         awardedPoints = loyaltyProgram.data.puntosPorVenta;
       } else {
         result = await saleInstruction.sendTransaction();
