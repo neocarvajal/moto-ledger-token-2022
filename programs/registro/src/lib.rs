@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, MintTo, TokenAccount, TokenInterface};
+use anchor_spl::token_interface::{self, Burn, Mint, MintTo, TokenAccount, TokenInterface};
 use anchor_spl::token_2022::spl_token_2022::extension::{BaseStateWithExtensions, ExtensionType, StateWithExtensions};
 
 declare_id!("64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj");
@@ -588,6 +588,199 @@ pub mod registro {
         Ok(())
     }
 
+
+    /// Creates the initial redemption catalog for a dealership.
+    /// The catalog is a separate PDA so existing account layouts remain unchanged.
+    pub fn inicializar_catalogo_servicios(
+        context: Context<InicializarCatalogoServicios>,
+    ) -> Result<()> {
+        context.accounts.catalogo_servicios.set_inner(CatalogoServicios {
+            concesionario: context.accounts.concesionario.key(),
+            total_servicios: 4,
+            servicios: vec![
+                ServicioCatalogo {
+                    id: 1,
+                    nombre: "Cambio de aceite".to_string(),
+                    descripcion: "Cambio de aceite y revision basica".to_string(),
+                    puntos: 80,
+                    activo: true,
+                },
+                ServicioCatalogo {
+                    id: 2,
+                    nombre: "Ajuste de frenos".to_string(),
+                    descripcion: "Revision y ajuste basico de frenos".to_string(),
+                    puntos: 60,
+                    activo: true,
+                },
+                ServicioCatalogo {
+                    id: 3,
+                    nombre: "Revision general".to_string(),
+                    descripcion: "Inspeccion general de la motocicleta".to_string(),
+                    puntos: 120,
+                    activo: true,
+                },
+                ServicioCatalogo {
+                    id: 4,
+                    nombre: "Mantenimiento preventivo".to_string(),
+                    descripcion: "Mantenimiento preventivo general".to_string(),
+                    puntos: 150,
+                    activo: true,
+                },
+            ],
+            bump: context.bumps.catalogo_servicios,
+        });
+
+        msg!("Catalogo inicial de servicios creado para el concesionario");
+        Ok(())
+    }
+
+    /// Updates the price, description, name or availability of an existing service.
+    pub fn actualizar_servicio_catalogo(
+        context: Context<AdministrarCatalogoServicios>,
+        servicio_id: u8,
+        nombre: String,
+        descripcion: String,
+        puntos: u64,
+        activo: bool,
+    ) -> Result<()> {
+        require!(!nombre.is_empty() && nombre.len() <= 40, Errores::NombreServicioInvalido);
+        require!(descripcion.len() <= 100, Errores::DescripcionServicioInvalida);
+        require!(puntos > 0, Errores::PuntosInvalidos);
+
+        let servicio = context.accounts.catalogo_servicios.servicios
+            .iter_mut()
+            .find(|servicio| servicio.id == servicio_id)
+            .ok_or(Errores::ServicioNoEncontrado)?;
+
+        servicio.nombre = nombre;
+        servicio.descripcion = descripcion;
+        servicio.puntos = puntos;
+        servicio.activo = activo;
+
+        Ok(())
+    }
+
+    /// Adds another service to the dealership catalog.
+    pub fn agregar_servicio_catalogo(
+        context: Context<AdministrarCatalogoServicios>,
+        nombre: String,
+        descripcion: String,
+        puntos: u64,
+        activo: bool,
+    ) -> Result<()> {
+        require!(!nombre.is_empty() && nombre.len() <= 40, Errores::NombreServicioInvalido);
+        require!(descripcion.len() <= 100, Errores::DescripcionServicioInvalida);
+        require!(puntos > 0, Errores::PuntosInvalidos);
+        require!(
+            context.accounts.catalogo_servicios.servicios.len() < CatalogoServicios::MAX_SERVICIOS,
+            Errores::CatalogoLleno
+        );
+
+        let id = context.accounts.catalogo_servicios.total_servicios
+            .checked_add(1)
+            .ok_or(Errores::ContadorInvalido)?;
+
+        context.accounts.catalogo_servicios.servicios.push(ServicioCatalogo {
+            id,
+            nombre,
+            descripcion,
+            puntos,
+            activo,
+        });
+        context.accounts.catalogo_servicios.total_servicios = id;
+
+        Ok(())
+    }
+
+    /// Burns the customer's non-transferable BERA points and stores an on-chain receipt.
+    /// Both the dealership owner and the linked customer wallet must sign.
+    pub fn canjear_servicio(
+        context: Context<CanjearServicio>,
+        servicio_id: u8,
+        id_canje: u64,
+    ) -> Result<()> {
+        require!(id_canje > 0, Errores::IdCanjeInvalido);
+        require!(
+            context.accounts.cliente.total_motos_cliente > 0,
+            Errores::ClienteSinCompras
+        );
+        require_keys_eq!(
+            context.accounts.wallet_cliente.wallet,
+            context.accounts.wallet.key(),
+            Errores::WalletClienteInvalida
+        );
+
+        let servicio = context.accounts.catalogo_servicios.servicios
+            .iter()
+            .find(|servicio| servicio.id == servicio_id)
+            .ok_or(Errores::ServicioNoEncontrado)?;
+
+        require!(servicio.activo, Errores::ServicioNoDisponible);
+        let puntos = servicio.puntos;
+        let nombre_servicio = servicio.nombre.clone();
+
+        require_keys_eq!(
+            context.accounts.mint.key(),
+            context.accounts.programa_fidelidad.mint,
+            Errores::MintInvalido
+        );
+        require_keys_eq!(
+            *context.accounts.mint.to_account_info().owner,
+            anchor_spl::token_2022::ID,
+            Errores::Token2022Requerido
+        );
+        require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
+        require_keys_eq!(
+            context.accounts.token_account.mint,
+            context.accounts.mint.key(),
+            Errores::MintInvalido
+        );
+        require_keys_eq!(
+            context.accounts.token_account.owner,
+            context.accounts.wallet.key(),
+            Errores::WalletClienteInvalida
+        );
+        require!(
+            context.accounts.token_account.amount >= puntos,
+            Errores::SaldoInsuficiente
+        );
+
+        token_interface::burn(
+            CpiContext::new(
+                context.accounts.token_program.to_account_info(),
+                Burn {
+                    mint: context.accounts.mint.to_account_info(),
+                    from: context.accounts.token_account.to_account_info(),
+                    authority: context.accounts.wallet.to_account_info(),
+                },
+            ),
+            puntos,
+        )?;
+
+        let fecha_canje = Clock::get()?.unix_timestamp;
+        context.accounts.canje_servicio.set_inner(CanjeServicio {
+            concesionario: context.accounts.concesionario.key(),
+            catalogo_servicios: context.accounts.catalogo_servicios.key(),
+            cliente: context.accounts.cliente.key(),
+            wallet: context.accounts.wallet.key(),
+            mint: context.accounts.mint.key(),
+            servicio_id,
+            servicio_nombre: nombre_servicio.clone(),
+            puntos,
+            fecha_canje,
+            id_canje,
+            bump: context.bumps.canje_servicio,
+        });
+
+        msg!(
+            "Canje confirmado: {} por {} BERA. Cliente: {}",
+            nombre_servicio,
+            puntos,
+            context.accounts.cliente.key()
+        );
+        Ok(())
+    }
+
 }
 
 
@@ -919,6 +1112,123 @@ pub struct OtorgarPuntos<'info> {
     pub system_program: Program<'info, System>,
 }
 
+
+#[derive(Accounts)]
+pub struct InicializarCatalogoServicios<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = CatalogoServicios::LEN,
+        seeds = [b"catalogo_servicios", concesionario.key().as_ref()],
+        bump
+    )]
+    pub catalogo_servicios: Account<'info, CatalogoServicios>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AdministrarCatalogoServicios<'info> {
+    pub owner: Signer<'info>,
+
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        mut,
+        has_one = concesionario,
+        seeds = [b"catalogo_servicios", concesionario.key().as_ref()],
+        bump = catalogo_servicios.bump
+    )]
+    pub catalogo_servicios: Account<'info, CatalogoServicios>,
+}
+
+#[derive(Accounts)]
+pub struct CanjearServicio<'info> {
+    /// The dealership owner pays the transaction fee and receipt rent, and confirms delivery.
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    /// The customer signs to authorize burning their BERA balance.
+    pub wallet: Signer<'info>,
+
+    #[account(
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        has_one = concesionario,
+        seeds = [b"programa_fidelidad", concesionario.key().as_ref()],
+        bump
+    )]
+    pub programa_fidelidad: Account<'info, ProgramaFidelidad>,
+
+    #[account(
+        has_one = concesionario,
+        seeds = [b"catalogo_servicios", concesionario.key().as_ref()],
+        bump = catalogo_servicios.bump
+    )]
+    pub catalogo_servicios: Account<'info, CatalogoServicios>,
+
+    #[account(
+        constraint = cliente.owner == owner.key() @ Errores::Unauthorized,
+        seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub cliente: Account<'info, Cliente>,
+
+    #[account(
+        has_one = cliente,
+        seeds = [b"wallet_cliente", cliente.key().as_ref()],
+        bump = wallet_cliente.bump
+    )]
+    pub wallet_cliente: Account<'info, WalletCliente>,
+
+    #[account(
+        mut,
+        address = programa_fidelidad.mint
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        constraint = token_account.mint == mint.key() @ Errores::MintInvalido,
+        constraint = token_account.owner == wallet.key() @ Errores::WalletClienteInvalida
+    )]
+    pub token_account: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = CanjeServicio::LEN,
+        seeds = [b"canje_servicio", cliente.key().as_ref(), id_canje.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub canje_servicio: Account<'info, CanjeServicio>,
+
+    #[account(address = anchor_spl::token_2022::ID)]
+    pub token_program: Interface<'info, TokenInterface>,
+
+    pub system_program: Program<'info, System>,
+}
+
 #[error_code]
 pub enum Errores {
     #[msg("Error, el serial N.I.V debe tener una longitud de 17 caracteres")]
@@ -969,12 +1279,77 @@ pub enum Errores {
     VentaNoCorresponde,
     #[msg("La wallet no esta vinculada al cliente o no coincide con la cuenta de tokens")]
     WalletClienteInvalida,
+    #[msg("El servicio no existe en el catalogo")]
+    ServicioNoEncontrado,
+    #[msg("El servicio no esta disponible para canje")]
+    ServicioNoDisponible,
+    #[msg("El catalogo alcanzo el maximo de servicios")]
+    CatalogoLleno,
+    #[msg("El nombre del servicio debe contener entre 1 y 40 caracteres")]
+    NombreServicioInvalido,
+    #[msg("El cliente no tiene suficientes puntos BERA para este servicio")]
+    SaldoInsuficiente,
+    #[msg("El identificador del canje debe ser mayor a cero")]
+    IdCanjeInvalido,
     #[msg("Error: El contador ha alcanzado su valor máximo.")]
     ContadorInvalido,
     #[msg("El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet")]
     ClienteSinCompras,
     #[msg("El CID debe contener entre 1 y 100 caracteres alfanuméricos")]
     MetadataCidInvalido,
+}
+
+
+/// A service offered in exchange for loyalty points.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
+pub struct ServicioCatalogo {
+    pub id: u8,
+    #[max_len(40)]
+    pub nombre: String,
+    #[max_len(100)]
+    pub descripcion: String,
+    pub puntos: u64,
+    pub activo: bool,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct CatalogoServicios {
+    pub concesionario: Pubkey,
+    pub total_servicios: u8,
+    #[max_len(8)]
+    pub servicios: Vec<ServicioCatalogo>,
+    pub bump: u8,
+}
+
+impl CatalogoServicios {
+    pub const MAX_SERVICIOS: usize = 8;
+    pub const LEN: usize = DISCRIMINATOR + Self::INIT_SPACE;
+}
+
+/// Immutable receipt created atomically with the Token-2022 burn.
+#[account]
+pub struct CanjeServicio {
+    pub concesionario: Pubkey,
+    pub catalogo_servicios: Pubkey,
+    pub cliente: Pubkey,
+    pub wallet: Pubkey,
+    pub mint: Pubkey,
+    pub servicio_id: u8,
+    pub servicio_nombre: String,
+    pub puntos: u64,
+    pub fecha_canje: i64,
+    pub id_canje: u64,
+    pub bump: u8,
+}
+
+impl CanjeServicio {
+    pub const MAX_NOMBRE: usize = 40;
+    pub const LEN: usize =
+        DISCRIMINATOR +
+        32 + 32 + 32 + 32 + 32 +
+        1 + (4 + Self::MAX_NOMBRE) +
+        8 + 8 + 8 + 1;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
