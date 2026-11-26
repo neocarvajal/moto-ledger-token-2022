@@ -8,10 +8,19 @@ import {
   type Base58EncodedBytes,
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@solana-program/token-2022";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
-import { deriveClientePda, deriveVentaPda } from "../../lib/moto-ledger/pdas";
+import {
+  deriveAutoridadFidelidadPda,
+  deriveClientePda,
+  deriveProgramaFidelidadPda,
+  derivePuntosVentaPda,
+  deriveToken2022Ata,
+  deriveVentaPda,
+  deriveWalletClientePda,
+} from "../../lib/moto-ledger/pdas";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import {
   getMotoDecoder,
@@ -283,7 +292,7 @@ export function SalesManagement({
       if (motorcycle.data.vendida) throw new Error("Esta moto ya fue vendida.");
 
       const [venta] = await deriveVentaPda(address(motorcycle.address));
-      const instruction = client.registro.instructions.registrarVenta({
+      const saleInstruction = client.registro.instructions.registrarVenta({
         owner: connected.signer,
         concesionario: dealerAddress,
         cliente,
@@ -294,8 +303,71 @@ export function SalesManagement({
         cedulaCliente: customerId,
         precioVenta: amount,
       });
-      const result = await instruction.sendTransaction();
-      notifyTransactionSuccess("Venta registrada correctamente en Solana.", result.context.signature);
+
+      // Loyalty is optional: a sale must still be possible for customers
+      // without a linked wallet or dealerships without a loyalty program.
+      const [walletCliente] = await deriveWalletClientePda(cliente);
+      const [programaFidelidad] = await deriveProgramaFidelidadPda(dealerAddress);
+      const [walletInfo, loyaltyInfo] = await Promise.all([
+        client.rpc.getAccountInfo(walletCliente, { encoding: "base64" }).send(),
+        client.rpc.getAccountInfo(programaFidelidad, { encoding: "base64" }).send(),
+      ]);
+
+      let result;
+      let awardedPoints: bigint | null = null;
+
+      if (walletInfo.value && loyaltyInfo.value) {
+        const linkedWallet = await client.registro.accounts.walletCliente.fetch(walletCliente);
+        const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
+        const customerWallet = linkedWallet.data.wallet;
+        const mint = loyaltyProgram.data.mint;
+        const [tokenAccount] = await deriveToken2022Ata(customerWallet, mint);
+
+        // Create the customer's Token-2022 ATA when it does not exist.
+        // The dealership wallet pays the refundable rent and transaction fee.
+        const tokenAccountInfo = await client.rpc
+          .getAccountInfo(tokenAccount, { encoding: "base64" })
+          .send();
+
+        if (!tokenAccountInfo.value) {
+          await client.associatedToken.instructions.createAssociatedToken({
+            payer: connected.signer,
+            mint,
+            owner: customerWallet,
+            tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+          }).sendTransaction();
+        }
+
+        const [autoridadFidelidad] = await deriveAutoridadFidelidadPda(dealerAddress);
+        const [puntosVenta] = await derivePuntosVentaPda(venta);
+        const rewardInstruction = client.registro.instructions.otorgarPuntos({
+          owner: connected.signer,
+          concesionario: dealerAddress,
+          programaFidelidad,
+          venta,
+          cliente,
+          walletCliente,
+          puntosVenta,
+          autoridadFidelidad,
+          mint,
+          tokenAccount,
+          tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+        });
+
+        // Both instructions are submitted as one atomic Solana transaction:
+        // if reward issuance fails, the sale registration is rolled back too.
+        result = await client.sendTransaction([saleInstruction, rewardInstruction]);
+        awardedPoints = loyaltyProgram.data.puntosPorVenta;
+      } else {
+        result = await saleInstruction.sendTransaction();
+      }
+
+      notifyTransactionSuccess(
+        awardedPoints === null
+          ? "Venta registrada correctamente en Solana."
+          : `Venta registrada y ${formatAmount(awardedPoints)} puntos de fidelización emitidos.`,
+        result.context.signature
+      );
       setCedula("");
       setPrice("");
       setCustomerName("");
