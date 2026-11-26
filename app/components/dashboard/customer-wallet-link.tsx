@@ -23,7 +23,6 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
 import { deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
-import type { AppClient } from "../../lib/solana-client";
 
 type LinkSession = {
   walletAddress: string | null;
@@ -35,9 +34,11 @@ type LinkSession = {
 
 export function CustomerWalletLink({
   cliente,
+  concesionario,
   totalMotos,
 }: {
   cliente: string;
+  concesionario: string;
   totalMotos: number;
 }) {
   const client = useAppClient();
@@ -194,7 +195,7 @@ export function CustomerWalletLink({
         body: JSON.stringify({
           owner: connected.account.address,
           cliente,
-          concesionario: connected.account.address,
+          concesionario,
           cluster,
         }),
       });
