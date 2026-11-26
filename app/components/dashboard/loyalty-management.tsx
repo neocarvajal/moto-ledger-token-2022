@@ -469,38 +469,47 @@ export function LoyaltyManagement({
       )}
 
       {mintResult && (
-        <section className="rounded-xl border border-[#ccebdc] bg-white p-6 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#edf8f2] text-[#168451]">✓</span>
-            <div>
-              <h3 className="text-[13px] font-bold text-[#252a30]">Programa de fidelización creado</h3>
-              <p className="text-[9px] text-[#858d96]">El mint Token-2022 y la configuración quedaron registrados en la misma transacción.</p>
+        <section className="rounded-xl border border-[#ccebdc] bg-white p-4 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#edf8f2] text-[#168451]">✓</span>
+              <div>
+                <h3 className="text-[12px] font-bold text-[#252a30]">Programa de fidelización creado</h3>
+                <p className="text-[9px] text-[#858d96]">Mint y configuración registrados en Solana.</p>
+              </div>
             </div>
+            <a
+              href={`https://explorer.solana.com/tx/${mintResult.signature}?cluster=${apiCluster}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-semibold text-[#d90011] underline decoration-dotted underline-offset-2"
+            >
+              Ver transacción ↗
+            </a>
           </div>
-          <div className="mt-4 space-y-3">
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {[
               { label: "Mint Token-2022", value: mintResult.mint },
               { label: "PDA del programa", value: mintResult.programaFidelidad },
-              { label: "PDA autoridad de fidelización", value: mintResult.autoridadFidelidad },
-              { label: "Firma de la transacción", value: mintResult.signature },
+              { label: "PDA autoridad", value: mintResult.autoridadFidelidad },
             ].map((item) => (
-              <div key={item.label} className="rounded-lg border border-[#eff0f2] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">{item.label.toUpperCase()}</p>
-                  <button type="button" onClick={() => void copyValue(item.value, item.label)} className="shrink-0 text-[9px] font-semibold text-[#d90011] hover:underline">Copiar</button>
-                </div>
-                <p className="mt-1 break-all font-mono text-[10px] text-[#555e68]">{item.value}</p>
-              </div>
+              <a
+                key={item.label}
+                href={`https://explorer.solana.com/address/${item.value}?cluster=${apiCluster}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={item.value}
+                className="min-w-0 rounded-lg border border-[#eff0f2] px-3 py-2 transition hover:border-[#e60012]"
+              >
+                <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">{item.label.toUpperCase()}</p>
+                <p className="mt-1 truncate font-mono text-[10px] text-[#555e68]">
+                  {item.value.slice(0, 5)}…{item.value.slice(-5)}
+                </p>
+                <p className="mt-1 text-[9px] font-semibold text-[#d90011]">Ver cuenta ↗</p>
+              </a>
             ))}
           </div>
-          <a
-            href={`https://explorer.solana.com/tx/${mintResult.signature}?cluster=${apiCluster}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex text-[10px] font-semibold text-[#d90011] underline decoration-dotted underline-offset-2"
-          >
-            Ver transacción en Solana Explorer ↗
-          </a>
         </section>
       )}
     </div>
