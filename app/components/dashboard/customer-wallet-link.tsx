@@ -135,7 +135,7 @@ export function CustomerWalletLink({
         (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx)
       );
 
-      const [partiallySigned] = await partiallySignTransactionMessageWithSigners(message);
+      const partiallySigned = await partiallySignTransactionMessageWithSigners(message);
       assertIsTransactionWithBlockhashLifetime(partiallySigned);
       const ownerSignature = partiallySigned.signatures[address(ownerAddress)];
       if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) {
