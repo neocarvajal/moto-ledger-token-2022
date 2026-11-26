@@ -138,3 +138,12 @@ El mensaje firmado conserva exactamente el formato validado por el endpoint. El 
 La subida no crea el mint ni inicializa `MetadataPointer` o `TokenMetadata`. La URI devuelta queda preparada para una siguiente operación on-chain. La selección de red se limita a Devnet y Mainnet, que son las redes admitidas por la validación RPC del endpoint.
 
 La versión del SDK declarada en el proyecto es `pinata@^2.5.6`. El lockfile registra la versión publicada `2.5.6`; no se debe inventar un número de versión ni un integrity hash para el paquete. Si se modifica la dependencia, se debe regenerar el lockfile con `npm install`.
+
+
+## Referencias IPFS persistidas on-chain
+
+La cuenta existente `ProgramaFidelidad` conserva su layout para no invalidar las cuentas ya creadas. Las referencias de contenido se guardan en una PDA independiente `MetadataFidelidad`, derivada con las seeds `["metadata_fidelidad", programa_fidelidad]`.
+
+La cuenta almacena `metadata_cid` e `image_cid` (hasta 100 caracteres alfanuméricos cada uno), además de la PDA del programa al que pertenece y su bump. La instrucción `registrar_metadata_fidelidad` crea esa cuenta para programas existentes; `actualizar_metadata_fidelidad` permite cambiar ambos CID sin recrear el mint. Ambas instrucciones validan la propiedad del concesionario, la relación con la cuenta ProgramaFidelidad, la dirección del mint y que la autoridad del mint corresponda a la PDA de fidelización.
+
+La aplicación reconstruye las URLs usando los CID on-chain y el gateway configurado en el cliente. El gateway no se considera una referencia permanente: puede cambiar sin modificar las cuentas de Solana. El JSON de metadata continúa conteniendo el CID/URI de la imagen, mientras que TokenMetadata del mint conserva la URI del JSON.
