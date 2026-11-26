@@ -181,7 +181,10 @@ export function WalletLinkClient({ token }: { token: string }) {
                   <div className="space-y-2">
                     {wallets.map((wallet) => (
                       <button key={wallet.name} type="button" disabled={connecting} onClick={() => void connect(wallet).catch((cause) => setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet."))} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] transition hover:border-[#e60012] disabled:opacity-50">
-                        {wallet.icon && <img src={wallet.icon} alt="" className="h-6 w-6 rounded-md" />}
+                        {wallet.icon && (
+                          // eslint-disable-next-line @next/next/no-img-element -- Wallet Standard icons are data URIs.
+                          <img src={wallet.icon} alt="" className="h-6 w-6 rounded-md" />
+                        )}
                         {wallet.name}
                       </button>
                     ))}
