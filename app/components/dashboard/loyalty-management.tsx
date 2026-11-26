@@ -16,6 +16,13 @@ import { useCluster } from "../cluster-context";
 import { createLoyaltyMint } from "../../lib/moto-ledger/loyalty-mint";
 import { deriveProgramaFidelidadPda } from "../../lib/moto-ledger/pdas";
 
+type TokenMetadataJson = {
+  name: string;
+  symbol: string;
+  description: string;
+  image: string;
+};
+
 type UploadResult = {
   imageUri: string;
   metadataUri: string;
@@ -23,6 +30,7 @@ type UploadResult = {
   metadataCid: string;
   imageFileId: string;
   metadataFileId: string;
+  metadata: TokenMetadataJson;
 };
 
 type MintResult = {
@@ -325,10 +333,17 @@ export function LoyaltyManagement({
       }
 
       const uploaded = payload as UploadResult;
+      const publicImageUri = toGatewayUrl(uploaded.imageUri, uploaded.imageCid);
       const usableResult: UploadResult = {
         ...uploaded,
-        imageUri: toGatewayUrl(uploaded.imageUri, uploaded.imageCid),
+        imageUri: publicImageUri,
         metadataUri: toGatewayUrl(uploaded.metadataUri, uploaded.metadataCid),
+        metadata: uploaded.metadata ?? {
+          name: name.trim(),
+          symbol: symbol.trim().toUpperCase(),
+          description: description.trim(),
+          image: publicImageUri,
+        },
       };
       setResult(usableResult);
       toast.success("Imagen y metadata subidas correctamente a IPFS.");
@@ -482,6 +497,7 @@ export function LoyaltyManagement({
       }
 
       const uploaded = payload as UploadResult;
+      const imageUri = toGatewayUrl(uploaded.imageUri, uploaded.imageCid);
       const metadataUri = toGatewayUrl(uploaded.metadataUri, uploaded.metadataCid);
       const mintAddress = address(existingProgram.mint);
       const instructions = [
@@ -512,6 +528,17 @@ export function LoyaltyManagement({
       ];
 
       await client.sendTransaction(instructions);
+      setResult({
+        ...uploaded,
+        imageUri,
+        metadataUri,
+        metadata: uploaded.metadata ?? {
+          name: name.trim(),
+          symbol: symbol.trim().toUpperCase(),
+          description: description.trim(),
+          image: imageUri,
+        },
+      });
       setImage(null);
       setImagePreview(null);
       setReloadProgram((value) => value + 1);
@@ -828,11 +855,9 @@ export function LoyaltyManagement({
             <div className="flex flex-col rounded-lg border border-[#eff0f2] p-3">
               <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">METADATA JSON</p>
               <div className="mt-2 flex flex-1 flex-col justify-center rounded-lg bg-[#f7f8fa] p-4">
-                <span className="text-3xl text-[#a0a6ad]">{"{}"}</span>
-                <p className="mt-2 text-[11px] font-semibold text-[#252a30]">Datos públicos del token</p>
-                <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">
-                  Incluye el nombre, símbolo, descripción y el enlace público de la imagen.
-                </p>
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-[9px] leading-relaxed text-[#555e68]">
+                  {JSON.stringify(result.metadata, null, 2)}
+                </pre>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <a href={result.metadataUri} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-[#d90011] underline decoration-dotted underline-offset-2">
