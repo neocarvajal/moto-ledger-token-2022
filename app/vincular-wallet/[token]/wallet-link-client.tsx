@@ -223,6 +223,17 @@ export function WalletLinkClient({ token }: { token: string }) {
                 <p className="mt-2 break-all font-mono text-[11px] text-[#424950]">{connected.account.address}</p>
                 <p className="mt-3 text-xs leading-relaxed text-[#68717b]">{message}</p>
                 {session.transaction && !session.signedTransaction && session.status !== "completed" && (
+                  <div className="mt-4 rounded-xl border border-[#ccebd9] bg-[#eaf8f0] p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#168354] text-[11px] font-bold text-white">✓</span>
+                      <p className="text-xs font-bold text-[#126b45]">Solicitud aprobada por el concesionario</p>
+                    </div>
+                    <p className="mt-2 pl-7 text-[11px] leading-relaxed text-[#39765a]">
+                      El concesionario autorizó la vinculación y preparó la transacción. Revisa y firma desde tu wallet para completar el proceso.
+                    </p>
+                  </div>
+                )}
+                {session.transaction && !session.signedTransaction && session.status !== "completed" && (
                   <button
                     type="button"
                     onClick={() => void signTransaction()}
