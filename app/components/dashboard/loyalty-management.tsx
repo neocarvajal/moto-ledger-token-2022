@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { address, getBase64Encoder } from "@solana/kit";
+import { address } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
+import { createLoyaltyMint } from "../../lib/moto-ledger/loyalty-mint";
 
 type UploadResult = {
   imageUri: string;
@@ -15,6 +16,13 @@ type UploadResult = {
   imageFileId: string;
   metadataFileId: string;
   groupId: string;
+};
+
+type MintResult = {
+  mint: string;
+  programaFidelidad: string;
+  autoridadFidelidad: string;
+  signature: string;
 };
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -42,13 +50,17 @@ export function LoyaltyManagement({
   );
   const [image, setImage] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mintBusy, setMintBusy] = useState(false);
+  const [pointsPerSale, setPointsPerSale] = useState("100");
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [mintResult, setMintResult] = useState<MintResult | null>(null);
 
   useEffect(() => {
     setName(`${nombreConcesionario} Rewards`);
     setDescription(`Programa de fidelización de ${nombreConcesionario} en MotoLedger.`);
     setImage(null);
     setResult(null);
+    setMintResult(null);
   }, [concesionario, nombreConcesionario]);
 
   const supportedCluster = cluster === "devnet" || cluster === "mainnet";
@@ -144,6 +156,68 @@ export function LoyaltyManagement({
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleCreateMint = async () => {
+    if (!connected?.signer || !connected.account) {
+      toast.error("Conecta una wallet que permita firmar transacciones.");
+      return;
+    }
+    if (!result) {
+      toast.error("Primero debes subir la metadata del programa a IPFS.");
+      return;
+    }
+    if (!supportedCluster) {
+      toast.error("La creación del mint solo está habilitada en Devnet y Mainnet.");
+      return;
+    }
+
+    const parsedPoints = Number(pointsPerSale);
+    if (!Number.isSafeInteger(parsedPoints) || parsedPoints <= 0) {
+      toast.error("Los puntos por venta deben ser un entero mayor a cero.");
+      return;
+    }
+
+    setMintBusy(true);
+    setMintResult(null);
+    try {
+      const dealershipAddress = address(concesionario);
+      const dealershipAccount = await client.registro.accounts.concesionario.fetch(
+        dealershipAddress
+      );
+      if (dealershipAccount.data.owner !== connected.account.address) {
+        throw new Error("La wallet conectada no es propietaria de este concesionario.");
+      }
+
+      const created = await createLoyaltyMint({
+        client,
+        owner: connected.signer,
+        concesionario: dealershipAddress,
+        nombreConcesionario,
+        name: name.trim(),
+        symbol: symbol.trim().toUpperCase(),
+        description: description.trim(),
+        metadataUri: result.metadataUri,
+        puntosPorVenta: BigInt(parsedPoints),
+      });
+
+      setMintResult({
+        mint: created.mint,
+        programaFidelidad: created.programaFidelidad,
+        autoridadFidelidad: created.autoridadFidelidad,
+        signature: created.signature,
+      });
+      toast.success("Mint Token-2022 creado y programa de fidelización registrado.");
+    } catch (error) {
+      console.error("No se pudo crear el mint de fidelización:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear el mint Token-2022."
+      );
+    } finally {
+      setMintBusy(false);
     }
   };
 
@@ -245,8 +319,85 @@ export function LoyaltyManagement({
             ))}
           </div>
           <p className="mt-4 text-[9px] leading-relaxed text-[#9299a1]">
-            Guarda la URI de metadata para inicializar la extensión TokenMetadata cuando creemos el mint Token-2022. Esta subida todavía no modifica ningún mint.
+            La metadata está lista para asociarse al mint Token-2022 de este concesionario.
           </p>
+        </section>
+      )}
+
+      {result && !mintResult && (
+        <section className="rounded-xl border border-[#e9ebee] bg-white p-6 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
+          <div>
+            <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">TOKEN-2022 / CONFIGURACIÓN ON-CHAIN</p>
+            <h2 className="mt-2 text-[15px] font-bold text-[#252a30]">Crear el token de puntos</h2>
+            <p className="mt-1 max-w-2xl text-[10px] leading-relaxed text-[#858d96]">
+              Se creará un mint no transferible con 0 decimales, Metadata Pointer y Token Metadata. La autoridad de emisión pasará a la PDA del programa MotoLedger.
+            </p>
+          </div>
+
+          <label className="mt-5 block max-w-xs">
+            <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Puntos que genera cada venta</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              inputMode="numeric"
+              value={pointsPerSale}
+              onChange={(event) => setPointsPerSale(event.target.value)}
+              disabled={mintBusy}
+              className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[12px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]"
+            />
+            <span className="mt-1 block text-[9px] text-[#a0a6ad]">Este valor podrá actualizarse mediante la instrucción de configuración correspondiente.</span>
+          </label>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#eff0f2] pt-4">
+            <p className="max-w-lg text-[9px] leading-relaxed text-[#9299a1]">
+              Esta operación sí envía una transacción y requiere SOL para rent y fees. Revisa que la wallet y la red seleccionadas sean las correctas.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleCreateMint()}
+              disabled={mintBusy || !connected?.signer || !supportedCluster}
+              className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {mintBusy ? "Creando mint y registrando programa…" : "Crear mint Token-2022"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {mintResult && (
+        <section className="rounded-xl border border-[#ccebdc] bg-white p-6 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#edf8f2] text-[#168451]">✓</span>
+            <div>
+              <h3 className="text-[13px] font-bold text-[#252a30]">Programa de fidelización creado</h3>
+              <p className="text-[9px] text-[#858d96]">El mint Token-2022 y la configuración quedaron registrados en la misma transacción.</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            {[
+              { label: "Mint Token-2022", value: mintResult.mint },
+              { label: "PDA del programa", value: mintResult.programaFidelidad },
+              { label: "PDA autoridad de fidelización", value: mintResult.autoridadFidelidad },
+              { label: "Firma de la transacción", value: mintResult.signature },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-[#eff0f2] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">{item.label.toUpperCase()}</p>
+                  <button type="button" onClick={() => void copyValue(item.value, item.label)} className="shrink-0 text-[9px] font-semibold text-[#d90011] hover:underline">Copiar</button>
+                </div>
+                <p className="mt-1 break-all font-mono text-[10px] text-[#555e68]">{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <a
+            href={`https://explorer.solana.com/tx/${mintResult.signature}?cluster=${apiCluster}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex text-[10px] font-semibold text-[#d90011] underline decoration-dotted underline-offset-2"
+          >
+            Ver transacción en Solana Explorer ↗
+          </a>
         </section>
       )}
     </div>
