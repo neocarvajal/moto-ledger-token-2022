@@ -243,6 +243,8 @@ export async function POST(request: Request) {
       metadataUri: `ipfs://${metadataResult.cid}`,
       imageCid: imageResult.cid,
       metadataCid: metadataResult.cid,
+      imageFileId: imageResult.id,
+      metadataFileId: metadataResult.id,
       groupId: group.id,
     });
   } catch (error) {
