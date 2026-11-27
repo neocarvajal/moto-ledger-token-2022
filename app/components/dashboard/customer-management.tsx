@@ -44,7 +44,7 @@ export function CustomerManagement({
   const [customer, setCustomer] = useState<CustomerRecord | null>(null);
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
-  const [busy, setBusy] = useState<"register" | "search" | null>(null);
+  const [busy, setBusy] = useState<"register" | "search" | "preload" | null>(null);
   const [loyaltyBalance, setLoyaltyBalance] = useState<bigint | null>(null);
   const [loyaltyStatus, setLoyaltyStatus] = useState<"idle" | "loading" | "ready" | "unlinked" | "unavailable" | "outside_dealership">("idle");
 
@@ -163,6 +163,87 @@ export function CustomerManagement({
     return () => { cancelled = true; };
   }, [client, concesionario, customer, customers]);
 
+  const handlePreloadCustomers = async () => {
+    if (!connected?.signer) {
+      toast.error("Conecta una wallet con capacidad de firma.");
+      return;
+    }
+
+    setBusy("preload");
+    let createdCount = 0;
+    let skippedCount = 0;
+    try {
+      const owner = address(connected.account.address);
+      const dealer = address(concesionario);
+
+      // El identificador de demostración depende del concesionario para evitar
+      // reutilizar la misma identidad global en otros concesionarios.
+      const dealerHash = [...concesionario].reduce(
+        (hash, character) => (Math.imul(hash, 31) + character.charCodeAt(0)) >>> 0,
+        2166136261
+      );
+      const baseCedula = 10000000 + (dealerHash % 80000000);
+      const demoCustomers = [
+        { nombre: "Carlos Mendoza", offset: 0 },
+        { nombre: "María González", offset: 1 },
+        { nombre: "José Rodríguez", offset: 2 },
+      ];
+
+      for (const demo of demoCustomers) {
+        let registered = false;
+        // Si una cédula sintética ya existe globalmente, buscamos otra libre.
+        // Nunca asociamos automáticamente un cliente existente a otro concesionario.
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          const cedulaDemo = baseCedula + demo.offset * 20 + attempt;
+          const [cliente] = await deriveClientePda(owner, cedulaDemo);
+          const existingCustomer = await client.registro.accounts.cliente
+            .fetch(cliente)
+            .catch(() => null);
+          if (existingCustomer) continue;
+
+          const [asociacionCliente] = await deriveAsociacionClientePda(dealer, cliente);
+          const associationInfo = await client.rpc
+            .getAccountInfo(asociacionCliente, { encoding: "base64" })
+            .send();
+          if (associationInfo.value) continue;
+
+          const instruction = client.registro.instructions.registrarCliente({
+            owner: connected.signer,
+            concesionario: dealer,
+            cliente,
+            asociacionCliente,
+            nombreConcesionario,
+            cedulaCliente: cedulaDemo,
+            nombreCliente: demo.nombre,
+          });
+          await instruction.sendTransaction();
+          createdCount += 1;
+          registered = true;
+          break;
+        }
+        if (!registered) skippedCount += 1;
+      }
+
+      await loadCustomers();
+      await onRegistered();
+      if (createdCount > 0) {
+        toast.success(`Se precargaron ${createdCount} clientes de demostración.`);
+      }
+      if (skippedCount > 0) {
+        toast.info(`${skippedCount} cliente(s) no se pudieron precargar porque no había una cédula de demostración disponible.`);
+      }
+    } catch (error) {
+      console.error("No se pudieron precargar los clientes:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudieron precargar los clientes.");
+      if (createdCount > 0) {
+        await loadCustomers();
+        toast.info(`Se registraron ${createdCount} cliente(s) antes del error.`);
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const lookup = async (value: string) => {
     if (!connected) throw new Error("Conecta tu wallet para consultar clientes.");
     const id = parseCedula(value);
@@ -269,6 +350,15 @@ export function CustomerManagement({
           </label>
           <button type="submit" disabled={busy !== null} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[11px] font-semibold text-white hover:bg-[#c90010] disabled:opacity-50">{busy === "register" ? "Registrando…" : "Registrar cliente"}</button>
         </form>
+        <div className="mt-4 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold text-[#555e68]">Datos de demostración</p>
+              <p className="mt-1 text-[9px] leading-relaxed text-[#9299a1]">Añade hasta 3 clientes de prueba únicamente a este concesionario. No reutiliza clientes existentes.</p>
+            </div>
+            <button type="button" onClick={() => void handlePreloadCustomers()} disabled={busy !== null} className="rounded-lg border border-[#d8dde2] bg-white px-3 py-2 text-[10px] font-semibold text-[#555e68] hover:border-[#e60012] hover:text-[#e60012] disabled:opacity-50">{busy === "preload" ? "Precargando…" : "Precargar 3 clientes"}</button>
+          </div>
+        </div>
         <p className="mt-4 text-[9px] leading-relaxed text-[#9aa1a9]">La PDA se deriva con la wallet propietaria y la cédula. No se puede repetir una cédula para la misma wallet.</p>
       </section>
 
