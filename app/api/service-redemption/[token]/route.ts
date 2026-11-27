@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../lib/service-redemption-store";
+import { getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../lib/service-redemption-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
