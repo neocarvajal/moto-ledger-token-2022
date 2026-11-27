@@ -141,7 +141,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         ) : !connected ? (
           <div className="mt-5 space-y-2">
             <p className="text-xs font-semibold text-[#424950]">Selecciona tu wallet para autorizar el canje</p>
-            {wallets.map((wallet) => <button key={wallet.name} type="button" disabled={connecting} onClick={() => { setSelected(true); void connect(wallet).catch((cause) => { setSelected(false); setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet."); }); }} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] hover:border-[#e60012] disabled:opacity-50">{wallet.icon && <img src={wallet.icon} alt="" className="h-6 w-6 rounded-md" />}{wallet.name}</button>)}
+            {wallets.map((wallet) => <button key={wallet.name} type="button" disabled={connecting} onClick={() => { void connect(wallet).catch((cause) => { setError(cause instanceof Error ? cause.message : "No se pudo conectar la wallet."); }); }} className="flex w-full items-center gap-3 rounded-xl border border-[#e2e5e8] px-4 py-3 text-left text-xs font-semibold text-[#424950] hover:border-[#e60012] disabled:opacity-50">{wallet.icon && <img src={wallet.icon} alt="" className="h-6 w-6 rounded-md" />}{wallet.name}</button>)}
           </div>
         ) : connected.account.address !== session.walletAddress ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Conecta la wallet vinculada a este cliente: {shortAddress(session.walletAddress)}.</p>
