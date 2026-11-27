@@ -31,10 +31,6 @@ Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node
 >
 > **No necesitas desconectar la wallet owner para utilizar la wallet del comprador.** Al generar un QR desde el dashboard, abre su enlace en el móvil o en otra ventana/pestaña del navegador y conecta allí la wallet del comprador. La sesión del dashboard permanece abierta con el owner conectado.
 
-> [!WARNING]
-> Antes de crear registros, ventas o canjes, revisa con la wallet owner si el concesionario de demostración ya tiene motos disponibles, clientes y un programa de fidelización configurado. No dupliques registros ni vendas una moto que ya figure como vendida. Para el flujo completo de recompensas necesitarás **dos motos disponibles** y una segunda wallet para el comprador.
-
-La URL pública utiliza la configuración de servidor ya provisionada para los flujos QR. El evaluador no necesita una cuenta propia de Upstash ni configurar Redis. Si la aplicación desplegada no está disponible temporalmente, o deseas ejecutar y modificar el proyecto en tu entorno, utiliza la instalación local que se documenta más adelante.
 
 ## Preparar datos de demostración
 
@@ -59,7 +55,8 @@ La precarga utiliza un catálogo de demostración según el nombre del concesion
 
 Se crean tres perfiles de demostración con nombres y cédulas sintéticas. La herramienta genera identificadores de prueba diferenciados por concesionario, consulta las cuentas on-chain y evita duplicar los clientes que ya estén asociados allí. Cada cliente se registra en su propia transacción.
 
-**Importante sobre la identidad de clientes:** la cuenta Cliente es global para la wallet owner y la cédula, mientras que la asociación con un concesionario es independiente. La precarga no reutiliza automáticamente una identidad que ya exista en otro concesionario. Si una misma persona debe estar registrada en varios concesionarios, búscala por cédula y realiza manualmente su asociación desde cada concesionario. Para datos reales, utiliza siempre el formulario de registro manual y la cédula correcta.
+> [!IMPORTANT]
+> **Identidad de clientes:** la cuenta Cliente es global para la wallet owner y la cédula, mientras que la asociación con un concesionario es independiente. La precarga no reutiliza automáticamente una identidad que ya exista en otro concesionario. Si una misma persona debe estar registrada en varios concesionarios, búscala por cédula y realiza manualmente su asociación desde cada concesionario. Para datos reales, utiliza siempre el formulario de registro manual y la cédula correcta.
 
 ## Integración de recompensas con Token-2022
 
@@ -200,6 +197,8 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 - [Programa MotoLedger en Solana Explorer](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet)
 
 ## Requisitos e instalación
+
+Para una instalación local, crea una base de datos en [Upstash Redis](https://console.upstash.com/) y configura sus credenciales REST. Consulta la [documentación oficial de Redis REST API](https://upstash.com/docs/redis/features/restapi) para obtener la URL y el token. Usa el **Standard REST Token** (no el Read-Only Token), o un usuario ACL personalizado que permita las operaciones de lectura y escritura que necesita la aplicación. Como mínimo, el usuario debe tener permitido el comando `SET`; si aparece `NOPERM` o `SET` está denegado, revisa sus permisos ACL. Para una regla ACL personalizada que permita las operaciones habituales de lectura y escritura sobre las claves, puedes partir de `+@read +set +del +expire ~*` y ajustarla según las restricciones de tu base de datos.
 
 - Node.js **24 o superior** y npm.
 - Wallet compatible con Solana, como Solflare o Phantom.
