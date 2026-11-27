@@ -280,6 +280,7 @@ describe("MotoLedger Codama instructions", () => {
       owner,
       concesionario,
       moto,
+      kilometrajeMoto,
       garantia,
       nombreConcesionario: "BERA MOTORS",
       serial: "BER0DT1500BM00003",
@@ -288,8 +289,8 @@ describe("MotoLedger Codama instructions", () => {
     expectInstruction(
       ix,
       "eliminar_moto",
-      [ownerAddress, concesionario, moto, garantia, systemProgram],
-      [3, 1, 1, 1, 0]
+      [ownerAddress, concesionario, moto, kilometrajeMoto, garantia, systemProgram],
+      [3, 1, 1, 1, 1, 0]
     );
     expect(getEliminarMotoInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
