@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { address, getBase64Encoder, getTransactionDecoder } from "@solana/kit";
-import { claimServiceRedemptionValue, getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../../lib/service-redemption-store";
+import { claimServiceRedemptionValue, getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../lib/service-redemption-store";
 
 export const runtime = "nodejs";
 
