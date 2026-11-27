@@ -278,7 +278,7 @@ export function CustomerManagement({
         <p className="mt-1 text-[10px] text-[#858d96]">El listado corresponde al concesionario seleccionado; la búsqueda por cédula es independiente y puede consultar cualquier cliente de esta wallet.</p>
         <div className="mt-5">
           <div className="mb-1.5 flex items-center justify-between gap-3">
-            <label htmlFor="registered-customer" className="block text-[10px] font-semibold text-[#555e68]">Clientes con ventas en este concesionario</label>
+            <label htmlFor="registered-customer" className="block text-[10px] font-semibold text-[#555e68]">Clientes asociados a este concesionario</label>
             <button type="button" onClick={() => void loadCustomers()} disabled={loadingCustomers} className="text-[10px] font-semibold text-[#68717b] hover:text-[#e60012] disabled:opacity-50">
               {loadingCustomers ? "Actualizando…" : "Actualizar"}
             </button>
@@ -303,13 +303,13 @@ export function CustomerManagement({
             </select>
           ) : (
             <div className="rounded-lg bg-[#f7f8fa] px-3 py-3 text-[10px] text-[#858d96]">
-              {loadingCustomers ? "Consultando clientes de este concesionario en Solana…" : "Todavía no hay clientes con ventas registradas en este concesionario."}
+              {loadingCustomers ? "Consultando clientes de este concesionario en Solana…" : "Todavía no hay clientes asociados a este concesionario."}
             </div>
           )}
           {customers.length > 0 && (
-            <p className="mt-2 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) con ventas en {nombreConcesionario}.</p>
+            <p className="mt-2 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) asociado(s) a {nombreConcesionario}.</p>
           )}
-          <p className="mt-2 text-[9px] leading-relaxed text-[#9299a1]">Este listado solo incluye clientes que tienen al menos una venta en el concesionario seleccionado. La búsqueda por cédula consulta el registro global de clientes de esta wallet, sin depender del concesionario seleccionado.</p>
+          <p className="mt-2 text-[9px] leading-relaxed text-[#9299a1]">Este listado incluye únicamente clientes asociados al concesionario seleccionado. La búsqueda por cédula consulta el registro global de clientes de esta wallet, independientemente del concesionario.</p>
         </div>
         <form onSubmit={handleSearch} className="mt-5 flex flex-col gap-3 sm:flex-row">
           <input value={searchCedula} onChange={(e) => setSearchCedula(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" maxLength={10} required placeholder="Número de cédula" className="min-w-0 flex-1 rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
