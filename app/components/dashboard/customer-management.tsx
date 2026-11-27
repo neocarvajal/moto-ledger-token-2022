@@ -13,11 +13,7 @@ import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { deriveClientePda, deriveProgramaFidelidadPda, deriveToken2022Ata, deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
 import { CustomerWalletLink } from "./customer-wallet-link";
-import {
-  getClienteDecoder,
-  getClienteDiscriminatorBytes,
-  type Cliente,
-} from "../../lib/moto-ledger/src/generated/accounts/cliente";
+import { type Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { getVentaDecoder, getVentaDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/venta";
 
@@ -305,8 +301,8 @@ export function CustomerManagement({
           )}
           {customers.length > 0 && (
             <p className="mt-2 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) con ventas en {nombreConcesionario}.</p>
-            <p className="mt-2 text-[9px] leading-relaxed text-[#9299a1]">Este listado solo incluye clientes que tienen al menos una venta en el concesionario seleccionado. La búsqueda por cédula consulta el registro global de clientes de esta wallet, sin depender del concesionario seleccionado.</p>
           )}
+          <p className="mt-2 text-[9px] leading-relaxed text-[#9299a1]">Este listado solo incluye clientes que tienen al menos una venta en el concesionario seleccionado. La búsqueda por cédula consulta el registro global de clientes de esta wallet, sin depender del concesionario seleccionado.</p>
         </div>
         <form onSubmit={handleSearch} className="mt-5 flex flex-col gap-3 sm:flex-row">
           <input value={searchCedula} onChange={(e) => setSearchCedula(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" maxLength={10} required placeholder="Número de cédula" className="min-w-0 flex-1 rounded-lg border border-[#e2e5e8] px-3 py-2.5 font-mono text-[11px] outline-none focus:border-[#e60012]" />
