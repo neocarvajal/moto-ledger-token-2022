@@ -57,16 +57,40 @@ export function MotorcycleRegistration({
 
       const demoMotorcycles = getDemoMotorcycles();
 
-      // Inspect the complete on-chain inventory. The demo set is shared globally:
-      // once a model belongs to another dealership, it must not be auto-created here.
+      // Inspect on-chain inventory, but enforce the one-time demo catalog
+      // only across dealerships owned by the currently connected wallet.
+      // Devnet is shared: models registered by unrelated users must not block us.
       const discriminator = getBase58Decoder().decode(getMotoDiscriminatorBytes()) as Base58EncodedBytes;
       const onChainMotos = await client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
         encoding: "base64",
         filters: [{ memcmp: { offset: 0n, bytes: discriminator, encoding: "base58" } }],
       }).send();
+      const decodedMotos = onChainMotos.map((item) =>
+        getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0]))
+      );
+
+      const ownedDealerships = new Set<string>([dealerAddress]);
+      const otherDealershipAddresses = [...new Set(
+        decodedMotos
+          .map((moto) => moto.concesionario)
+          .filter((registeredDealer) => registeredDealer !== dealerAddress)
+      )];
+      const ownershipChecks = await Promise.all(
+        otherDealershipAddresses.map(async (registeredDealer) => {
+          try {
+            const account = await client.registro.accounts.concesionario.fetch(address(registeredDealer));
+            if (account.data.owner === connected.account.address) {
+              ownedDealerships.add(registeredDealer);
+            }
+          } catch {
+            // Ignore unrelated or no-longer-readable dealership records.
+          }
+        })
+      );
+      void ownershipChecks;
+
       const existingModels = new Map<string, Set<string>>();
-      for (const item of onChainMotos) {
-        const moto = getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0]));
+      for (const moto of decodedMotos) {
         const modelKey = normalizeMotorcycleModel(moto.marca, moto.modelo);
         const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
         registeredDealers.add(moto.concesionario);
@@ -75,13 +99,16 @@ export function MotorcycleRegistration({
 
       const alreadyUsedElsewhere = demoMotorcycles.filter((item) => {
         const registeredDealers = existingModels.get(normalizeMotorcycleModel(item.marca, item.modelo));
-        return registeredDealers && [...registeredDealers].some((registeredDealer) => registeredDealer !== dealerAddress);
+        return registeredDealers && [...registeredDealers].some(
+          (registeredDealer) => registeredDealer !== dealerAddress && ownedDealerships.has(registeredDealer)
+        );
       });
       if (alreadyUsedElsewhere.length > 0) {
         const models = alreadyUsedElsewhere.map((item) => `${item.marca} ${item.modelo}`).join(", ");
-        throw new Error(
-          `El catálogo de demostración ya fue utilizado en otro concesionario (${models}). Para cargar motos en este concesionario, regístralas manualmente.`
+        toast.error(
+          `El catálogo de demostración ya está registrado en otro concesionario de esta wallet (${models}). Para este concesionario, registra las motos manualmente.`
         );
+        return;
       }
 
       for (const [index, item] of demoMotorcycles.entries()) {
