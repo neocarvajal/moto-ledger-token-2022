@@ -8,7 +8,7 @@ import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { getMotoDecoder, getMotoDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/moto";
-import { getDemoMotorcycles, normalizeMotorcycleModel } from "../../lib/moto-ledger/demo-motorcycles";
+import { getDemoMotorcycles } from "../../lib/moto-ledger/demo-motorcycles";
 import {
   deriveGarantiaPda,
   deriveMotoPda,
@@ -57,9 +57,9 @@ export function MotorcycleRegistration({
 
       const demoMotorcycles = getDemoMotorcycles();
 
-      // Inspect on-chain inventory, but enforce the one-time demo catalog
-      // only across dealerships owned by the currently connected wallet.
-      // Devnet is shared: models registered by unrelated users must not block us.
+      // Identify prior demo preloads by their reserved serial prefix, not by
+      // make/model. Ordinary motorcycles with the same model must never count
+      // as demo entries or cause a first preload to be skipped.
       const discriminator = getBase58Decoder().decode(getMotoDiscriminatorBytes()) as Base58EncodedBytes;
       const onChainMotos = await client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
         encoding: "base64",
@@ -69,14 +69,18 @@ export function MotorcycleRegistration({
         getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0]))
       );
 
+      const demoSerialPrefixes = demoMotorcycles.map((item) => `ML${item.code}`);
+      const demoMotos = decodedMotos.filter((moto) =>
+        demoSerialPrefixes.some((prefix) => moto.serial.startsWith(prefix))
+      );
       const ownedDealerships = new Set<string>([dealerAddress]);
-      const otherDealershipAddresses = [...new Set(
-        decodedMotos
+      const otherDemoDealerships = [...new Set(
+        demoMotos
           .map((moto) => moto.concesionario)
           .filter((registeredDealer) => registeredDealer !== dealerAddress)
       )];
       await Promise.all(
-        otherDealershipAddresses.map(async (registeredDealer) => {
+        otherDemoDealerships.map(async (registeredDealer) => {
           try {
             const account = await client.registro.accounts.concesionario.fetch(address(registeredDealer));
             if (account.data.owner === connected.account.address) {
@@ -88,47 +92,35 @@ export function MotorcycleRegistration({
         })
       );
 
-      const existingModels = new Map<string, Set<string>>();
-      for (const moto of decodedMotos) {
-        const modelKey = normalizeMotorcycleModel(moto.marca, moto.modelo);
-        const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
-        registeredDealers.add(moto.concesionario);
-        existingModels.set(modelKey, registeredDealers);
-      }
-
-      const alreadyUsedElsewhere = demoMotorcycles.filter((item) => {
-        const registeredDealers = existingModels.get(normalizeMotorcycleModel(item.marca, item.modelo));
-        return registeredDealers && [...registeredDealers].some(
-          (registeredDealer) => registeredDealer !== dealerAddress && ownedDealerships.has(registeredDealer)
-        );
-      });
+      const alreadyUsedElsewhere = demoMotos.filter((moto) =>
+        moto.concesionario !== dealerAddress && ownedDealerships.has(moto.concesionario)
+      );
       if (alreadyUsedElsewhere.length > 0) {
-        const models = alreadyUsedElsewhere.map((item) => `${item.marca} ${item.modelo}`).join(", ");
         toast.error(
-          `El catálogo de demostración ya está registrado en otro concesionario de esta wallet (${models}). Para este concesionario, registra las motos manualmente.`
+          "El catálogo de demostración ya está registrado en otro concesionario de esta wallet. Para este concesionario, registra las motos manualmente."
         );
         return;
       }
 
       for (const [index, item] of demoMotorcycles.entries()) {
-        const modelKey = normalizeMotorcycleModel(item.marca, item.modelo);
-        if (existingModels.get(modelKey)?.has(dealerAddress)) { skipped += 1; continue; }
-
         // Stable model-specific serials make repeated runs idempotent.
         const serial = `ML${item.code}${concesionario.slice(0, 10)}01`;
+        if (new TextEncoder().encode(serial).length !== 17) {
+          throw new Error(`El serial de demostración para ${item.marca} ${item.modelo} no tiene exactamente 17 bytes.`);
+        }
         const placa = `D${concesionario.slice(-4).toUpperCase()}${String(index + 1).padStart(2, "0")}`;
         const [moto] = await deriveMotoPda(serial, dealerAddress);
         const [garantia] = await deriveGarantiaPda(serial);
         const existing = await client.registro.accounts.moto.fetch(moto).catch(() => null);
         if (existing) {
-          if (existing.data.concesionario !== dealerAddress) {
-            failed += 1;
-            toast.error(`El identificador de ${item.marca} ${item.modelo} ya está ocupado por otro concesionario.`);
-          } else {
+          if (
+            existing.data.concesionario === dealerAddress &&
+            existing.data.serial === serial
+          ) {
             skipped += 1;
-            const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
-            registeredDealers.add(dealerAddress);
-            existingModels.set(modelKey, registeredDealers);
+          } else {
+            failed += 1;
+            toast.error(`La PDA calculada para ${item.marca} ${item.modelo} ya está ocupada por un registro distinto. No se omitirá silenciosamente.`);
           }
           continue;
         }
@@ -140,9 +132,6 @@ export function MotorcycleRegistration({
           });
           const result = await instruction.sendTransaction();
           created += 1;
-          const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
-          registeredDealers.add(dealerAddress);
-          existingModels.set(modelKey, registeredDealers);
           notifyTransactionSuccess(`${item.marca} ${item.modelo} precargada (${item.transmision.toLowerCase()}).`, result.context.signature);
         } catch (error) {
           failed += 1;
