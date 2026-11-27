@@ -11,7 +11,7 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
-import { deriveClientePda } from "../../lib/moto-ledger/pdas";
+import { deriveClientePda, deriveProgramaFidelidadPda, deriveToken2022Ata, deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
 import { CustomerWalletLink } from "./customer-wallet-link";
 import {
   getClienteDecoder,
@@ -48,6 +48,8 @@ export function CustomerManagement({
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [busy, setBusy] = useState<"register" | "search" | null>(null);
+  const [loyaltyBalance, setLoyaltyBalance] = useState<bigint | null>(null);
+  const [loyaltyStatus, setLoyaltyStatus] = useState<"idle" | "loading" | "ready" | "unlinked" | "unavailable">("idle");
 
   const loadCustomers = useCallback(async () => {
     if (!connected?.account.address) {
@@ -81,7 +83,7 @@ export function CustomerManagement({
       found.sort((a, b) => a.data.idCliente - b.data.idCliente);
       setCustomers(found);
       setCustomer((current) =>
-        found.find((item) => item.address === current?.address) ?? found[0] ?? null
+        found.find((item) => item.address === current?.address) ?? null
       );
     } catch (error) {
       console.error("No se pudieron cargar los clientes:", error);
@@ -94,6 +96,54 @@ export function CustomerManagement({
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLoyaltyBalance() {
+      setLoyaltyBalance(null);
+      if (!customer) {
+        setLoyaltyStatus("idle");
+        return;
+      }
+      setLoyaltyStatus("loading");
+      try {
+        const [walletPda] = await deriveWalletClientePda(address(customer.address));
+        const [programPda] = await deriveProgramaFidelidadPda(address(concesionario));
+        const [walletInfo, programInfo] = await Promise.all([
+          client.registro.accounts.walletCliente.fetch(walletPda).catch(() => null),
+          client.rpc.getAccountInfo(programPda, { encoding: "base64" }).send(),
+        ]);
+        if (!walletInfo) {
+          if (!cancelled) setLoyaltyStatus("unlinked");
+          return;
+        }
+        if (!programInfo.value) {
+          if (!cancelled) setLoyaltyStatus("unavailable");
+          return;
+        }
+        const program = await client.registro.accounts.programaFidelidad.fetch(programPda);
+        const [ata] = await deriveToken2022Ata(address(walletInfo.data.wallet), address(program.data.mint));
+        const tokenAccountInfo = await client.rpc.getAccountInfo(ata, { encoding: "base64" }).send();
+        if (!tokenAccountInfo.value) {
+          if (!cancelled) {
+            setLoyaltyBalance(0n);
+            setLoyaltyStatus("ready");
+          }
+          return;
+        }
+        const tokenBalance = await client.rpc.getTokenAccountBalance(ata).send();
+        if (!cancelled) {
+          setLoyaltyBalance(BigInt(tokenBalance.value.amount));
+          setLoyaltyStatus("ready");
+        }
+      } catch (error) {
+        console.error("No se pudo consultar el saldo de fidelización:", error);
+        if (!cancelled) setLoyaltyStatus("unavailable");
+      }
+    }
+    void loadLoyaltyBalance();
+    return () => { cancelled = true; };
+  }, [client, concesionario, customer]);
 
   const lookup = async (value: string) => {
     if (!connected) throw new Error("Conecta tu wallet para consultar clientes.");
@@ -226,6 +276,7 @@ export function CustomerManagement({
               }}
               className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-3 text-[11px] text-[#252a30] outline-none focus:border-[#e60012]"
             >
+              <option value="">Selecciona un cliente</option>
               {customers.map((item) => (
                 <option key={item.address} value={item.address}>
                   {item.data.nombreCliente} · C.I. {item.data.cedulaCliente}
@@ -260,6 +311,27 @@ export function CustomerManagement({
               <div className="rounded-lg bg-white p-3"><p className="text-[9px] text-[#9299a1]">Concesionario</p><p className="mt-1 truncate text-[11px] font-semibold text-[#252a30]">{nombreConcesionario}</p></div>
             </div>
             <p className="mt-3 text-[9px] text-[#9299a1]">PDA: <a href={`https://explorer.solana.com/address/${customer.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[#68717b] underline decoration-dotted underline-offset-2 transition hover:text-[#e60012]">{customer.address} ↗</a></p>
+            <div className="mt-3 rounded-lg border border-[#e7eaed] bg-white p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-bold tracking-[0.1em] text-[#9299a1]">FIDELIZACIÓN TOKEN-2022</p>
+                  <p className="mt-1 text-[10px] text-[#68717b]">Saldo acumulado del cliente en este concesionario</p>
+                </div>
+                <div className="text-right">
+                  {loyaltyStatus === "loading" ? (
+                    <p className="text-[10px] text-[#9299a1]">Consultando…</p>
+                  ) : loyaltyStatus === "ready" ? (
+                    <p className="text-[20px] font-bold text-[#252a30]">{(loyaltyBalance ?? 0n).toLocaleString("es-VE")} <span className="text-[10px] font-semibold text-[#68717b]">puntos</span></p>
+                  ) : loyaltyStatus === "unlinked" ? (
+                    <p className="text-[10px] font-semibold text-[#b7791f]">Wallet no vinculada</p>
+                  ) : loyaltyStatus === "unavailable" ? (
+                    <p className="text-[10px] text-[#9299a1]">Programa no disponible</p>
+                  ) : (
+                    <p className="text-[10px] text-[#9299a1]">—</p>
+                  )}
+                </div>
+              </div>
+            </div>
             <CustomerWalletLink cliente={customer.address} clienteNombre={customer.data.nombreCliente} clienteCedula={String(customer.data.cedulaCliente)} concesionario={concesionario} totalMotos={Number(customer.data.totalMotosCliente)} />
           </div>
         ) : (
