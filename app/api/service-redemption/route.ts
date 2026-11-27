@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       typeof body.puntos !== "string" || !/^\d+$/.test(body.puntos) ||
       typeof body.kilometrajeActual !== "string" || !/^\d+$/.test(body.kilometrajeActual) ||
       typeof body.idCanje !== "string" || !/^\d+$/.test(body.idCanje) ||
+      typeof body.lastValidBlockHeight !== "string" || !/^\d+$/.test(body.lastValidBlockHeight) ||
       typeof body.servicioId !== "number" || !Number.isInteger(body.servicioId) ||
       typeof body.cluster !== "string" || !CLUSTERS.includes(body.cluster as RedemptionCluster)
     ) {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       puntos: body.puntos,
       kilometrajeActual: body.kilometrajeActual,
       idCanje: body.idCanje,
+      lastValidBlockHeight: body.lastValidBlockHeight,
       cluster: body.cluster as RedemptionCluster,
     });
 
