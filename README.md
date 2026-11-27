@@ -32,6 +32,19 @@ Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node
 > **No necesitas desconectar la wallet owner para utilizar la wallet del comprador.** Al generar un QR desde el dashboard, abre su enlace en el móvil o en otra ventana/pestaña del navegador y conecta allí la wallet del comprador. La sesión del dashboard permanece abierta con el owner conectado.
 
 
+## Organización del dashboard
+
+El dashboard comienza en **Configuración**, que concentra el registro y la selección de concesionarios, junto con la política de garantía de cada uno. Una vez preparado el concesionario, el trabajo operativo se distribuye en este orden:
+
+1. **Configuración:** registrar o seleccionar el concesionario y establecer la duración y el kilometraje máximo de garantía.
+2. **Inventario:** registrar motos o precargar el catálogo de demostración.
+3. **Clientes:** registrar o precargar clientes y administrar sus asociaciones con el concesionario.
+4. **Ventas:** registrar las ventas utilizando motos disponibles y clientes registrados.
+5. **Fidelización:** configurar el programa Token-2022, consultar recompensas y gestionar canjes.
+6. **Servicios:** administrar el catálogo y los trabajos de posventa.
+
+El registro de concesionarios solo se realiza desde **Configuración**. Los demás módulos conservan el selector del concesionario; si la wallet conectada no tiene uno registrado, muestran un acceso a Configuración en lugar de repetir el formulario. Si la garantía todavía no está configurada, el estado on-chain lo indica y ofrece ir directamente a su configuración antes de registrar motos.
+
 ## Preparar datos de demostración
 
 La aplicación incluye herramientas opcionales para configurar la cobertura de posventa y acelerar las pruebas desde el dashboard. Los cambios de configuración y los registros se guardan en **Solana Devnet**; no son datos ficticios guardados en el navegador.
@@ -91,7 +104,7 @@ MotoLedger es un proyecto propio al que incorporé un sistema de fidelización c
 > **Antes de comenzar:** confirma que hay al menos **dos motos disponibles** en el mismo concesionario. Cada moto solo puede venderse una vez.
 
 1. **Conectar y seleccionar el concesionario.** Abre la aplicación en Devnet, conecta la wallet que administra el concesionario y selecciona el concesionario que tiene configurado el programa de fidelización. Si aún no existe, regístralo.
-2. **Preparar inventario.** En el módulo **Motos**, registra al menos dos motocicletas disponibles manualmente o utiliza el botón opcional **Precargar 3 motos**. La precarga selecciona un pequeño catálogo de demostración según el nombre del concesionario (actualmente Motos Toro y BERA), consulta el inventario on-chain y omite modelos que ya estén registrados para ese concesionario. Para Motos Toro incluye TORO FOX TR180, CYCLONE RT3S y ASIAWING NC250E; para BERA incluye COBRA 150, MILLAN 150 y SBR 150. Cada unidad crea su cuenta de moto y garantía en una transacción que requiere firma. El concesionario debe tener configurada su garantía. Si el nombre no coincide con un catálogo disponible, el botón no inventa marcas: puedes continuar con el registro manual.
+2. **Preparar inventario.** En el módulo **Inventario**, registra al menos dos motos disponibles manualmente o utiliza el botón opcional **Precargar 3 motos**. La precarga selecciona un pequeño catálogo de demostración según el nombre del concesionario (actualmente Motos Toro y BERA), consulta el inventario on-chain y omite modelos que ya estén registrados para ese concesionario. Para Motos Toro incluye TORO FOX TR180, CYCLONE RT3S y ASIAWING NC250E; para BERA incluye COBRA 150, MILLAN 150 y SBR 150. Cada unidad crea su cuenta de moto y garantía en una transacción que requiere firma. El concesionario debe tener configurada su garantía. Si el nombre no coincide con un catálogo disponible, el botón no inventa marcas: puedes continuar con el registro manual.
 3. **Registrar el cliente.** En **Clientes**, selecciona el concesionario y registra nombre y cédula manualmente, o utiliza **Precargar 3 clientes** para crear datos sintéticos de demostración asociados a ese concesionario. La precarga deriva cédulas de prueba distintas según la dirección del concesionario, consulta las cuentas on-chain antes de crear cada registro y es idempotente: si ya existen los clientes precargados, no los duplica. La identidad Cliente es global para la wallet owner y la cédula; una PDA `AsociacionCliente` vincula esa identidad con un concesionario. Por seguridad, la precarga nunca toma un cliente global ya existente para asociarlo automáticamente a otro concesionario. Si necesitas que la misma persona esté registrada en varios concesionarios, búscala por cédula y realiza el registro/asociación manual desde cada concesionario. Solo clientes asociados pueden seleccionarse en Ventas.
 4. **Primera venta.** En **Ventas**, selecciona la primera moto disponible y el cliente, introduce el precio y confirma. Esta compra habilita la vinculación de wallet. Si el comprador todavía no tiene wallet vinculada, la venta se registra sin recompensa.
 5. **Vincular la wallet del comprador.** En el dashboard (que permanece conectado con la wallet owner), regresa a **Clientes**, selecciona el mismo cliente y genera el QR. Desde el teléfono del comprador —o desde otra pestaña/ventana del navegador— escanea el QR y abre el enlace. Allí conecta la wallet del comprador y firma la solicitud. Mientras tanto, el owner continúa en el dashboard y completa su autorización. **No desconectes la wallet owner ni la reemplaces por la del comprador.** El programa exige ambas firmas y valida que el cliente ya tenga al menos una moto comprada. El QR es de un solo uso y expira a los cinco minutos.
