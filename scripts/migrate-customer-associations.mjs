@@ -24,6 +24,7 @@ import {
   getBase64Encoder,
   getUtf8Encoder,
   getProgramDerivedAddress,
+  getSignatureFromTransaction,
   createTransactionMessage,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -185,8 +186,9 @@ async function main() {
       message = setTransactionMessageLifetimeUsingBlockhash(latest.value, message);
       message = appendTransactionMessageInstruction(instruction, message);
       const signed = await signTransactionMessageWithSigners(message);
-      const result = await sendAndConfirm(signed, { commitment: "confirmed" });
-      report.push({ dealership, customer, association, source: item.source, signature: result, status: "created" });
+      const signature = getSignatureFromTransaction(signed);
+      await sendAndConfirm(signed, { commitment: "confirmed" });
+      report.push({ dealership, customer, association, source: item.source, signature, status: "created" });
       created++;
       console.log(`Created association ${association}`);
     } catch (error) {
