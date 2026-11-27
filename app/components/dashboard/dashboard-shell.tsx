@@ -8,20 +8,20 @@ import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
 
 const navigation = [
-  { id: "overview", label: "Resumen", icon: "◫", group: "GESTIÓN" },
+  { id: "settings", label: "Configuración", icon: "☷", group: "SISTEMA" },
+  { id: "motorcycles", label: "Inventario", icon: "◫", group: "GESTIÓN" },
   { id: "customers", label: "Clientes", icon: "♙" },
   { id: "sales", label: "Ventas", icon: "↗" },
   { id: "loyalty", label: "Fidelización", icon: "✦", group: "GESTIÓN" },
   { id: "services", label: "Servicios", icon: "⚙" },
   { id: "warranties", label: "Garantías", icon: "◇", group: "POSVENTA", disabled: true },
   { id: "claims", label: "Reclamaciones", icon: "▤" },
-  { id: "settings", label: "Configuración", icon: "☷", group: "SISTEMA" },
 ] as const;
 
 const pageCopy: Record<string, { title: string; description: string }> = {
-  overview: {
-    title: "Resumen general",
-    description: "Una vista de la operación de tu concesionario.",
+  motorcycles: {
+    title: "Inventario",
+    description: "Registro, consulta y seguimiento de las motos de tu concesionario.",
   },
   customers: {
     title: "Clientes",
@@ -49,7 +49,7 @@ const pageCopy: Record<string, { title: string; description: string }> = {
   },
   settings: {
     title: "Configuración",
-    description: "Datos del concesionario y parámetros de garantía.",
+    description: "Registra y administra tus concesionarios y define sus políticas de garantía.",
   },
 };
 
@@ -84,7 +84,7 @@ function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-4 py-7" aria-label="Navegación principal">
-        {["GESTIÓN", "POSVENTA", "SISTEMA"].map((group) => (
+        {["SISTEMA", "GESTIÓN", "POSVENTA"].map((group) => (
           <div key={group}>
             <p className="mb-2 px-3 text-[9px] font-bold tracking-[0.18em] text-[#a0a6ad]">{group}</p>
             <div className="space-y-1">
@@ -242,7 +242,7 @@ function EmptySection({ title }: { title: string }) {
 }
 
 export function DashboardShell() {
-  const [active, setActive] = useState("overview");
+  const [active, setActive] = useState("settings");
   const page = pageCopy[active];
 
   return (
@@ -288,8 +288,8 @@ export function DashboardShell() {
             <NetworkStatusBadge />
           </div>
 
-          <div className={active === "overview" || active === "customers" || active === "sales" || active === "services" || active === "loyalty" || active === "settings" ? "" : "hidden"}><DealershipWorkspace activeModule={active} /></div>
-          {active !== "overview" && active !== "customers" && active !== "sales" && active !== "services" && active !== "loyalty" && active !== "settings" && <EmptySection title={page.title} />}
+          <div className={active === "motorcycles" || active === "customers" || active === "sales" || active === "services" || active === "loyalty" || active === "settings" ? "" : "hidden"}><DealershipWorkspace activeModule={active} onNavigate={setActive} /></div>
+          {active !== "motorcycles" && active !== "customers" && active !== "sales" && active !== "services" && active !== "loyalty" && active !== "settings" && <EmptySection title={page.title} />}
 
           <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#e9ebee] pt-4 text-[9px] text-[#a0a6ad]">
             <span>MOTOLEDGER · GESTIÓN DE CONCESIONARIOS</span>
