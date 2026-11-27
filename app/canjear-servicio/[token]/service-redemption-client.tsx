@@ -76,27 +76,29 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   useEffect(() => {
     let active = true;
     setCompletionVerified(false);
-    if (session?.status !== "completed") return;
-    void (async () => {
+    if (session?.status !== "signed") return;
+    const verifyReceipt = async () => {
       try {
         const [receiptPda] = await deriveCanjeServicioPda(address(session.cliente), BigInt(session.idCanje));
-        const receipt = await client.registro.accounts.canjeServicio.fetch(receiptPda);
+        const receipt = await client.registro.accounts.canjeServicio.fetch(receiptPda).catch(() => null);
+        if (!receipt || !active) return;
         const data = receipt.data;
         if (
-          data.cliente !== session.cliente ||
-          data.wallet !== session.walletAddress ||
-          data.concesionario !== session.concesionario ||
-          data.mint !== session.mint ||
-          data.idCanje !== BigInt(session.idCanje) ||
-          data.servicioId !== session.servicioId ||
-          data.puntos !== BigInt(session.puntos)
-        ) throw new Error("El estado indica finalización, pero el recibo no coincide con la solicitud en Solana.");
-        if (active) setCompletionVerified(true);
-      } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "No se pudo verificar el recibo en Solana.");
+          data.cliente === session.cliente &&
+          data.wallet === session.walletAddress &&
+          data.concesionario === session.concesionario &&
+          data.mint === session.mint &&
+          data.idCanje === BigInt(session.idCanje) &&
+          data.servicioId === session.servicioId &&
+          data.puntos === BigInt(session.puntos)
+        ) setCompletionVerified(true);
+      } catch {
+        // The receipt may not exist until the dealership submits the signed transaction.
       }
-    })();
-    return () => { active = false; };
+    };
+    void verifyReceipt();
+    const poll = window.setInterval(() => { void verifyReceipt(); }, 2000);
+    return () => { active = false; window.clearInterval(poll); };
   }, [client, session?.status, session?.cliente, session?.idCanje, session?.walletAddress, session?.concesionario, session?.mint, session?.servicioId, session?.puntos]);
 
   const sign = async () => {
@@ -172,10 +174,10 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
         {expired || session.status === "cancelled" ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">La solicitud expiró o fue cancelada. Solicita un nuevo QR en el concesionario.</p>
-        ) : session.status === "completed" && completionVerified ? (
+        ) : session.status === "signed" && completionVerified ? (
           <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Canje confirmado en Solana. El recibo fue verificado y los puntos fueron quemados.</p>
-        ) : session.status === "signed" || session.status === "completed" ? (
-          <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">{session.status === "completed" ? "Verificando el recibo del canje directamente en Solana…" : "Firma recibida. El concesionario debe finalizar y confirmar el canje en Solana."}</p>
+        ) : session.status === "signed" ? (
+          <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Firma recibida. Verificando el recibo del canje directamente en Solana…</p>
         ) : cluster !== session.cluster ? (
           <p className="mt-5 text-xs text-[#68717b]">Conectando a {session.cluster}…</p>
         ) : !connected ? (
