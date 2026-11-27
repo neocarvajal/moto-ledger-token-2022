@@ -308,7 +308,7 @@ cd moto-ledger-token-2022
 npm install
 ```
 
-Crea un archivo `.env.local` en la raíz del proyecto:
+Verifica que tu archivo `.env.local` en la raíz del proyecto tenga este formato con los valores que corresponde:
 
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3000
