@@ -46,7 +46,7 @@ export function CustomerManagement({
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [busy, setBusy] = useState<"register" | "search" | null>(null);
   const [loyaltyBalance, setLoyaltyBalance] = useState<bigint | null>(null);
-  const [loyaltyStatus, setLoyaltyStatus] = useState<"idle" | "loading" | "ready" | "unlinked" | "unavailable">("idle");
+  const [loyaltyStatus, setLoyaltyStatus] = useState<"idle" | "loading" | "ready" | "unlinked" | "unavailable" | "outside_dealership">("idle");
 
   const loadCustomers = useCallback(async () => {
     if (!connected?.account.address || !concesionario) {
@@ -116,6 +116,10 @@ export function CustomerManagement({
         setLoyaltyStatus("idle");
         return;
       }
+      if (!customers.some((item) => item.address === customer.address)) {
+        setLoyaltyStatus("outside_dealership");
+        return;
+      }
       setLoyaltyStatus("loading");
       try {
         const [walletPda] = await deriveWalletClientePda(address(customer.address));
@@ -154,7 +158,7 @@ export function CustomerManagement({
     }
     void loadLoyaltyBalance();
     return () => { cancelled = true; };
-  }, [client, concesionario, customer]);
+  }, [client, concesionario, customer, customers]);
 
   const lookup = async (value: string) => {
     if (!connected) throw new Error("Conecta tu wallet para consultar clientes.");
