@@ -19,6 +19,7 @@ import {
   type Cliente,
 } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
+import { getVentaDecoder, getVentaDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/venta";
 
 type CustomerRecord = { address: string; data: Cliente };
 
@@ -52,46 +53,60 @@ export function CustomerManagement({
   const [loyaltyStatus, setLoyaltyStatus] = useState<"idle" | "loading" | "ready" | "unlinked" | "unavailable">("idle");
 
   const loadCustomers = useCallback(async () => {
-    if (!connected?.account.address) {
+    if (!connected?.account.address || !concesionario) {
       setCustomers([]);
-      setCustomer(null);
       return;
     }
 
     setLoadingCustomers(true);
     try {
-      const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
+      const ownerAddress = address(connected.account.address);
+      const dealerAddress = address(concesionario);
       const discriminatorFilter = getBase58Decoder().decode(
-        getClienteDiscriminatorBytes()
+        getVentaDiscriminatorBytes()
       ) as Base58EncodedBytes;
-      const results = await client.rpc
+      const dealerFilter = dealerAddress as Base58EncodedBytes;
+      const sales = await client.rpc
         .getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
           encoding: "base64",
           filters: [
             { memcmp: { offset: 0n, bytes: discriminatorFilter, encoding: "base58" } },
-            { memcmp: { offset: 8n, bytes: ownerFilter, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: dealerFilter, encoding: "base58" } },
           ],
         })
         .send();
 
-      const found: CustomerRecord[] = results.map((result) => ({
-        address: result.pubkey,
-        data: getClienteDecoder().decode(
-          getBase64Encoder().encode(result.account.data[0])
-        ),
-      }));
-      found.sort((a, b) => a.data.idCliente - b.data.idCliente);
-      setCustomers(found);
-      setCustomer((current) =>
-        found.find((item) => item.address === current?.address) ?? null
+      const customerAddresses = [...new Set(
+        sales.map((sale) =>
+          getVentaDecoder().decode(
+            getBase64Encoder().encode(sale.account.data[0])
+          ).cliente
+        )
+      )];
+
+      const records = await Promise.all(
+        customerAddresses.map(async (customerAddress) => {
+          try {
+            const account = await client.registro.accounts.cliente.fetch(address(customerAddress));
+            if (account.data.owner !== ownerAddress) return null;
+            return { address: customerAddress, data: account.data } satisfies CustomerRecord;
+          } catch {
+            return null;
+          }
+        })
       );
+      const found = records
+        .filter((record): record is CustomerRecord => record !== null)
+        .sort((a, b) => a.data.idCliente - b.data.idCliente);
+
+      setCustomers(found);
     } catch (error) {
-      console.error("No se pudieron cargar los clientes:", error);
-      toast.error("No se pudieron consultar tus clientes en Solana.");
+      console.error("No se pudieron cargar los clientes del concesionario:", error);
+      toast.error("No se pudieron consultar los clientes con ventas en este concesionario.");
     } finally {
       setLoadingCustomers(false);
     }
-  }, [client, connected?.account.address]);
+  }, [client, connected?.account.address, concesionario]);
 
   useEffect(() => {
     void loadCustomers();
@@ -257,10 +272,10 @@ export function CustomerManagement({
       <section className="rounded-xl border border-[#e9ebee] bg-white p-6 shadow-[0_2px_8px_rgba(24,32,40,0.025)]">
         <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">CONSULTA ON-CHAIN</p>
         <h2 className="mt-2 text-[15px] font-bold text-[#252a30]">Buscar cliente</h2>
-        <p className="mt-1 text-[10px] text-[#858d96]">Selecciona un cliente registrado o búscalo mediante su cédula.</p>
+        <p className="mt-1 text-[10px] text-[#858d96]">El listado corresponde al concesionario seleccionado; la búsqueda por cédula es independiente y puede consultar cualquier cliente de esta wallet.</p>
         <div className="mt-5">
           <div className="mb-1.5 flex items-center justify-between gap-3">
-            <label htmlFor="registered-customer" className="block text-[10px] font-semibold text-[#555e68]">Clientes registrados en esta wallet</label>
+            <label htmlFor="registered-customer" className="block text-[10px] font-semibold text-[#555e68]">Clientes con ventas en este concesionario</label>
             <button type="button" onClick={() => void loadCustomers()} disabled={loadingCustomers} className="text-[10px] font-semibold text-[#68717b] hover:text-[#e60012] disabled:opacity-50">
               {loadingCustomers ? "Actualizando…" : "Actualizar"}
             </button>
@@ -268,7 +283,7 @@ export function CustomerManagement({
           {customers.length > 0 ? (
             <select
               id="registered-customer"
-              value={customer?.address ?? ""}
+              value={customers.some((item) => item.address === customer?.address) ? customer?.address ?? "" : ""}
               onChange={(event) => {
                 const selected = customers.find((item) => item.address === event.target.value) ?? null;
                 setCustomer(selected);
@@ -285,11 +300,12 @@ export function CustomerManagement({
             </select>
           ) : (
             <div className="rounded-lg bg-[#f7f8fa] px-3 py-3 text-[10px] text-[#858d96]">
-              {loadingCustomers ? "Consultando clientes en Solana…" : "No hay clientes registrados para esta wallet."}
+              {loadingCustomers ? "Consultando clientes de este concesionario en Solana…" : "Todavía no hay clientes con ventas registradas en este concesionario."}
             </div>
           )}
           {customers.length > 0 && (
-            <p className="mt-2 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) encontrados en la red seleccionada.</p>
+            <p className="mt-2 text-[9px] text-[#a0a6ad]">{customers.length} cliente(s) con ventas en {nombreConcesionario}.</p>
+            <p className="mt-2 text-[9px] leading-relaxed text-[#9299a1]">Este listado solo incluye clientes que tienen al menos una venta en el concesionario seleccionado. La búsqueda por cédula consulta el registro global de clientes de esta wallet, sin depender del concesionario seleccionado.</p>
           )}
         </div>
         <form onSubmit={handleSearch} className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -308,7 +324,7 @@ export function CustomerManagement({
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-white p-3"><p className="text-[9px] text-[#9299a1]">Motos asociadas</p><p className="mt-1 text-[18px] font-bold text-[#252a30]">{customer.data.totalMotosCliente}</p></div>
-              <div className="rounded-lg bg-white p-3"><p className="text-[9px] text-[#9299a1]">Concesionario</p><p className="mt-1 truncate text-[11px] font-semibold text-[#252a30]">{nombreConcesionario}</p></div>
+              <div className="rounded-lg bg-white p-3"><p className="text-[9px] text-[#9299a1]">Contexto de consulta</p><p className="mt-1 truncate text-[11px] font-semibold text-[#252a30]">{customers.some((item) => item.address === customer.address) ? nombreConcesionario : "Búsqueda global por cédula"}</p></div>
             </div>
             <p className="mt-3 text-[9px] text-[#9299a1]">PDA: <a href={`https://explorer.solana.com/address/${customer.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[#68717b] underline decoration-dotted underline-offset-2 transition hover:text-[#e60012]">{customer.address} ↗</a></p>
             <div className="mt-3 rounded-lg border border-[#e7eaed] bg-white p-3">
