@@ -78,7 +78,7 @@ export function createServiceRedemptionToken() {
 
 export async function createServiceRedemptionSession(
   token: string,
-  input: Omit<ServiceRedemptionSession, "transaction" | "signedTransaction" | "status" | "createdAt" | "expiresAt">
+  input: Omit<ServiceRedemptionSession, "lastValidBlockHeight" | "transaction" | "signedTransaction" | "status" | "createdAt" | "expiresAt">
 ) {
   if (!Number.isInteger(input.servicioId) || input.servicioId < 0 || input.servicioId > 255) {
     throw new Error("El servicio seleccionado no es válido.");
@@ -96,6 +96,7 @@ export async function createServiceRedemptionSession(
   const now = Date.now();
   const session: ServiceRedemptionSession = {
     ...input,
+    lastValidBlockHeight: "0",
     transaction: null,
     signedTransaction: null,
     status: "waiting_customer_ready",
