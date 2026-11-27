@@ -17,7 +17,7 @@ import { type Cliente } from "../../lib/moto-ledger/src/generated/accounts/clien
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { getVentaDecoder, getVentaDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/venta";
 
-type CustomerRecord = { address: string; data: Cliente };
+type CustomerRecord = { address: ReturnType<typeof address>; data: Cliente };
 
 function parseCedula(value: string) {
   const parsed = Number(value.trim());
@@ -92,7 +92,7 @@ export function CustomerManagement({
         })
       );
       const found = records
-        .filter((record): record is CustomerRecord => record !== null)
+        .filter((record) => record !== null)
         .sort((a, b) => a.data.idCliente - b.data.idCliente);
 
       setCustomers(found);
