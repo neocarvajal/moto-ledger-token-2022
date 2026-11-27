@@ -11,14 +11,17 @@
  *
  * Run only after regenerating Codama clients from the updated Anchor IDL.
  */
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
+  AccountRole,
   address,
   createKeyPairSignerFromBytes,
   createSolanaRpc,
   createSolanaRpcSubscriptions,
+  getBase58Encoder,
   getBase64Encoder,
   getUtf8Encoder,
   getAddressEncoder,
@@ -30,12 +33,20 @@ import {
   signTransactionMessageWithSigners,
   sendAndConfirmTransactionFactory,
 } from "@solana/kit";
-import { getConcesionarioDecoder, getConcesionarioDiscriminatorBytes } from "../app/lib/moto-ledger/src/generated/accounts/concesionario.ts";
-import { getClienteDecoder, getClienteDiscriminatorBytes } from "../app/lib/moto-ledger/src/generated/accounts/cliente.ts";
-import { getVentaDecoder, getVentaDiscriminatorBytes } from "../app/lib/moto-ledger/src/generated/accounts/venta.ts";
-import { getAsociacionClienteDecoder, getAsociacionClienteDiscriminatorBytes } from "../app/lib/moto-ledger/src/generated/accounts/asociacionCliente.ts";
-import { getRegistrarAsociacionClienteInstruction } from "../app/lib/moto-ledger/src/generated/instructions/registrarAsociacionCliente.ts";
-import { REGISTRO_PROGRAM_ADDRESS } from "../app/lib/moto-ledger/src/generated/programs/index.ts";
+const REGISTRO_PROGRAM_ADDRESS = address("64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj");
+const accountDiscriminator = (name) =>
+  new Uint8Array(createHash("sha256").update(`account:${name}`).digest().subarray(0, 8));
+const instructionDiscriminator = new Uint8Array(
+  createHash("sha256").update("global:registrar_asociacion_cliente").digest().subarray(0, 8)
+);
+const accountDiscriminators = {
+  dealership: accountDiscriminator("Concesionario"),
+  customer: accountDiscriminator("Cliente"),
+  sale: accountDiscriminator("Venta"),
+  association: accountDiscriminator("AsociacionCliente"),
+};
+const base58 = getBase58Encoder();
+const readAddress = (bytes, offset) => base58.encode(bytes.subarray(offset, offset + 32));
 
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const WS_URL = RPC_URL.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
@@ -64,10 +75,10 @@ async function main() {
   console.log(`Mode: ${EXECUTE ? "EXECUTE" : "DRY RUN"}`);
 
   const rawAccounts = await rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, { encoding: "base64" }).send();
-  const dealerDisc = getConcesionarioDiscriminatorBytes();
-  const customerDisc = getClienteDiscriminatorBytes();
-  const saleDisc = getVentaDiscriminatorBytes();
-  const associationDisc = getAsociacionClienteDiscriminatorBytes();
+  const dealerDisc = accountDiscriminators.dealership;
+  const customerDisc = accountDiscriminators.customer;
+  const saleDisc = accountDiscriminators.sale;
+  const associationDisc = accountDiscriminators.association;
   const dealers = new Map();
   const customers = new Map();
   const sales = [];
@@ -80,16 +91,12 @@ async function main() {
     const pubkey = account.pubkey;
 
     if (discriminator.every((value, index) => value === dealerDisc[index])) {
-      const decoded = getConcesionarioDecoder().decode(bytes);
-      dealers.set(pubkey, { owner: decoded.owner });
+      dealers.set(pubkey, { owner: readAddress(bytes, 8) });
     } else if (discriminator.every((value, index) => value === customerDisc[index])) {
-      const decoded = getClienteDecoder().decode(bytes);
-      customers.set(pubkey, { owner: decoded.owner });
+      customers.set(pubkey, { owner: readAddress(bytes, 8) });
     } else if (discriminator.every((value, index) => value === saleDisc[index])) {
-      const decoded = getVentaDecoder().decode(bytes);
-      sales.push({ dealership: decoded.concesionario, customer: decoded.cliente });
+      sales.push({ dealership: readAddress(bytes, 8), customer: readAddress(bytes, 40) });
     } else if (discriminator.every((value, index) => value === associationDisc[index])) {
-      getAsociacionClienteDecoder().decode(bytes);
       associationCount++;
     }
   }
@@ -158,12 +165,17 @@ async function main() {
     }
 
     try {
-      const instruction = getRegistrarAsociacionClienteInstruction({
-        owner: payer,
-        concesionario: address(dealership),
-        cliente: address(customer),
-        asociacionCliente: association,
-      });
+      const instruction = {
+        programAddress: REGISTRO_PROGRAM_ADDRESS,
+        accounts: [
+          { address: payer.address, role: AccountRole.WRITABLE_SIGNER },
+          { address: address(dealership), role: AccountRole.WRITABLE },
+          { address: address(customer), role: AccountRole.READONLY },
+          { address: association, role: AccountRole.WRITABLE },
+          { address: address("11111111111111111111111111111111"), role: AccountRole.READONLY },
+        ],
+        data: instructionDiscriminator,
+      };
       const latest = await rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
       let message = createTransactionMessage({ version: 0 });
       message = setTransactionMessageFeePayerSigner(payer, message);
