@@ -114,6 +114,14 @@ pub mod registro {
 
         let fecha_inicio = Clock::get()?.unix_timestamp;
 
+        context.accounts.kilometraje_moto.set_inner(KilometrajeMoto {
+            moto: context.accounts.moto.key(),
+            concesionario: context.accounts.concesionario.key(),
+            kilometraje_actual: 0,
+            fecha_actualizacion: fecha_inicio,
+            bump: context.bumps.kilometraje_moto,
+        });
+
         let duracion_garantia =
             (context.accounts.concesionario.duracion_garantia_dias as i64)
             * 86400;
@@ -349,6 +357,15 @@ pub mod registro {
 
         let fecha_servicio = Clock::get()?.unix_timestamp;
 
+        actualizar_kilometraje_moto(
+            &mut context.accounts.kilometraje_moto,
+            context.accounts.moto.key(),
+            context.accounts.concesionario.key(),
+            kilometraje,
+            fecha_servicio,
+            context.bumps.kilometraje_moto,
+        )?;
+
         if tipo == TipoServicio::Garantia {
 
             require!(
@@ -420,6 +437,15 @@ pub mod registro {
         );
 
         let fecha_reclamacion = Clock::get()?.unix_timestamp;
+
+        actualizar_kilometraje_moto(
+            &mut context.accounts.kilometraje_moto,
+            context.accounts.moto.key(),
+            context.accounts.concesionario.key(),
+            kilometraje,
+            fecha_reclamacion,
+            context.bumps.kilometraje_moto,
+        )?;
 
         require!(
             context.accounts.garantia.estado == EstadoGarantia::Activa,
@@ -824,6 +850,16 @@ pub mod registro {
         );
 
         let fecha_canje = Clock::get()?.unix_timestamp;
+
+        actualizar_kilometraje_moto(
+            &mut context.accounts.kilometraje_moto,
+            context.accounts.moto.key(),
+            context.accounts.concesionario.key(),
+            kilometraje_actual,
+            fecha_canje,
+            context.bumps.kilometraje_moto,
+        )?;
+
         require!(
             fecha_canje >= context.accounts.garantia.fecha_inicio,
             Errores::GarantiaNoIniciada
@@ -1345,6 +1381,16 @@ pub struct CanjearServicio<'info> {
     pub moto: Account<'info, Moto>,
 
     #[account(
+        mut,
+        init_if_needed,
+        payer = owner,
+        space = KilometrajeMoto::LEN,
+        seeds = [b"kilometraje_moto", moto.key().as_ref()],
+        bump
+    )]
+    pub kilometraje_moto: Account<'info, KilometrajeMoto>,
+
+    #[account(
         constraint = garantia.moto == moto.key() @ Errores::GarantiaNoCorresponde,
         constraint = garantia.concesionario == concesionario.key() @ Errores::GarantiaNoCorresponde
     )]
@@ -1458,6 +1504,10 @@ pub enum Errores {
     ClienteSinCompras,
     #[msg("El CID debe contener entre 1 y 100 caracteres alfanuméricos")]
     MetadataCidInvalido,
+    #[msg("El registro de kilometraje no corresponde a esta moto o concesionario")]
+    KilometrajeMotoInvalido,
+    #[msg("El kilometraje no puede ser inferior al último valor registrado")]
+    KilometrajeDecreciente,
 }
 
 
@@ -1623,6 +1673,58 @@ impl Moto {
         32       + // concesionario: Pubkey
         8        + // servicios: u64
         8;         // total_reclamaciones: u64
+}
+
+/// Latest known odometer reading shared by Services, Warranty and Loyalty.
+#[account]
+pub struct KilometrajeMoto {
+    pub moto: Pubkey,
+    pub concesionario: Pubkey,
+    pub kilometraje_actual: u64,
+    pub fecha_actualizacion: i64,
+    pub bump: u8,
+}
+
+impl KilometrajeMoto {
+    pub const LEN: usize = DISCRIMINATOR + 32 + 32 + 8 + 8 + 1;
+}
+
+fn actualizar_kilometraje_moto(
+    registro: &mut Account<KilometrajeMoto>,
+    moto: Pubkey,
+    concesionario: Pubkey,
+    kilometraje: u64,
+    fecha: i64,
+    bump: u8,
+) -> Result<()> {
+    if registro.moto == Pubkey::default() {
+        registro.set_inner(KilometrajeMoto {
+            moto,
+            concesionario,
+            kilometraje_actual: kilometraje,
+            fecha_actualizacion: fecha,
+            bump,
+        });
+        return Ok(());
+    }
+
+    require_keys_eq!(registro.moto, moto, Errores::KilometrajeMotoInvalido);
+    require_keys_eq!(
+        registro.concesionario,
+        concesionario,
+        Errores::KilometrajeMotoInvalido
+    );
+    require!(
+        kilometraje >= registro.kilometraje_actual,
+        Errores::KilometrajeDecreciente
+    );
+
+    if kilometraje > registro.kilometraje_actual {
+        registro.kilometraje_actual = kilometraje;
+        registro.fecha_actualizacion = fecha;
+    }
+
+    Ok(())
 }
 
 #[account]
@@ -1829,6 +1931,15 @@ pub struct RegistrarMoto<'info> {
     )]
     pub moto: Account<'info, Moto>,
 
+    #[account(
+        init,
+        payer = owner,
+        space = KilometrajeMoto::LEN,
+        seeds = [b"kilometraje_moto", moto.key().as_ref()],
+        bump
+    )]
+    pub kilometraje_moto: Account<'info, KilometrajeMoto>,
+
     pub system_program: Program<'info, System>
 }
 
@@ -2024,6 +2135,16 @@ pub struct RegistrarServicio<'info> {
     pub garantia: Account<'info, Garantia>,
 
     #[account(
+        mut,
+        init_if_needed,
+        payer = owner,
+        space = KilometrajeMoto::LEN,
+        seeds = [b"kilometraje_moto", moto.key().as_ref()],
+        bump
+    )]
+    pub kilometraje_moto: Account<'info, KilometrajeMoto>,
+
+    #[account(
         init,
         payer = owner,
         space = Servicio::LEN,
@@ -2081,6 +2202,16 @@ pub struct ReclamarGarantia<'info> {
             @ Errores::Unauthorized
     )]
     pub garantia: Account<'info, Garantia>,
+
+    #[account(
+        mut,
+        init_if_needed,
+        payer = owner,
+        space = KilometrajeMoto::LEN,
+        seeds = [b"kilometraje_moto", moto.key().as_ref()],
+        bump
+    )]
+    pub kilometraje_moto: Account<'info, KilometrajeMoto>,
 
     #[account(
         init,
