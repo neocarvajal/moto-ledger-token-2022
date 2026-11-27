@@ -332,29 +332,6 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       const receiptExists = await client.rpc.getAccountInfo(canjeServicio[0], { encoding: "base64" }).send();
       if (receiptExists.value) throw new Error("No se pudo generar un identificador de canje único. Inténtalo nuevamente.");
 
-      const token = await fetch("/api/service-redemption", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({
-          owner: connected.account.address,
-          concesionario,
-          cliente: selectedCustomer,
-          clienteNombre: selectedCustomerRecord.data.nombreCliente,
-          clienteCedula: String(selectedCustomerRecord.data.cedulaCliente),
-          walletAddress: wallet,
-          mint,
-          servicioId: selectedServiceRecord.id,
-          servicioNombre: selectedServiceRecord.nombre,
-          puntos: selectedServiceRecord.puntos.toString(),
-          kilometrajeActual: km.toString(),
-          idCanje: idCanje.toString(),
-          cluster,
-        }),
-      });
-      const tokenPayload = await token.json() as { token?: string; error?: string };
-      if (!token.ok || !tokenPayload.token) throw new Error(tokenPayload.error ?? "No se pudo crear el QR de canje.");
-
       const instruction = client.registro.instructions.canjearServicio({
         owner: connected.signer,
         wallet: createNoopSigner(address(wallet)),
@@ -365,7 +342,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         walletCliente,
         venta: address(selectedSaleRecord.address),
         moto: address(selectedSaleRecord.data.moto),
-        garantia: address(saleDetails.garantia ? (await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto))).data.garantia : selectedSaleRecord.data.moto),
+        garantia: address((await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto))).data.garantia),
         mint: address(mint),
         tokenAccount,
         canjeServicio: canjeServicio[0],
@@ -385,6 +362,31 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       assertIsTransactionWithBlockhashLifetime(partiallySigned);
       const ownerSignature = partiallySigned.signatures[address(connected.account.address)];
       if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) throw new Error("La wallet del concesionario no pudo firmar parcialmente la transacción.");
+
+      const token = await fetch("/api/service-redemption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          owner: connected.account.address,
+          concesionario,
+          cliente: selectedCustomer,
+          clienteNombre: selectedCustomerRecord.data.nombreCliente,
+          clienteCedula: String(selectedCustomerRecord.data.cedulaCliente),
+          walletAddress: wallet,
+          mint,
+          servicioId: selectedServiceRecord.id,
+          servicioNombre: selectedServiceRecord.nombre,
+          puntos: selectedServiceRecord.puntos.toString(),
+          kilometrajeActual: km.toString(),
+          idCanje: idCanje.toString(),
+          lastValidBlockHeight: latestBlockhash.value.lastValidBlockHeight.toString(),
+          cluster,
+        }),
+      });
+      const tokenPayload = await token.json() as { token?: string; error?: string };
+      if (!token.ok || !tokenPayload.token) throw new Error(tokenPayload.error ?? "No se pudo crear el QR de canje.");
+
       const response = await fetch(`/api/service-redemption/${tokenPayload.token}/transaction`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
