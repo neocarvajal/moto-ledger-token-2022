@@ -4,7 +4,7 @@ import {
   createServiceRedemptionToken,
   isRedemptionAddress,
   type RedemptionCluster,
-} from "../../../lib/service-redemption-store";
+} from "../../lib/service-redemption-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
