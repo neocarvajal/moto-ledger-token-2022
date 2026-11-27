@@ -19,7 +19,7 @@ export type ServiceRedemptionSession = {
   cluster: RedemptionCluster;
   transaction: string | null;
   signedTransaction: string | null;
-  status: "waiting_transaction" | "waiting_customer_signature" | "signed" | "completed" | "cancelled";
+  status: "waiting_customer_ready" | "ready_to_prepare" | "waiting_customer_signature" | "signed" | "completed" | "cancelled";
   createdAt: number;
   expiresAt: number;
 };
@@ -86,7 +86,7 @@ export async function createServiceRedemptionSession(
   if (!/^\d+$/.test(input.puntos) || BigInt(input.puntos) <= 0n) {
     throw new Error("La cantidad de puntos no es válida.");
   }
-  if (!/^\d+$/.test(input.kilometrajeActual) || !/^\d+$/.test(input.idCanje) || !/^\d+$/.test(input.lastValidBlockHeight)) {
+  if (!/^\d+$/.test(input.kilometrajeActual) || !/^\d+$/.test(input.idCanje)) {
     throw new Error("Los datos del canje no son válidos.");
   }
   for (const value of [input.owner, input.concesionario, input.cliente, input.walletAddress, input.mint]) {
@@ -98,7 +98,7 @@ export async function createServiceRedemptionSession(
     ...input,
     transaction: null,
     signedTransaction: null,
-    status: "waiting_transaction",
+    status: "waiting_customer_ready",
     createdAt: now,
     expiresAt: now + SESSION_TTL_SECONDS * 1000,
   };
@@ -141,14 +141,15 @@ export async function updateServiceRedemptionSession(
   const immutableFields: (keyof ServiceRedemptionSession)[] = [
     "owner", "concesionario", "cliente", "clienteNombre", "clienteCedula",
     "walletAddress", "mint", "servicioId", "servicioNombre", "puntos",
-    "kilometrajeActual", "idCanje", "lastValidBlockHeight", "cluster", "createdAt", "expiresAt",
+    "kilometrajeActual", "idCanje", "cluster", "createdAt", "expiresAt",
   ];
   if (immutableFields.some((field) => next[field] !== current[field])) {
     throw new Error("No se puede modificar la intención original del canje.");
   }
 
   const allowedTransitions: Record<ServiceRedemptionSession["status"], ServiceRedemptionSession["status"][]> = {
-    waiting_transaction: ["waiting_customer_signature", "cancelled"],
+    waiting_customer_ready: ["ready_to_prepare", "cancelled"],
+    ready_to_prepare: ["waiting_customer_signature", "cancelled"],
     waiting_customer_signature: ["signed", "cancelled"],
     signed: ["completed", "cancelled"],
     completed: [],
@@ -157,7 +158,7 @@ export async function updateServiceRedemptionSession(
   if (next.status !== current.status && !allowedTransitions[current.status].includes(next.status)) {
     throw new Error("Transición de estado de canje no permitida.");
   }
-  if (current.status !== "waiting_transaction" && next.transaction !== current.transaction) {
+  if (current.status !== "ready_to_prepare" && next.transaction !== current.transaction) {
     throw new Error("La transacción preparada no puede sustituirse.");
   }
   if (current.status !== "waiting_customer_signature" && next.signedTransaction !== current.signedTransaction) {
