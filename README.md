@@ -1,229 +1,200 @@
 # MotoLedger
 
-**Gestión de concesionarios, trazabilidad de motocicletas y fidelización de clientes sobre Solana.**
+**Gestión de concesionarios, trazabilidad de motocicletas y fidelización con Solana y Token-2022.**
 
 <p align="center">
-  <img src="assets/moto-ledger-preview-.gif" alt="Demostración animada del dashboard de MotoLedger" width="100%">
+  <img src="assets/moto-ledger-preview-.gif" alt="Dashboard de MotoLedger" width="100%">
 </p>
 
-
-> **Red actual:** Solana Devnet  
+> **Red:** Solana Devnet  
 > **Programa:** `64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj`  
-> **Aplicación:** [moto-ledger-eta.vercel.app](https://moto-ledger-eta.vercel.app/)
+> **Aplicación:** [moto-ledger-token-2022.vercel.app](https://moto-ledger-token-2022.vercel.app/)
 
+## Integración de recompensas con Token-2022
 
-## Sistema de fidelización con Token-2022
+MotoLedger es un proyecto propio al que incorporé un sistema de fidelización conectado con las ventas reales de cada concesionario. Cada concesionario configura su propio mint de puntos bajo **Token-2022**. Los puntos son unidades enteras (0 decimales) y el mint utiliza la extensión **NonTransferable**, por lo que no se pueden transferir entre wallets.
 
-### Por qué incorporé esta funcionalidad
+### Flujo de prueba de extremo a extremo
 
-Decidí ampliar MotoLedger con un sistema de fidelización porque la entrega requiere demostrar una integración funcional con **Token-2022**, no solamente describir el estándar o mostrar una transferencia de tokens aislada. Vincular la emisión de puntos con las ventas y los clientes que ya administra MotoLedger permite que la nueva funcionalidad tenga un propósito concreto dentro del producto y que pueda probarse mediante operaciones relacionadas con el negocio del concesionario.
+Para reproducir el recorrido completo utiliza una wallet owner con SOL de Devnet, una wallet distinta para el comprador y al menos **dos motos disponibles** en el mismo concesionario. Una moto solo puede venderse una vez.
 
-También decidí extender el programa existente en lugar de desplegar uno independiente. La lógica de fidelización necesita validar las cuentas de concesionario, cliente y venta que ya utiliza la aplicación. Mantenerla en el mismo programa permite aplicar esas validaciones directamente y conservar el modelo de datos que ya está desplegado. Las cuentas originales mantienen su estructura; la funcionalidad nueva utiliza cuentas PDA adicionales.
+1. **Conectar y seleccionar el concesionario.** Abre la aplicación en Devnet, conecta la wallet que administra el concesionario y selecciona el concesionario que tiene configurado el programa de fidelización. Si aún no existe, regístralo.
+2. **Preparar inventario.** En el módulo **Motos**, registra al menos dos motocicletas disponibles.
+3. **Registrar el cliente.** En **Clientes**, selecciona el concesionario y registra nombre y cédula. La identidad Cliente es global para la wallet owner y la cédula; una PDA `AsociacionCliente` vincula ese cliente con el concesionario. Solo clientes asociados pueden seleccionarse en Ventas.
+4. **Primera venta.** En **Ventas**, selecciona la primera moto disponible y el cliente, introduce el precio y confirma. Esta compra habilita la vinculación de wallet. Si el comprador todavía no tiene wallet vinculada, la venta se registra sin recompensa.
+5. **Vincular la wallet.** Regresa a **Clientes**, selecciona/busca el mismo cliente y genera el QR. El comprador abre el enlace en un navegador compatible con su wallet, conecta su wallet y firma; el owner también autoriza desde el dashboard. El programa exige ambas firmas y valida que el cliente ya tenga al menos una moto comprada. El QR es de un solo uso y expira a los cinco minutos.
+6. **Segunda venta con recompensa.** Vuelve a **Ventas**, selecciona la segunda moto y el mismo cliente. Si existe wallet vinculada y el concesionario tiene un programa activo, la aplicación prepara una única transacción con: creación idempotente de la ATA Token-2022, `registrar_venta` y `otorgar_puntos`. Es atómica: si falla una instrucción, no se confirma ninguna. La cantidad se toma de la configuración on-chain `ProgramaFidelidad.puntos_por_venta`.
+7. **Consultar saldo.** En **Clientes**, selecciona el comprador. La ficha consulta `WalletCliente`, deriva la ATA con el programa Token-2022 y obtiene el saldo directamente desde RPC. No se usa un saldo local como fuente de verdad.
+8. **Canjear puntos.** Abre el módulo de **Fidelización / Canje**, selecciona cliente, una de sus ventas, un servicio y el kilometraje actual. El owner inicia el canje y genera un QR; el comprador escanea y firma desde su wallet vinculada. Cuando están ambas firmas, la aplicación envía la transacción. El programa valida cliente, wallet, venta, moto, concesionario, garantía, servicio activo y saldo; después quema los puntos mediante Token-2022 y crea un recibo on-chain `CanjeServicio`.
 
-### Reglas y funcionamiento definidos
+**Importante:** la primera venta habilita la vinculación, pero no genera puntos si aún no existe wallet vinculada. La segunda venta debe usar otra moto. El concesionario debe tener su mint y programa de fidelización configurados antes de intentar emitir recompensas.
 
-- Cada concesionario tendrá su propio mint de puntos bajo **Token-2022**.
-- Los puntos serán unidades enteras, por lo que el mint utilizará **cero decimales**.
-- El mint utilizará la extensión **NonTransferable**: los puntos sirven como recompensa dentro del sistema y no se pueden transferir entre wallets.
-- Cada concesionario podrá configurar y actualizar la cantidad fija de puntos que otorga por venta. Elegí una cantidad fija porque el campo de precio actual no identifica una moneda ni sus decimales; así evito asumir una conversión monetaria que el modelo todavía no define.
-- La autoridad de emisión será una PDA derivada por el programa para el concesionario. El programa valida el mint, el programa Token-2022, los decimales, la extensión y la autoridad antes de permitir la configuración y emisión.
-- Solo participan clientes que ya hayan comprado al menos una motocicleta en el concesionario. La vinculación de wallet se habilita después de registrar la venta y el programa comprueba on-chain que `total_motos_cliente` sea mayor que cero; no basta con estar registrado como cliente.
-- La wallet del comprador se vincula al cliente mediante una operación que requiere la firma del concesionario y la firma de la propia wallet del comprador. La cuenta Cliente existente no se modifica para almacenar esa wallet.
-- La instrucción de emisión valida que la venta corresponda al concesionario y al cliente indicados. Además, crea una cuenta `PuntosVenta` asociada a esa venta para impedir que se otorguen puntos más de una vez.
-- La instrucción `otorgar_puntos` está diseñada para enviarse en la misma transacción que `registrar_venta`. De esa forma, el registro de la venta y la recompensa se confirman o revierten juntos.
+### Catálogo inicial
 
-### Instrucciones añadidas al programa
+Al inicializar el catálogo de un concesionario, el programa crea estos servicios:
+
+| Servicio | Coste |
+| --- | ---: |
+| Ajuste de frenos | 60 puntos |
+| Cambio de aceite | 80 puntos |
+| Revisión general | 120 puntos |
+| Mantenimiento preventivo | 150 puntos |
+
+Con 200 puntos por venta, por ejemplo, un cliente podría canjear un cambio de aceite y un ajuste de frenos, si cumple las demás condiciones del programa.
+
+## Configuración del mint y las instrucciones
+
+Desde la sección de fidelización, el owner carga la metadata y crea el mint Token-2022. El mint se configura con 0 decimales, extensión `NonTransferable`, Metadata Pointer y Token Metadata. Su mint authority es la PDA `autoridad_fidelidad` derivada por el programa para el concesionario.
+
+La instrucción `configurar_programa_fidelidad` comprueba que el token program sea Token-2022, que el mint tenga cero decimales, que incluya `NonTransferable` y que la mint authority sea la PDA esperada. `actualizar_puntos_fidelidad` permite al owner cambiar la cantidad fija por venta (debe ser mayor que cero).
 
 | Instrucción | Responsabilidad |
 | --- | --- |
-| `configurar_programa_fidelidad` | Registra la configuración del concesionario y valida el mint Token-2022. |
-| `actualizar_puntos_fidelidad` | Cambia la cantidad de puntos otorgados por venta. |
-| `vincular_wallet_cliente` | Asocia la wallet del comprador con un cliente registrado mediante ambas firmas. |
-| `otorgar_puntos` | Emite los puntos de una venta y registra la emisión para evitar duplicados. |
+| `configurar_programa_fidelidad` | Registra el mint y los puntos por venta; valida token program, decimales, extensión y autoridad. |
+| `actualizar_puntos_fidelidad` | Actualiza la recompensa fija por venta. |
+| `vincular_wallet_cliente` | Vincula la wallet del comprador después de una compra; requiere owner y comprador. |
+| `desvincular_wallet_cliente` | Elimina el vínculo sin borrar identidad ni historial del cliente. |
+| `otorgar_puntos` | Emite puntos mediante CPI a Token-2022 y crea un recibo `PuntosVenta`. |
+| `inicializar_catalogo_servicios` | Crea el catálogo inicial de canjes. |
+| `actualizar_servicio_catalogo` | Modifica los datos o disponibilidad de un servicio. |
+| `canjear_servicio` | Valida el canje, quema puntos mediante Token-2022 y crea `CanjeServicio`. |
 
-El mint se crea desde el cliente antes de configurar el programa, ya que debe nacer con la PDA de autoridad correspondiente como mint authority y con la extensión NonTransferable. La emisión on-chain se realiza mediante CPI al programa Token-2022.
+## Qué valida la red y qué hace la aplicación
 
-### Estado de esta integración
+**Validaciones on-chain (programa y Token-2022):**
 
-En esta etapa ya amplié el código fuente del programa y actualicé el IDL con las nuevas instrucciones y cuentas. También generé el cliente TypeScript con Codama y ajusté las rutas de importación para que la aplicación y sus pruebas consuman el cliente desde `app/lib/moto-ledger/src/generated/`. El build de la aplicación se ejecuta sin errores después de esos ajustes.
+- El owner debe ser propietario del concesionario y firmar las instrucciones que lo requieren.
+- El cliente debe pertenecer al owner y tener una asociación activa con el concesionario.
+- La wallet vinculada debe firmar; el programa exige que el cliente ya haya comprado al menos una moto.
+- La venta usada para emitir puntos debe corresponder al mismo concesionario y cliente.
+- El mint debe ser el configurado para ese concesionario, pertenecer a Token-2022, tener 0 decimales y usar la PDA de fidelización como mint authority.
+- `PuntosVenta` es una PDA derivada de la venta: su inicialización impide emitir una segunda recompensa por la misma venta.
+- Para canjear, el programa valida cliente, wallet, venta, moto, garantía, servicio activo y saldo. El comprador firma como autoridad de su cuenta de tokens para autorizar el burn.
+- La quema y el recibo del canje ocurren en una transacción atómica; si falla una validación o el CPI, Solana revierte los cambios de esa transacción.
 
-La integración de las operaciones de fidelización en la interfaz, la creación del mint en Devnet y las pruebas de extremo a extremo todavía deben completarse y verificarse. Por eso, no presento aún una emisión de puntos ni un saldo de fidelización como evidencia on-chain confirmada. Cuando estén disponibles, añadiré aquí los enlaces de las transacciones y las evidencias de creación, configuración, vinculación, emisión y consulta de saldo.
+**Responsabilidades de la aplicación:**
 
-En esta primera versión no incorporé `PermanentDelegate`, recuperación de puntos ni metadatos del mint. No son necesarios para el flujo inicial de acumulación y no quiero añadir autoridades o capacidades que la aplicación todavía no necesita.
+- Presenta formularios, selecciona cuentas, deriva PDAs/ATAs, prepara instrucciones y coordina firmas.
+- Consulta el saldo Token-2022 mediante RPC; no mantiene un saldo paralelo.
+- Presenta la cantidad configurada y el coste del servicio. El programa vuelve a leer y validar esos valores desde las cuentas on-chain.
+- Coordina temporalmente los QR; un QR no sustituye las firmas ni las validaciones de la red.
 
-## MotoLedger: gestión y trazabilidad del concesionario
+**Datos que se conservan:**
 
-MotoLedger es una dApp que permite a un concesionario administrar su operación desde un dashboard web y registrar información clave directamente en la blockchain. Cada concesionario, motocicleta, cliente, venta y servicio se representa mediante cuentas on-chain y direcciones determinísticas (PDA), lo que facilita consultar y verificar el historial de las operaciones.
+- `Venta`: relación entre concesionario, cliente y moto, además de fecha y precio.
+- `PuntosVenta`: venta, cliente, wallet receptora, cantidad y fecha de emisión. No guarda una copia del saldo acumulado ni una conversión monetaria.
+- El saldo agregado vive en la cuenta de tokens Token-2022 del comprador.
+- `CanjeServicio`: concesionario, catálogo, cliente, wallet, mint, venta, moto, kilometraje, servicio, puntos quemados, fecha e identificador del canje.
+- El precio de venta no determina la recompensa. No se almacena una tasa de cambio entre precio y puntos; la recompensa es fija por concesionario.
 
-## Ruta del proyecto y aporte propio
+## Autoridades y limitaciones
 
-**Ruta elegida: proyecto propio.** MotoLedger parte de una propuesta propia para digitalizar la operación de un concesionario de motocicletas y aportar trazabilidad verificable mediante Solana. El propósito es centralizar la gestión del inventario, clientes, ventas y servicios, manteniendo en la blockchain los registros relevantes de cada operación.
+- **Owner del concesionario:** administra el programa y actualiza los puntos por venta.
+- **PDA `autoridad_fidelidad`:** mint authority; firma el CPI `MintTo` mediante las seeds del programa. No existe una clave privada exportable para esta PDA.
+- **Wallet del comprador:** autoridad de su cuenta de tokens; firma el canje para autorizar el burn.
+- **Token-2022:** valida las operaciones del mint y de las cuentas de tokens, incluida la restricción de no transferencia.
 
-El aporte propio comprende el diseño y desarrollo de la solución de extremo a extremo: definición del modelo de cuentas y PDAs, integración del programa desplegado en Solana Devnet, construcción de la interfaz web, conexión de wallets, generación e integración del cliente del programa con Codama, lectura y escritura de datos on-chain, y pruebas unitarias, de interfaz e integración. También se implementaron flujos de gestión para concesionarios, motocicletas, clientes, ventas y servicios, junto con la consulta de operaciones y sus enlaces de verificación.
+Esta entrega **no implementa `PermanentDelegate`, recuperación administrativa de tokens ni reversión de recompensas por anulación de ventas**. Tampoco incluye NFT. No debe afirmarse que existe recuperación privilegiada de puntos: los tokens son no transferibles y el canje los quema con autorización del comprador.
 
-## Funcionalidades
+## Rechazos y cómo reportarlos
 
-### Concesionarios
-- Conectar una wallet compatible con Solana.
-- Detectar automáticamente los concesionarios asociados a la wallet.
-- Registrar y seleccionar varios concesionarios.
-- Consultar sus datos, propietario, PDA y métricas on-chain.
+Al probar una operación inválida, identifica la capa exacta:
 
-### Inventario de motocicletas
-- Registrar motocicletas con serial N.I.V., placa, marca, modelo y color.
-- Crear la cuenta de la motocicleta y su cuenta de garantía asociada en la misma operación.
-- Consultar el catálogo del concesionario.
-- Eliminar motocicletas cuando cumplen las condiciones definidas por el programa.
-- Actualizar el catálogo después de registrar o eliminar una motocicleta.
+1. **Validación local:** la interfaz bloquea datos incorrectos antes de construir/enviar la transacción. No hay firma on-chain.
+2. **Simulación / preflight:** el RPC devuelve un error durante la simulación. No debe reportarse como transacción fallida confirmada en la red.
+3. **Ejecución on-chain:** existe una firma y Solana Explorer/RPC muestra `meta.err` distinto de `null`. Incluye la firma y el error del programa.
 
-### Clientes y ventas
-- Registrar clientes asociados a la wallet.
-- Registrar ventas vinculando concesionario, cliente y motocicleta.
-- Consultar el historial de ventas y abrir el detalle de cada operación.
+Un caso negativo relevante es intentar canjear un servicio cuyo coste supere el saldo. El programa exige `token_account.amount >= puntos` y devuelve `SaldoInsuficiente` si no se cumple. También valida que el servicio exista y esté activo, y que las cuentas de venta, moto y garantía correspondan al mismo contexto. No describas un rechazo como on-chain si solo lo bloqueó la interfaz o la simulación.
 
-### Posventa y servicios
-- Registrar mantenimientos y reparaciones, incluso para motocicletas vendidas.
-- Consultar el historial y el detalle de los servicios.
-- Validar las condiciones de garantía cuando se registra un servicio de tipo garantía.
+## Evidencias de Devnet
 
-### Configuración y trazabilidad
-- Consultar la identidad on-chain del concesionario.
-- Configurar la duración y el kilometraje máximo de la cobertura para futuras motocicletas.
-- Abrir las cuentas y transacciones en Solana Explorer.
-- Recibir notificaciones persistentes con el enlace de la transacción confirmada.
+Las siguientes direcciones y firmas corresponden a datos compartidos durante las pruebas. Las firmas se incluyen solo cuando se conoce qué operación representan.
 
-**Nota sobre garantías:** la configuración de cobertura se aplica a las nuevas garantías creadas al registrar motocicletas; no modifica retroactivamente las cuentas existentes. El acceso al módulo de garantías permanece desactivado en la navegación mientras se completa esa funcionalidad.
+| Evidencia | Dirección / firma | Alcance comprobado |
+| --- | --- | --- |
+| Programa MotoLedger | `64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj` | Programa desplegado en Devnet. |
+| Mint Token-2022 MTTR | `Bd4QqZEnVDRLMrTjgwVo2RRW9GZwTao9w7UKGhqtNAPF` | Mint mostrado por el dashboard como **MOTOS TORO REWARDS (MTTR)**; la configuración visible indicaba 200 puntos por venta. |
+| PDA de concesionario mostrada con ese programa | `8WQjh7p1vmnPRVicWVvS5gXxZmibd5YfTfmkGRwufYKS` | Dirección mostrada durante la revisión de la configuración. |
+| Registro de Juan Perez | [`4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS`](https://explorer.solana.com/tx/4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS?cluster=devnet) | Transacción confirmada de `RegistrarCliente`; logs: BERA MOTORS, Juan Perez y su PDA de cliente. **No es una transacción de emisión de puntos.** |
 
-## Arquitectura y tecnologías
+**Evidencias de fidelización que aún deben adjuntarse para cerrar la demostración:** firma de creación/configuración del mint, firma de una venta con recompensa, consulta verificable del saldo de la ATA, firma de un canje con burn y evidencia de una operación inválida. Si el rechazo ocurre en validación local o simulación, se debe indicar esa capa y adjuntar el mensaje; no inventar una firma.
 
-| Capa | Tecnologías |
-| --- | --- |
-| Frontend | Next.js 16, React 19, TypeScript |
-| Estilos | Tailwind CSS v4 |
-| Blockchain | Solana |
-| Cliente Solana | `@solana/kit` v8 |
-| Wallet | `@solana/kit-plugin-wallet`, `@solana/react` |
-| RPC | `@solana/kit-plugin-rpc` |
-| Cliente del programa | Codama, `@solana/program-client-core` |
-| Notificaciones | Sonner |
+- [Mint MTTR en Solana Explorer](https://explorer.solana.com/address/Bd4QqZEnVDRLMrTjgwVo2RRW9GZwTao9w7UKGhqtNAPF?cluster=devnet)
+- [Programa MotoLedger en Solana Explorer](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet)
 
-La interfaz utiliza **Solana Kit y el cliente generado con Codama** para consultar cuentas, derivar PDAs, construir instrucciones y enviar transacciones firmadas por la wallet conectada. El frontend consume un programa ya desplegado; este repositorio no requiere un workspace local de Anchor para ejecutar la aplicación.
+## Requisitos e instalación
 
-## Modelo on-chain
-
-Las principales cuentas utilizadas por el programa son:
-
-- **RegistroGlobal:** registro global del sistema.
-- **Concesionario:** propietario, identidad comercial, contadores y política de garantía.
-- **Moto:** datos de identificación de la motocicleta y contadores de posventa.
-- **Garantía:** cobertura asociada a la motocicleta.
-- **Cliente:** identidad del cliente y contador de motocicletas.
-- **Venta:** relación entre concesionario, cliente y motocicleta, con fecha y precio.
-- **Servicio:** historial de mantenimiento, reparación o servicio de garantía.
-- **Reclamación:** estructura prevista para el flujo de reclamaciones de garantía.
-- **ProgramaFidelidad:** configuración de fidelización de cada concesionario, con el mint asociado y la cantidad de puntos por venta.
-- **WalletCliente:** vínculo verificable entre una cuenta Cliente existente y la wallet del comprador.
-- **PuntosVenta:** registro de la emisión asociada a una venta, con cliente, wallet, cantidad y fecha.
-
-Las cuentas se derivan mediante **Program Derived Addresses (PDA)**, utilizando semillas determinísticas definidas por el programa. La aplicación muestra direcciones relevantes y enlaces al explorador de Solana para facilitar la verificación.
-
-## Requisitos
-
-- Node.js **24 o superior**.
-- npm.
-- Una wallet compatible con Solana, por ejemplo Phantom o Solflare.
-- SOL de Devnet para cubrir las comisiones de las transacciones.
-
-## Ejecución local
-
-Clona el repositorio e instala las dependencias:
+- Node.js **24 o superior** y npm.
+- Wallet compatible con Solana, como Solflare o Phantom.
+- SOL de Devnet para el owner y las wallets que deban pagar rent/fees.
+- Acceso a Solana Devnet.
 
 ```bash
-git clone https://github.com/neocarvajal/moto-ledger.git
-cd moto-ledger
+git clone https://github.com/neocarvajal/moto-ledger-token-2022.git
+cd moto-ledger-token-2022
 npm install
 ```
 
-Inicia el servidor de desarrollo:
+Crea `.env.local` para la URL pública y el almacenamiento temporal de las sesiones QR:
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+UPSTASH_REDIS_REST_URL=https://<tu-base-de-datos>.upstash.io
+UPSTASH_REDIS_REST_TOKEN=<tu-token-rest>
+```
+
+Configura Upstash Redis para el intercambio temporal entre el dashboard y el teléfono. Mantén el token como secreto del servidor; nunca uses el prefijo `NEXT_PUBLIC_` para secretos. Para escanear QR desde un teléfono, la aplicación debe ser accesible mediante HTTPS público. Establece `NEXT_PUBLIC_APP_URL` con esa URL y reinicia Next.js después de cambiarla. Las sesiones QR expiran a los cinco minutos.
 
 ```bash
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000), conecta tu wallet y selecciona la red Devnet desde el selector de cluster de la aplicación.
+Abre [http://localhost:3000](http://localhost:3000), conecta el owner y selecciona **Devnet**. Puedes obtener SOL desde el [faucet oficial](https://faucet.solana.com/).
 
-Puedes obtener SOL de prueba desde el [faucet oficial de Solana](https://faucet.solana.com/).
+## Arquitectura y cuentas on-chain
 
-## Vinculación de wallet del cliente mediante QR
+| Capa | Tecnología |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript |
+| Estilos | Tailwind CSS v4 |
+| Blockchain | Solana Devnet |
+| Cliente Solana | `@solana/kit` |
+| Token | `@solana-program/token-2022` |
+| Cliente del programa | Codama |
+| Almacenamiento efímero QR | Upstash Redis |
+| Metadata del token | Pinata / IPFS |
 
-El módulo de clientes incorpora un flujo de vinculación en dos dispositivos. Desde la ficha del cliente, el owner genera un QR temporal; el comprador lo escanea, abre la página móvil de MotoLedger y conecta su propia wallet. La aplicación prepara una única transacción para `vincular_wallet_cliente`: el owner la firma desde el dashboard y el comprador completa la firma desde su teléfono. La transacción se envía a Solana cuando están presentes ambas firmas.
+Cuentas de la integración: `ProgramaFidelidad` (concesionario, mint y puntos por venta), `WalletCliente` (cliente-wallet), `PuntosVenta` (recibo único por venta), `CatalogoServicios` (catálogo y coste), `CanjeServicio` (recibo de quema) y `AsociacionCliente` (relación cliente-concesionario).
 
-La solicitud temporal tiene una vigencia de **cinco minutos**. El QR contiene un token aleatorio de un solo uso; no incluye la cédula ni el nombre del cliente. El servidor conserva temporalmente el contexto y la transacción parcialmente firmada en Redis, pero nunca recibe ni almacena claves privadas o frases semilla. La red valida las firmas y las restricciones del programa al ejecutar la instrucción.
+Las PDAs se derivan con semillas determinísticas en el programa y en `app/lib/moto-ledger/pdas.ts`. El frontend consulta las cuentas desde RPC; los datos on-chain no dependen de localStorage.
 
-El QR abre una página web de MotoLedger; no ejecuta una firma directamente desde la cámara. La página detecta wallets compatibles con **Wallet Standard** en el navegador. En móviles, esto normalmente requiere abrir la URL desde el navegador integrado de la wallet. Esta primera iteración no incorpora todavía WalletConnect ni enlaces profundos específicos de Phantom/Solflare, por lo que no todas las combinaciones de navegador y wallet móvil estarán disponibles. La wallet debe permitir firmar una transacción parcialmente firmada sin enviarla por su cuenta.
-
-Antes de autorizar, el dashboard muestra la dirección pública detectada para que el concesionario la confirme con el comprador. Solo después de esa confirmación se prepara y firma la transacción.
-
-### Configuración del almacenamiento temporal
-
-El intercambio entre el dashboard y el teléfono requiere Redis. Esta implementación utiliza la API REST de **Upstash Redis**. Crea una base de datos Redis y configura estas variables en el entorno local y en Vercel:
-
-```env
-UPSTASH_REDIS_REST_URL=https://<tu-base-de-datos>.upstash.io
-UPSTASH_REDIS_REST_TOKEN=<tu-token-rest>
-```
-
-Puedes tomar ambos valores desde la sección REST API de tu base de datos Upstash. No agregues el token al prefijo `NEXT_PUBLIC_`: debe permanecer como variable privada del servidor. Si estas variables no están configuradas, la API de vinculación responderá que el almacenamiento temporal no está disponible.
-
-El flujo QR requiere una red pública (Devnet, Testnet o Mainnet) accesible desde el teléfono. La cuenta de vinculación se crea con la wallet del comprador como pagadora de la renta; el owner paga la comisión de la transacción. Por eso, el comprador debe disponer de SOL en la red seleccionada para cubrir la renta de la nueva cuenta.
-
-**Estado:** el flujo de coordinación, la página móvil, el QR local y los endpoints temporales están incorporados en la rama de desarrollo. Antes de integrarlo en `main`, todavía debo ejecutar build/typecheck y completar una prueba real de extremo a extremo con dos wallets y Redis configurado.
-
-## Pruebas
-
-Las pruebas unitarias y de interfaz se ejecutan sin conectarse a la blockchain:
+## Pruebas automatizadas
 
 ```bash
 npm run test
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Las pruebas de integración de Devnet son **opt-in y de solo lectura**. Comprueban que el programa desplegado exista como cuenta ejecutable y que la PDA del registro global exista, pertenezca al programa y pueda decodificarse con el decoder generado por Codama. No firman ni envían transacciones y no requieren una wallet ni claves privadas.
+Las pruebas de integración Devnet existentes son de solo lectura: verifican que el programa desplegado y la PDA del registro global puedan consultarse y decodificarse. No crean mints, ventas ni recompensas.
 
-En PowerShell:
+macOS/Linux:
+```bash
+MOTO_LEDGER_DEVNET_RPC_URL=https://api.devnet.solana.com npm run test:devnet
+```
 
+PowerShell:
 ```powershell
 $env:MOTO_LEDGER_DEVNET_RPC_URL="https://api.devnet.solana.com"
 npm run test:devnet
 ```
 
-En macOS/Linux:
+## Migración de asociaciones de clientes existentes
 
-```bash
-MOTO_LEDGER_DEVNET_RPC_URL=https://api.devnet.solana.com npm run test:devnet
-```
+`scripts/migrate-customer-associations.mjs` es una utilidad para instalaciones antiguas que tenían clientes globales sin una PDA por relación cliente/concesionario. Reconstruye relaciones a partir de ventas y acepta un mapeo manual verificado. Por defecto ejecuta un **dry run**; solo crea asociaciones con `--execute`.
 
-Si no se configura `MOTO_LEDGER_DEVNET_RPC_URL`, la suite de integración queda omitida durante la ejecución normal de `npm run test`.
-
-## Pruebas y evidencias
-
-### Transacción verificable en Solana Devnet
-
-La siguiente transacción corresponde al **registro de un cliente** desde MotoLedger. Puedes abrirla en Solana Explorer para consultar su estado, instrucciones, firma y detalles on-chain:
-
-<p align="center">
-  <a href="https://explorer.solana.com/tx/VXJqHCWf4Y5bPC7r9SWDFWSotY2HRkteiLtQJtrRPe7ussezbS88nWnRyV37zTEjiUzHseYpUreiTdHshh88Lpj?cluster=devnet" target="_blank" rel="noopener noreferrer">
-    Ver transacción de registro de cliente en Solana Explorer
-  </a>
-</p>
-
-### Cómo probar el proyecto
-
-1. Instala las dependencias y ejecuta la aplicación siguiendo la sección [Ejecución local](#ejecución-local).
-2. Abre la aplicación y conecta una wallet compatible con Solana que tenga SOL de prueba en Devnet.
-3. Confirma que el selector de red esté configurado en **Devnet**.
-4. Selecciona o registra un concesionario y prueba los módulos disponibles: inventario, clientes, ventas y servicios.
-5. Al confirmar una operación on-chain, abre el enlace de transacción que muestra la aplicación o consulta la transacción de ejemplo enlazada arriba.
-6. Ejecuta las pruebas automatizadas con `npm run test`. Para comprobar la integración de solo lectura con el programa desplegado, configura `MOTO_LEDGER_DEVNET_RPC_URL` y ejecuta `npm run test:devnet`, tal como se explica en la sección [Pruebas](#pruebas).
+La migración histórica de esta instalación Devnet ya se completó: se crearon cinco asociaciones y una ejecución posterior de dry run confirmó cinco existentes, cero pendientes y cero errores. No es necesario repetirla.
 
 ## Scripts
 
@@ -231,55 +202,16 @@ La siguiente transacción corresponde al **registro de un cliente** desde MotoLe
 npm run dev          # Servidor local
 npm run build        # Compilación de producción
 npm run start        # Servidor de producción
-npm run typecheck    # Verificación de TypeScript de la app (excluye agente/)
-npm run typecheck:agente # Verificación del agente (requiere npm install en agente/)
+npm run typecheck    # Verificación TypeScript
 npm run lint         # ESLint
-npm run format       # Formatear con Prettier
-npm run format:check # Comprobar formato
 npm run test         # Pruebas unitarias y de interfaz
-npm run test:devnet  # Pruebas de integración read-only contra Devnet
+npm run test:devnet  # Pruebas Devnet de solo lectura
 npm run ci           # Build, typecheck, lint, formato y tests
 ```
 
-`agente/` es un proyecto Node independiente con sus propias dependencias. La compilación y el `typecheck` de la app (incluido el build en Vercel) no lo incluyen: instala sus dependencias con `cd agente && npm install` y verifícalo con `npm run typecheck:agente`.
+## Seguridad
 
-## Alcance actual
-
-MotoLedger se encuentra en desarrollo sobre Devnet. El dashboard integra la gestión de concesionarios, inventario, clientes, ventas, servicios y configuración de garantía. El código del programa y el IDL ya incluyen la base on-chain del sistema de fidelización con Token-2022; la integración completa de sus flujos en la interfaz y su validación con transacciones Devnet están pendientes. El módulo de reclamaciones y la gestión completa del ciclo de garantías también están pendientes de implementación.
-
-Las operaciones que modifican el estado se envían al programa desplegado y requieren firma de la wallet correspondiente. La disponibilidad real de cada función depende de que la versión actualizada del programa esté desplegada y de que el flujo haya sido probado en la red. Las nuevas instrucciones de fidelización documentadas en este README no deben interpretarse como evidencia de que ya se hayan emitido puntos en Devnet.
-
-
-## Customer-to-dealership association migration
-
-The current program stores each customer globally per owner and stores a separate PDA for each dealership/customer relationship. Existing sales provide reliable evidence for reconstructing historical relationships.
-
-After deploying the updated Anchor program, run the migration utility from the repository root:
-
-```bash
-git pull origin main
-npm install
-```
-
-The script defaults to a **dry run** and writes `customer-association-migration-report.json`:
-
-```bash
-npm run migrate:customer-associations
-```
-
-Review the report. It lists candidate associations, missing related accounts, and global customers whose dealership cannot be inferred from on-chain sales. For those customers, create a verified mapping based on your records using `scripts/customer-association-mapping.example.json`, then set:
-
-```bash
-export CUSTOMER_ASSOCIATION_MAPPING=scripts/customer-association-mapping.json
-```
-
-To submit the missing association transactions, use the owner keypair that controls the dealerships:
-
-```bash
-export SOLANA_KEYPAIR_PATH="$HOME/.config/solana/id.json"
-npm run migrate:customer-associations -- --execute
-```
-
-The utility only creates associations for dealerships owned by the configured signer. Run it once per owner wallet if the program contains dealerships controlled by multiple owners. Existing association PDAs are skipped, so rerunning the utility is safe. It does not modify customer accounts, sales, motorcycles, loyalty programs, Token-2022 mints, or token balances. Historical migration deliberately leaves the legacy dealership customer counters unchanged to avoid double-counting registrations that were already counted by the old instruction; the dashboard's customer lists now use association PDAs.
-
-**Important:** a customer account with no sale and no verified manual mapping cannot be assigned to a dealership automatically. The original customer-registration instruction did not persist that relationship, so the migration report leaves such customers unresolved instead of guessing.
+- Nunca incluyas claves privadas, keypairs JSON, frases semilla ni tokens de Upstash/Pinata en el repositorio, README, capturas o evidencias.
+- Los QR usan tokens aleatorios temporales; no contienen la cédula ni el nombre del cliente.
+- El QR coordina firmas, pero no firma por el usuario. Las firmas requeridas deben autorizarse en las wallets.
+- La red y el programa son la fuente de verdad para emisión, saldo y canje.
