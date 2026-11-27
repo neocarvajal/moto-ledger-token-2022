@@ -1,6 +1,7 @@
 import { address } from "@solana/kit";
 import { describe, expect, it } from "vitest";
 import {
+  deriveAsociacionClientePda,
   deriveClientePda,
   deriveConcesionarioPda,
   deriveGarantiaPda,
@@ -64,6 +65,15 @@ describe("MotoLedger PDA derivation", () => {
       "Bkqenztc4YScJr1GNLEnUQxsHZE6pwhfH1ScKZCwiGte",
       254,
     ]);
+  });
+
+  it("derives one independent customer association per dealership", async () => {
+    const [firstAssociation] = await deriveAsociacionClientePda(dealership, owner);
+    const [sameAssociation] = await deriveAsociacionClientePda(dealership, owner);
+    const [otherDealershipAssociation] = await deriveAsociacionClientePda(anotherOwner, owner);
+
+    expect(firstAssociation).toBe(sameAssociation);
+    expect(firstAssociation).not.toBe(otherDealershipAssociation);
   });
 
   it("derives the sale PDA from the motorcycle address", async () => {
