@@ -8,7 +8,7 @@ import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { getMotoDecoder, getMotoDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/moto";
-import { getDemoMotorcycles } from "../../lib/moto-ledger/demo-motorcycles";
+import { getDemoMotorcycleGroups } from "../../lib/moto-ledger/demo-motorcycles";
 import {
   deriveGarantiaPda,
   deriveMotoPda,
@@ -55,11 +55,15 @@ export function MotorcycleRegistration({
         throw new Error("Configura primero la duración y el kilometraje de la garantía del concesionario.");
       }
 
-      const demoMotorcycles = getDemoMotorcycles();
+      const demoGroups = getDemoMotorcycleGroups();
+      const demoMotorcycles = demoGroups.flat();
+      const demoGroupByCode = new Map<string, number>();
+      demoGroups.forEach((group, groupIndex) => {
+        group.forEach((item) => demoGroupByCode.set(item.code, groupIndex));
+      });
 
-      // Identify prior demo preloads by their reserved serial prefix, not by
-      // make/model. Ordinary motorcycles with the same model must never count
-      // as demo entries or cause a first preload to be skipped.
+      // Detect every demo model on Devnet by its reserved serial prefix.
+      // Other Devnet owners never consume a group for this wallet.
       const discriminator = getBase58Decoder().decode(getMotoDiscriminatorBytes()) as Base58EncodedBytes;
       const onChainMotos = await client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
         encoding: "base64",
@@ -68,17 +72,17 @@ export function MotorcycleRegistration({
       const decodedMotos = onChainMotos.map((item) =>
         getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0]))
       );
-
-      const demoSerialPrefixes = demoMotorcycles.map((item) => `ML${item.code}`);
+      const demoSerialPrefixes = [...demoGroupByCode.keys()].map((code) => `ML${code}`);
       const demoMotos = decodedMotos.filter((moto) =>
         demoSerialPrefixes.some((prefix) => moto.serial.startsWith(prefix))
       );
-      const ownedDealerships = new Set<string>([dealerAddress]);
+
       const otherDemoDealerships = [...new Set(
         demoMotos
           .map((moto) => moto.concesionario)
           .filter((registeredDealer) => registeredDealer !== dealerAddress)
       )];
+      const ownedDealerships = new Set<string>([dealerAddress]);
       await Promise.all(
         otherDemoDealerships.map(async (registeredDealer) => {
           try {
@@ -92,17 +96,38 @@ export function MotorcycleRegistration({
         })
       );
 
-      const alreadyUsedElsewhere = demoMotos.filter((moto) =>
-        moto.concesionario !== dealerAddress && ownedDealerships.has(moto.concesionario)
-      );
-      if (alreadyUsedElsewhere.length > 0) {
-        toast.error(
-          "El catálogo de demostración ya está registrado en otro concesionario de esta wallet. Para este concesionario, registra las motos manualmente."
+      const usedGroups = new Set<number>();
+      const currentDealerGroups = new Set<number>();
+      for (const moto of demoMotos) {
+        const code = [...demoGroupByCode.keys()].find((candidate) =>
+          moto.serial.startsWith(`ML${candidate}`)
         );
-        return;
+        if (!code) continue;
+        const groupIndex = demoGroupByCode.get(code);
+        if (groupIndex === undefined) continue;
+        if (moto.concesionario === dealerAddress) {
+          currentDealerGroups.add(groupIndex);
+        } else if (ownedDealerships.has(moto.concesionario)) {
+          usedGroups.add(groupIndex);
+        }
       }
 
-      for (const [index, item] of demoMotorcycles.entries()) {
+      if (currentDealerGroups.size > 1) {
+        throw new Error("Este concesionario contiene motos de varios grupos de demostración. Revisa el inventario antes de volver a precargar.");
+      }
+
+      const selectedGroupIndex = currentDealerGroups.size === 1
+        ? [...currentDealerGroups][0]
+        : demoGroups.findIndex((_, groupIndex) => !usedGroups.has(groupIndex));
+
+      if (selectedGroupIndex < 0) {
+        throw new Error("Ya se utilizaron los cuatro grupos de demostración en otros concesionarios de esta wallet. Registra las motos manualmente.");
+      }
+
+      const selectedGroup = demoGroups[selectedGroupIndex];
+      toast.info(`Grupo de demostración ${selectedGroupIndex + 1} de ${demoGroups.length}: ${selectedGroup.map((item) => item.marca + " " + item.modelo).join(", ")}.`);
+
+      for (const [index, item] of selectedGroup.entries()) {
         // Stable model-specific serials make repeated runs idempotent.
         const serial = `ML${item.code}${concesionario.slice(0, 10)}01`;
         if (new TextEncoder().encode(serial).length !== 17) {
@@ -222,7 +247,7 @@ export function MotorcycleRegistration({
       <div className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-semibold text-[#424950]">¿Necesitas inventario de prueba?</p>
-          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Precarga un único catálogo de 3 motos de demostración, independiente de la marca del concesionario. Solo puede utilizarse una vez en toda la aplicación; para otros concesionarios, registra las motos manualmente.</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Hay 4 grupos de demostración con 3 motos cada uno. Cada concesionario de la misma wallet recibe automáticamente un grupo distinto; los registros de otros usuarios de Devnet no afectan la asignación.</p>
         </div>
         <button
           type="button"
