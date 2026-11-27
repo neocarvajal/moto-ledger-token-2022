@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { address, getBase64Encoder, getTransactionDecoder } from "@solana/kit";
-import { getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../../lib/service-redemption-store";
+import { claimServiceRedemptionValue, getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../../lib/service-redemption-store";
 
 export const runtime = "nodejs";
 
@@ -37,6 +37,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         !hasSignature(submitted.signatures[address(current.walletAddress)])) {
       return NextResponse.json({ error: "Faltan las firmas del concesionario o del cliente." }, { status: 400 });
     }
+
+    const claimed = await claimServiceRedemptionValue(token, "signed", body.transaction);
+    if (!claimed) return NextResponse.json({ error: "Ya se recibió una firma para esta solicitud." }, { status: 409 });
 
     const updated = await updateServiceRedemptionSession(token, (latest) => {
       if (latest.status !== "waiting_customer_signature" || latest.signedTransaction) {
