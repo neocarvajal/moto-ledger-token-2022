@@ -259,10 +259,9 @@ After deploying the updated Anchor program and regenerating the Codama clients, 
 ```bash
 git pull origin main
 npm install
-npm run codama
 ```
 
-If the repository's Codama command is not configured in your local setup, regenerate the clients using the existing Codama workflow before running the migration script.
+Then regenerate the Codama clients using the project's existing Codama configuration and workflow before running the migration script.
 
 The script defaults to a **dry run** and writes `customer-association-migration-report.json`:
 
