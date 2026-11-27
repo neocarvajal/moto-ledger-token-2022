@@ -124,12 +124,30 @@ export async function updateServiceRedemptionSession(
   const current = await getServiceRedemptionSession(token);
   if (!current) return null;
   const next = update(current);
-  if (next.expiresAt !== current.expiresAt || next.owner !== current.owner ||
-      next.concesionario !== current.concesionario || next.cliente !== current.cliente ||
-      next.walletAddress !== current.walletAddress || next.mint !== current.mint ||
-      next.servicioId !== current.servicioId || next.puntos !== current.puntos ||
-      next.kilometrajeActual !== current.kilometrajeActual || next.idCanje !== current.idCanje) {
+  const immutableFields: (keyof ServiceRedemptionSession)[] = [
+    "owner", "concesionario", "cliente", "clienteNombre", "clienteCedula",
+    "walletAddress", "mint", "servicioId", "servicioNombre", "puntos",
+    "kilometrajeActual", "idCanje", "cluster", "createdAt", "expiresAt",
+  ];
+  if (immutableFields.some((field) => next[field] !== current[field])) {
     throw new Error("No se puede modificar la intención original del canje.");
+  }
+
+  const allowedTransitions: Record<ServiceRedemptionSession["status"], ServiceRedemptionSession["status"][]> = {
+    waiting_transaction: ["waiting_customer_signature", "cancelled"],
+    waiting_customer_signature: ["signed", "cancelled"],
+    signed: ["completed", "cancelled"],
+    completed: [],
+    cancelled: [],
+  };
+  if (next.status !== current.status && !allowedTransitions[current.status].includes(next.status)) {
+    throw new Error("Transición de estado de canje no permitida.");
+  }
+  if (current.status !== "waiting_transaction" && next.transaction !== current.transaction) {
+    throw new Error("La transacción preparada no puede sustituirse.");
+  }
+  if (current.status !== "waiting_customer_signature" && next.signedTransaction !== current.signedTransaction) {
+    throw new Error("La firma del cliente no puede sustituirse.");
   }
   const remainingSeconds = Math.max(1, Math.ceil((next.expiresAt - Date.now()) / 1000));
   await redisCommand("SET", key, JSON.stringify(next), "EX", remainingSeconds);
