@@ -68,7 +68,7 @@ async function main() {
   const customerDisc = getClienteDiscriminatorBytes();
   const saleDisc = getVentaDiscriminatorBytes();
   const associationDisc = getAsociacionClienteDiscriminatorBytes();
-  const dealers = new Map<string, { owner: string; data: ReturnType<typeof getConcesionarioDecoder> extends (...args: never[]) => infer T ? T : never }>();
+  const dealers = new Map<string, { owner: string }>();
   const customers = new Map<string, { owner: string }>();
   const sales: Array<{ dealership: string; customer: string }> = [];
   let associationCount = 0;
@@ -81,7 +81,7 @@ async function main() {
 
     if (discriminator.every((value, index) => value === dealerDisc[index])) {
       const decoded = getConcesionarioDecoder().decode(bytes);
-      dealers.set(pubkey, { owner: decoded.owner, data: decoded as never });
+      dealers.set(pubkey, { owner: decoded.owner });
     } else if (discriminator.every((value, index) => value === customerDisc[index])) {
       const decoded = getClienteDecoder().decode(bytes);
       customers.set(pubkey, { owner: decoded.owner });
