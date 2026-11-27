@@ -522,6 +522,29 @@ pub mod registro {
                 .checked_sub(1)
                 .ok_or(Errores::ContadorInvalido)?;
 
+        // Close the mileage PDA only when it already exists. Legacy motorcycles
+        // may not have this account, so deletion must not initialize it.
+        let kilometraje_info = context.accounts.kilometraje_moto.to_account_info();
+        if *kilometraje_info.owner == crate::ID {
+            let lamports = kilometraje_info.lamports();
+            let owner_info = context.accounts.owner.to_account_info();
+            let owner_lamports = owner_info.lamports();
+            let updated_owner_lamports = owner_lamports
+                .checked_add(lamports)
+                .ok_or(Errores::ContadorInvalido)?;
+
+            **kilometraje_info.try_borrow_mut_lamports()? = 0;
+            **owner_info.try_borrow_mut_lamports()? = updated_owner_lamports;
+            kilometraje_info.realloc(0, false)?;
+            kilometraje_info.assign(&system_program::ID);
+        } else {
+            require!(
+                *kilometraje_info.owner == system_program::ID
+                    && kilometraje_info.data_is_empty(),
+                Errores::KilometrajeMotoInvalido
+            );
+        }
+
         msg!("========================================");
         msg!("          ELIMINAR MOTOCICLETA");
         msg!("========================================");
@@ -2265,15 +2288,14 @@ pub struct EliminarMoto<'info> {
     )]
     pub moto: Account<'info, Moto>,
 
+    /// CHECK: Optional PDA. Legacy motorcycles may not have a mileage account.
+    /// The handler validates its owner and closes it manually when program-owned.
     #[account(
-        init_if_needed,
-        payer = owner,
-        close = owner,
-        space = KilometrajeMoto::LEN,
+        mut,
         seeds = [b"kilometraje_moto", moto.key().as_ref()],
         bump
     )]
-    pub kilometraje_moto: Account<'info, KilometrajeMoto>,
+    pub kilometraje_moto: UncheckedAccount<'info>,
 
     #[account(
         mut,
