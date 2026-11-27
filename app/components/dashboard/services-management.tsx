@@ -11,6 +11,7 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
+import { fetchHistoricalMotorcycleMileage } from "../../lib/moto-ledger/mileage";
 import {
   deriveGarantiaPda,
   deriveKilometrajeMotoPda,
@@ -162,11 +163,16 @@ export function ServicesManagement({
       try {
         const motoAddress = address(selectedMotorcycle.address);
         const [mileagePda] = await deriveKilometrajeMotoPda(motoAddress);
+        const historicalMileage = await fetchHistoricalMotorcycleMileage(
+          client,
+          motoAddress,
+          address(concesionario)
+        );
         const info = await client.rpc.getAccountInfo(mileagePda, { encoding: "base64" }).send();
         if (!info.value) {
           if (active) {
-            setLatestMileage(0n);
-            setMileage("0");
+            setLatestMileage(historicalMileage);
+            setMileage(historicalMileage.toString());
           }
           return;
         }
@@ -175,9 +181,12 @@ export function ServicesManagement({
             record.data.concesionario !== concesionario) {
           throw new Error("El registro de kilometraje no corresponde a esta moto.");
         }
+        const currentMileage = record.data.kilometrajeActual > historicalMileage
+          ? record.data.kilometrajeActual
+          : historicalMileage;
         if (active) {
-          setLatestMileage(record.data.kilometrajeActual);
-          setMileage(record.data.kilometrajeActual.toString());
+          setLatestMileage(currentMileage);
+          setMileage(currentMileage.toString());
         }
       } catch (error) {
         console.error("Motorcycle mileage:", error);
