@@ -34,10 +34,12 @@ import {
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { getClienteDecoder, getClienteDiscriminatorBytes, type Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import { getVentaDecoder, getVentaDiscriminatorBytes, type Venta } from "../../lib/moto-ledger/src/generated/accounts/venta";
+import { getCanjeServicioDecoder, getCanjeServicioDiscriminatorBytes, type CanjeServicio } from "../../lib/moto-ledger/src/generated/accounts/canjeServicio";
 import { EstadoGarantia } from "../../lib/moto-ledger/src/generated/types/estadoGarantia";
 
 type Customer = { address: string; data: Cliente };
 type Sale = { address: string; data: Venta };
+type RedemptionRecord = { address: string; data: CanjeServicio };
 type SelectedSale = Sale & {
   serial: string;
   modelo: string;
@@ -68,6 +70,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const { cluster } = useCluster();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [redemptions, setRedemptions] = useState<RedemptionRecord[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [catalogReady, setCatalogReady] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState("");
@@ -109,6 +112,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     if (!connected?.account.address) {
       setCustomers([]);
       setSales([]);
+      setRedemptions([]);
       setServices([]);
       setCatalogReady(false);
       setLoading(false);
@@ -147,9 +151,10 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       const customerDiscriminator = getBase58Decoder().decode(getClienteDiscriminatorBytes()) as Base58EncodedBytes;
       const saleDiscriminator = getBase58Decoder().decode(getVentaDiscriminatorBytes()) as Base58EncodedBytes;
+      const redemptionDiscriminator = getBase58Decoder().decode(getCanjeServicioDiscriminatorBytes()) as Base58EncodedBytes;
       const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
       const dealerFilter = address(concesionario) as Base58EncodedBytes;
-      const [customerAccounts, saleAccounts] = await Promise.all([
+      const [customerAccounts, saleAccounts, redemptionAccounts] = await Promise.all([
         client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
           encoding: "base64",
           filters: [
@@ -169,7 +174,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         address: item.pubkey,
         data: getClienteDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
       }));
-      const saleRecords: Sale[] = saleAccounts.map((item) => ({
+      const redemptionRecords: RedemptionRecord[] = redemptionAccounts.map((item) => ({\n        address: item.pubkey,\n        data: getCanjeServicioDecoder().decode(getBase64Encoder().encode(item.account.data[0])),\n      })).filter((item) => item.data.concesionario === concesionario);\n      const saleRecords: Sale[] = saleAccounts.map((item) => ({
         address: item.pubkey,
         data: getVentaDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
       })).filter((sale) => sale.data.concesionario === concesionario &&
@@ -191,7 +196,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
   useEffect(() => { void loadChainData(); }, [loadChainData]);
 
-  const customerSales = useMemo(
+  const customerRedemptions = useMemo(\n    () => redemptions.filter((item) => item.data.cliente === selectedCustomer),\n    [redemptions, selectedCustomer]\n  );\n\n  const customerSales = useMemo(
     () => sales.filter((sale) => sale.data.cliente === selectedCustomer),
     [sales, selectedCustomer]
   );
@@ -485,6 +490,41 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Saldo Token-2022</span><strong className="text-[#252a30]">{balance === null ? "—" : balance.toLocaleString("es-VE") + " puntos"}</strong></div>
         {saleDetails && <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>}
       </div>}
+
+      {selectedCustomerRecord && (
+        <section className="mt-4 rounded-xl border border-[#e9ebee] bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[9px] font-bold tracking-[0.14em] text-[#e60012]">DETALLE DEL CLIENTE</p>
+              <h4 className="mt-1 text-[12px] font-bold text-[#252a30]">Historial de canjes</h4>
+              <p className="mt-1 text-[10px] text-[#858d96]">Servicios que este cliente ha canjeado en el concesionario.</p>
+            </div>
+            <span className="rounded-full bg-[#f7f8fa] px-3 py-1 text-[10px] font-semibold text-[#555e68]">{customerRedemptions.length} {customerRedemptions.length === 1 ? "canje" : "canjes"}</span>
+          </div>
+          {customerRedemptions.length === 0 ? (
+            <p className="mt-3 rounded-lg bg-[#f7f8fa] p-3 text-[10px] text-[#858d96]">Este cliente todavía no tiene canjes registrados.</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-[10px]">
+                <thead className="border-b border-[#eff0f2] text-[9px] font-bold tracking-wide text-[#9299a1]">
+                  <tr><th className="px-2 py-2">FECHA</th><th className="px-2 py-2">SERVICIO CANJEADO</th><th className="px-2 py-2">PUNTOS</th><th className="px-2 py-2">KILOMETRAJE</th><th className="px-2 py-2">RECIBO</th></tr>
+                </thead>
+                <tbody>
+                  {customerRedemptions.map((item) => (
+                    <tr key={item.address} className="border-b border-[#f1f2f4] last:border-0">
+                      <td className="whitespace-nowrap px-2 py-3 text-[#68717b]">{new Date(Number(item.data.fechaCanje) * 1000).toLocaleString("es-VE")}</td>
+                      <td className="px-2 py-3 font-semibold text-[#252a30]">{item.data.servicioNombre}</td>
+                      <td className="whitespace-nowrap px-2 py-3 font-semibold text-[#d90011]">-{item.data.puntos.toLocaleString("es-VE")}</td>
+                      <td className="whitespace-nowrap px-2 py-3 text-[#68717b]">{item.data.kilometrajeActual.toLocaleString("es-VE")} km</td>
+                      <td className="px-2 py-3"><a href={`https://explorer.solana.com/address/${item.address}?cluster=${cluster === "mainnet" ? "mainnet-beta" : cluster}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#d90011] underline decoration-dotted underline-offset-2">Ver ↗</a></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {selectedServiceRecord && <p className="mt-3 text-[10px] text-[#68717b]">El canje quemará {selectedServiceRecord.puntos.toLocaleString("es-VE")} puntos del mint {shortAddress(mint)}. La garantía cubierta no consume puntos; Solana vuelve a validar todas las cuentas y condiciones al ejecutar.</p>}
 
