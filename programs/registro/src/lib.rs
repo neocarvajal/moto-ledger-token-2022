@@ -2266,7 +2266,6 @@ pub struct EliminarMoto<'info> {
     pub moto: Account<'info, Moto>,
 
     #[account(
-        mut,
         init_if_needed,
         payer = owner,
         close = owner,
