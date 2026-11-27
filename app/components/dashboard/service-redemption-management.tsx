@@ -184,7 +184,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       const redemptionRecords: RedemptionRecord[] = redemptionAccounts.map((item) => ({
         address: item.pubkey,
         data: getCanjeServicioDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
-      })).filter((item) => item.data.concesionario === concesionario);\n      const saleRecords: Sale[] = saleAccounts.map((item) => ({
+      })).filter((item) => item.data.concesionario === concesionario);
+      const saleRecords: Sale[] = saleAccounts.map((item) => ({
         address: item.pubkey,
         data: getVentaDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
       })).filter((sale) => sale.data.concesionario === concesionario &&
