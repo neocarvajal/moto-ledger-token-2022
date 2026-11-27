@@ -167,7 +167,7 @@ async function main() {
       const instruction = {
         programAddress: REGISTRO_PROGRAM_ADDRESS,
         accounts: [
-          { address: payer.address, role: AccountRole.WRITABLE_SIGNER },
+          { address: payer.address, role: AccountRole.WRITABLE_SIGNER, signer: payer },
           { address: address(dealership), role: AccountRole.WRITABLE },
           { address: address(customer), role: AccountRole.READONLY },
           { address: association, role: AccountRole.WRITABLE },
