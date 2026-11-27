@@ -219,7 +219,7 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 | Evidencia | Dirección / firma | Alcance comprobado |
 | --- | --- | --- |
 | Programa MotoLedger | `64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj` | Programa desplegado en Devnet. |
-| Mint Token-2022 MTTR | `Bd4QqZEnVDRLMrTjgwVo2RRW9GZwTao9w7UKGhqtNAPF` | Mint mostrado por el dashboard como **MOTOS TORO REWARDS (MTTR)**; la configuración visible indicaba 200 puntos por venta. |
+| Creación del mint Token-2022 MOTO KINGS REWARDS (MKTR) | [`5ei9biit2dMYH1V7ioArvzmpwGxhbejKBVp5Bat55J39Wx8D3L7N3rgsT5hrgaQcpzaWPvFS8Cc3fkeG6cA6v2GC`](https://explorer.solana.com/tx/5ei9biit2dMYH1V7ioArvzmpwGxhbejKBVp5Bat55J39Wx8D3L7N3rgsT5hrgaQcpzaWPvFS8Cc3fkeG6cA6v2GC?cluster=devnet) | Transacción de creación del mint **MOTO KINGS REWARDS (MKTR)** en Devnet. |
 | PDA de concesionario mostrada con ese programa | `8WQjh7p1vmnPRVicWVvS5gXxZmibd5YfTfmkGRwufYKS` | Dirección mostrada durante la revisión de la configuración. |
 | Registro de Juan Perez | [`4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS`](https://explorer.solana.com/tx/4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS?cluster=devnet) | Transacción confirmada de `RegistrarCliente`; logs: BERA MOTORS, Juan Perez y su PDA de cliente. **No es una transacción de emisión de puntos.** |
 
