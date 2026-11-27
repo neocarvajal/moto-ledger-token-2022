@@ -145,7 +145,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   if (!session) return <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] p-5"><section className="max-w-md rounded-2xl bg-white p-6 text-sm text-red-700">{error ?? "Solicitud no disponible."}</section></main>;
 
   const remaining = Math.max(0, Math.ceil((session.expiresAt - now) / 1000));
-  const expired = remaining === 0;
+  const expired = remaining === 0 && session.status !== "signed";
   const canSign = session.status === "waiting_customer_signature" && Boolean(session.transaction) && connected?.account.address === session.walletAddress;
 
   return (
