@@ -116,6 +116,19 @@ export async function getServiceRedemptionSession(token: string) {
   return session;
 }
 
+export async function claimServiceRedemptionValue(token: string, field: "transaction" | "signed", value: string) {
+  if (!value || value.length > 20_000) throw new Error("Valor de solicitud inválido.");
+  const result = await redisCommand<string>(
+    "SET",
+    `${redisKey(token)}:${field}`,
+    createHash("sha256").update(value).digest("hex"),
+    "EX",
+    String(SESSION_TTL_SECONDS),
+    "NX"
+  );
+  return result === "OK";
+}
+
 export async function updateServiceRedemptionSession(
   token: string,
   update: (session: ServiceRedemptionSession) => ServiceRedemptionSession
