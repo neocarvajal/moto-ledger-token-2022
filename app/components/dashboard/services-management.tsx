@@ -11,7 +11,7 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
-import { fetchHistoricalMotorcycleMileage } from "../../lib/moto-ledger/mileage";
+import { fetchLatestMotorcycleMileage } from "../../lib/moto-ledger/mileage";
 import {
   deriveGarantiaPda,
   deriveKilometrajeMotoPda,
@@ -162,28 +162,11 @@ export function ServicesManagement({
     void (async () => {
       try {
         const motoAddress = address(selectedMotorcycle.address);
-        const [mileagePda] = await deriveKilometrajeMotoPda(motoAddress);
-        const historicalMileage = await fetchHistoricalMotorcycleMileage(
+        const currentMileage = await fetchLatestMotorcycleMileage(
           client,
           motoAddress,
           address(concesionario)
         );
-        const info = await client.rpc.getAccountInfo(mileagePda, { encoding: "base64" }).send();
-        if (!info.value) {
-          if (active) {
-            setLatestMileage(historicalMileage);
-            setMileage(historicalMileage.toString());
-          }
-          return;
-        }
-        const record = await client.registro.accounts.kilometrajeMoto.fetch(mileagePda);
-        if (record.data.moto !== selectedMotorcycle.address ||
-            record.data.concesionario !== concesionario) {
-          throw new Error("El registro de kilometraje no corresponde a esta moto.");
-        }
-        const currentMileage = record.data.kilometrajeActual > historicalMileage
-          ? record.data.kilometrajeActual
-          : historicalMileage;
         if (active) {
           setLatestMileage(currentMileage);
           setMileage(currentMileage.toString());
