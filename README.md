@@ -223,9 +223,9 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 | PDA de concesionario mostrada con ese programa | `8WQjh7p1vmnPRVicWVvS5gXxZmibd5YfTfmkGRwufYKS` | Dirección mostrada durante la revisión de la configuración. |
 | Registro de Juan Perez | [`4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS`](https://explorer.solana.com/tx/4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS?cluster=devnet) | Transacción confirmada de `RegistrarCliente`; logs: BERA MOTORS, Juan Perez y su PDA de cliente. **No es una transacción de emisión de puntos.** |
 
-**Evidencias de fidelización que aún deben adjuntarse para cerrar la demostración:** firma de creación/configuración del mint, firma de una venta con recompensa, consulta verificable del saldo de la ATA, firma de un canje con burn y evidencia de una operación inválida. Si el rechazo ocurre en validación local o simulación, se debe indicar esa capa y adjuntar el mensaje; no inventar una firma.
+**Evidencias de fidelización que aún deben adjuntarse para cerrar la demostración:** firma de una venta con recompensa, consulta verificable del saldo de la ATA, firma de un canje con burn y evidencia de una operación inválida. La creación del mint MOTO KINGS REWARDS (MKTR) ya está documentada arriba. Si el rechazo ocurre en validación local o simulación, se debe indicar esa capa y adjuntar el mensaje; no inventar una firma.
 
-- [Mint MTTR en Solana Explorer](https://explorer.solana.com/address/Bd4QqZEnVDRLMrTjgwVo2RRW9GZwTao9w7UKGhqtNAPF?cluster=devnet)
+- [Creación del mint MOTO KINGS REWARDS (MKTR) en Solana Explorer](https://explorer.solana.com/tx/5ei9biit2dMYH1V7ioArvzmpwGxhbejKBVp5Bat55J39Wx8D3L7N3rgsT5hrgaQcpzaWPvFS8Cc3fkeG6cA6v2GC?cluster=devnet)
 - [Programa MotoLedger en Solana Explorer](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet)
 
 ## Requisitos e instalación
