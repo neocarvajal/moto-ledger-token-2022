@@ -55,6 +55,7 @@ export function DealershipWorkspace({
   const [dealership, setDealership] = useState<DealershipRecord | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [loadingDealerships, setLoadingDealerships] = useState(false);
+  const [loadingSelectedDealership, setLoadingSelectedDealership] = useState(false);
   const [busy, setBusy] = useState<"create" | null>(null);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [associatedCustomerCount, setAssociatedCustomerCount] = useState<number | null>(null);
@@ -129,34 +130,44 @@ export function DealershipWorkspace({
     return record;
   }, [client]);
 
-  // Re-read the selected dealership whenever the user enters another module.
-  // This keeps the dashboard aligned with the latest confirmed on-chain state.
+  // Each module has its own dealership selection. Entering a module
+  // clears the previous selection so the user explicitly selects it again.
   useEffect(() => {
-    if (!dealership?.address) return;
+    setDealership(null);
+    setAssociatedCustomerCount(null);
+    setLoadingSelectedDealership(false);
+  }, [activeModule]);
 
-    let cancelled = false;
-    const selectedAddress = dealership.address;
+  const handleSelectDealership = useCallback(async (selectedAddress: string) => {
+    if (!selectedAddress) {
+      setDealership(null);
+      setAssociatedCustomerCount(null);
+      return;
+    }
 
-    void client.registro.accounts.concesionario
-      .fetch(address(selectedAddress))
-      .then((refreshed) => {
-        if (cancelled) return;
-        const record = { address: selectedAddress, data: refreshed.data };
-        setDealership((current) =>
-          current?.address === selectedAddress ? record : current
-        );
-        setDealerships((current) =>
-          current.map((item) => item.address === selectedAddress ? record : item)
-        );
-      })
-      .catch((error) => {
-        console.error("No se pudo actualizar el estado del concesionario:", error);
-      });
+    setDealership(null);
+    setAssociatedCustomerCount(null);
+    setLoadingSelectedDealership(true);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [activeModule, client, dealership?.address]);
+    try {
+      // Always fetch the account from Solana on selection; do not rely on
+      // the possibly stale copy used to populate the dropdown.
+      const refreshed = await client.registro.accounts.concesionario.fetch(
+        address(selectedAddress)
+      );
+      const record = { address: selectedAddress, data: refreshed.data };
+
+      setDealerships((current) =>
+        current.map((item) => item.address === selectedAddress ? record : item)
+      );
+      setDealership(record);
+    } catch (error) {
+      console.error("No se pudo consultar el concesionario seleccionado:", error);
+      toast.error("No se pudo consultar el estado actualizado del concesionario en Solana.");
+    } finally {
+      setLoadingSelectedDealership(false);
+    }
+  }, [client]);
 
   useEffect(() => {
     let cancelled = false;
@@ -310,7 +321,8 @@ export function DealershipWorkspace({
             <label className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Concesionarios de esta wallet</label>
             <select
               value={dealership?.address ?? ""}
-              onChange={(event) => setDealership(dealerships.find((item) => item.address === event.target.value) ?? null)}
+              onChange={(event) => void handleSelectDealership(event.target.value)}
+              disabled={loadingSelectedDealership}
               className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-3 text-[12px] text-[#252a30] outline-none focus:border-[#e60012]"
             >
               <option value="">Selecciona un concesionario</option>
@@ -321,6 +333,12 @@ export function DealershipWorkspace({
               ))}
             </select>
             <p className="mt-2 text-[9px] text-[#a0a6ad]">{dealerships.length} concesionario(s) encontrados en la red seleccionada.</p>
+          </div>
+        )}
+
+        {loadingSelectedDealership && (
+          <div className="mt-5 rounded-lg bg-[#f7f8fa] p-5 text-center text-[11px] text-[#858d96]">
+            Consultando el estado actualizado del concesionario en Solana…
           </div>
         )}
 
