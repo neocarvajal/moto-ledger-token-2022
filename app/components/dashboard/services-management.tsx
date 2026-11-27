@@ -72,7 +72,7 @@ export function ServicesManagement({
   const [mileage, setMileage] = useState("");
   const [description, setDescription] = useState("");
   const [cost, setCost] = useState("");
-  const [serviceType, setServiceType] = useState<TipoServicio>(TipoServicio.Mantenimiento);
+  const [serviceType, setServiceType] = useState<TipoServicio | "">("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<ServiceRecord | null>(null);
@@ -130,9 +130,7 @@ export function ServicesManagement({
       setMotorcycles(motoRecords);
       setServices(serviceRecords);
       setSelectedMoto((current) =>
-        motoRecords.some((item) => item.address === current)
-          ? current
-          : motoRecords[0]?.address ?? ""
+        motoRecords.some((item) => item.address === current) ? current : ""
       );
     } catch (error) {
       console.error("No se pudieron cargar los servicios:", error);
@@ -154,6 +152,10 @@ export function ServicesManagement({
     }
     if (!selectedMotorcycle) {
       toast.error("Selecciona una moto registrada.");
+      return;
+    }
+    if (serviceType === "") {
+      toast.error("Selecciona el tipo de servicio.");
       return;
     }
     const normalizedDescription = description.trim();
@@ -245,7 +247,7 @@ export function ServicesManagement({
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Moto</span>
               <select value={selectedMoto} onChange={(event) => setSelectedMoto(event.target.value)} required disabled={motorcycles.length === 0 || busy} className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]">
-                {motorcycles.length === 0 ? <option value="">No hay motos registradas</option> : motorcycles.map((item) => <option key={item.address} value={item.address}>{item.data.marca} {item.data.modelo} · {item.data.serial}{item.data.vendida ? " · Vendida" : ""}</option>)}
+                {motorcycles.length === 0 ? <option value="">No hay motos registradas</option> : <><option value="">Selecciona una moto</option>{motorcycles.map((item) => <option key={item.address} value={item.address}>{item.data.marca} {item.data.modelo} · {item.data.serial}{item.data.vendida ? " · Vendida" : ""}</option>)}</>}
               </select>
             </label>
 
@@ -278,7 +280,8 @@ export function ServicesManagement({
 
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Tipo de servicio</span>
-              <select value={serviceType} onChange={(event) => setServiceType(Number(event.target.value) as TipoServicio)} className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]" disabled={busy}>
+              <select value={serviceType} onChange={(event) => setServiceType(event.target.value === "" ? "" : Number(event.target.value) as TipoServicio)} className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]" disabled={busy}>
+                <option value="">Selecciona un tipo de servicio</option>
                 <option value={TipoServicio.Mantenimiento}>Mantenimiento</option>
                 <option value={TipoServicio.Reparacion}>Reparación</option>
                 <option value={TipoServicio.Garantia}>Garantía</option>
