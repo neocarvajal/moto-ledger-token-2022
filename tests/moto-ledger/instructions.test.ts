@@ -10,6 +10,7 @@ import {
   getReclamarGarantiaInstructionDataDecoder,
   getRegistrarClienteInstruction,
   getRegistrarClienteInstructionDataDecoder,
+  getRegistrarAsociacionClienteInstruction,
   getRegistrarConcesionarioInstruction,
   getRegistrarConcesionarioInstructionDataDecoder,
   getRegistrarMotoInstruction,
@@ -35,6 +36,7 @@ const concesionario = address(
 const moto = address("247Qs9cEC8Lyn9z76sHC9EBPCWNtiQULvDkYt2p58mer");
 const garantia = address("ArixyEXxhaePfLFw8XxvsY5wUYPGLZUSKpH4SsZuBKHP");
 const cliente = address("Bkqenztc4YScJr1GNLEnUQxsHZE6pwhfH1ScKZCwiGte");
+const asociacionCliente = address("6wN7mP8cY9QfJ3rT2xV5bK1dH4sA7eG9uL6oC2zF5mQp");
 const venta = address("AdfybrUm7UX2ZTkJRo9NQLGWooGywtf9RKEegaMwAWp");
 const servicio = address("66VbHcx43C94XVASUtzM6mxy2nwbpPMdwBBLejZ9uNEt");
 const reclamacion = address("LU16b9JNWweojQfLUmNEJNrYvFY8tVnMYRscG1SZxJs");
@@ -144,6 +146,7 @@ describe("MotoLedger Codama instructions", () => {
       owner,
       concesionario,
       cliente,
+      asociacionCliente,
       nombreConcesionario: "BERA MOTORS",
       cedulaCliente: 12345678,
       nombreCliente: "Ana Pérez",
@@ -152,8 +155,8 @@ describe("MotoLedger Codama instructions", () => {
     expectInstruction(
       ix,
       "registrar_cliente",
-      [ownerAddress, concesionario, cliente, systemProgram],
-      [3, 1, 1, 0]
+      [ownerAddress, concesionario, cliente, asociacionCliente, systemProgram],
+      [3, 1, 1, 1, 0]
     );
     expect(getRegistrarClienteInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
@@ -163,11 +166,28 @@ describe("MotoLedger Codama instructions", () => {
       });
   });
 
+  it("serializes registrarAsociacionCliente with the expected account order", () => {
+    const ix = getRegistrarAsociacionClienteInstruction({
+      owner,
+      concesionario,
+      cliente,
+      asociacionCliente,
+    });
+
+    expectInstruction(
+      ix,
+      "registrar_asociacion_cliente",
+      [ownerAddress, concesionario, cliente, asociacionCliente, systemProgram],
+      [3, 1, 0, 1, 0]
+    );
+  });
+
   it("serializes registrarVenta with the u64 sale amount", () => {
     const ix = getRegistrarVentaInstruction({
       owner,
       concesionario,
       cliente,
+      asociacionCliente,
       moto,
       venta,
       nombreConcesionario: "BERA MOTORS",
@@ -179,8 +199,8 @@ describe("MotoLedger Codama instructions", () => {
     expectInstruction(
       ix,
       "registrar_venta",
-      [ownerAddress, concesionario, cliente, moto, venta, systemProgram],
-      [3, 1, 1, 1, 1, 0]
+      [ownerAddress, concesionario, cliente, asociacionCliente, moto, venta, systemProgram],
+      [3, 1, 1, 1, 1, 1, 0]
     );
     expect(getRegistrarVentaInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
