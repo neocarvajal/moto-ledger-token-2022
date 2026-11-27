@@ -200,7 +200,7 @@ describe("MotoLedger Codama instructions", () => {
       ix,
       "registrar_venta",
       [ownerAddress, concesionario, cliente, asociacionCliente, moto, venta, systemProgram],
-      [3, 1, 1, 1, 1, 1, 0]
+      [3, 1, 1, 0, 1, 1, 0]
     );
     expect(getRegistrarVentaInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
