@@ -271,6 +271,15 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                     receiptData.moto !== selectedSaleRecord?.data.moto) {
                   throw new Error(`El recibo on-chain no coincide con la intención firmada. Firma: ${signature}`);
                 }
+                const completionResponse = await fetch(`/api/service-redemption/${session.token}/complete`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  cache: "no-store",
+                  body: JSON.stringify({ signature, receipt: receiptPda }),
+                });
+                if (!completionResponse.ok) {
+                  console.warn("The on-chain receipt is valid, but the QR status could not be updated.");
+                }
                 setReceipt({ signature, address: receiptPda, points: receiptData.puntos });
                 toast.success("Canje registrado en Solana y puntos quemados.");
                 setSession(null);
