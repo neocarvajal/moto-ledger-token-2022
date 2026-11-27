@@ -5,6 +5,7 @@ import { address, getBase64Encoder, getTransactionDecoder, getBase64EncodedWireT
 import { useConnectedWallet, useConnect, useWallets } from "@solana/kit-plugin-wallet/react";
 import { useAppClient } from "../../../lib/client-provider";
 import { useCluster } from "../../../components/cluster-context";
+import { validateRedemptionIntentOnChain } from "../../../lib/service-redemption-chain-validation";
 
 type Session = {
   owner: string;
@@ -74,6 +75,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     setSigning(true);
     setError(null);
     try {
+      await validateRedemptionIntentOnChain(client, session);
       const tx = getTransactionDecoder().decode(getBase64Encoder().encode(session.transaction));
       const signer = connected.signer;
       if (!("modifyAndSignTransactions" in signer)) {
