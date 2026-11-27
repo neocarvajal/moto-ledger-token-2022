@@ -64,15 +64,18 @@ export function MotorcycleRegistration({
         encoding: "base64",
         filters: [{ memcmp: { offset: 0n, bytes: discriminator, encoding: "base58" } }],
       }).send();
-      const existingModels = new Map<string, string>();
+      const existingModels = new Map<string, Set<string>>();
       for (const item of onChainMotos) {
         const moto = getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0]));
-        existingModels.set(normalizeMotorcycleModel(moto.marca, moto.modelo), moto.concesionario);
+        const modelKey = normalizeMotorcycleModel(moto.marca, moto.modelo);
+        const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
+        registeredDealers.add(moto.concesionario);
+        existingModels.set(modelKey, registeredDealers);
       }
 
       const alreadyUsedElsewhere = demoMotorcycles.filter((item) => {
-        const registeredDealer = existingModels.get(normalizeMotorcycleModel(item.marca, item.modelo));
-        return registeredDealer && registeredDealer !== dealerAddress;
+        const registeredDealers = existingModels.get(normalizeMotorcycleModel(item.marca, item.modelo));
+        return registeredDealers && [...registeredDealers].some((registeredDealer) => registeredDealer !== dealerAddress);
       });
       if (alreadyUsedElsewhere.length > 0) {
         const models = alreadyUsedElsewhere.map((item) => `${item.marca} ${item.modelo}`).join(", ");
@@ -83,7 +86,7 @@ export function MotorcycleRegistration({
 
       for (const [index, item] of demoMotorcycles.entries()) {
         const modelKey = normalizeMotorcycleModel(item.marca, item.modelo);
-        if (existingModels.get(modelKey) === dealerAddress) { skipped += 1; continue; }
+        if (existingModels.get(modelKey)?.has(dealerAddress)) { skipped += 1; continue; }
 
         // Stable model-specific serials make repeated runs idempotent.
         const serial = `ML${item.code}${concesionario.slice(0, 11)}01`;
