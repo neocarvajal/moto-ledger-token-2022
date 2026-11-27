@@ -69,6 +69,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [catalogReady, setCatalogReady] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [selectedSale, setSelectedSale] = useState("");
   const [selectedService, setSelectedService] = useState("");
@@ -93,6 +94,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       setCustomers([]);
       setSales([]);
       setServices([]);
+      setCatalogReady(false);
       setLoading(false);
       return;
     }
@@ -103,13 +105,28 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       const [programPda] = await deriveProgramaFidelidadPda(address(concesionario));
       const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
-      const [program, catalog] = await Promise.all([
-        client.registro.accounts.programaFidelidad.fetch(programPda),
-        client.registro.accounts.catalogoServicios.fetch(catalogPda),
-      ]);
-      if (program.data.concesionario !== concesionario || catalog.data.concesionario !== concesionario) {
-        throw new Error("La configuración de fidelización o el catálogo no corresponde a este concesionario.");
+
+      // The loyalty mint must exist, but the redemption catalog is initialized
+      // separately and may legitimately be absent on an existing program.
+      const programInfo = await client.rpc.getAccountInfo(programPda, { encoding: "base64" }).send();
+      if (!programInfo.value) {
+        throw new Error("Este concesionario todavía no tiene un programa de fidelización Token-2022. Créalo primero en la sección de fidelización.");
       }
+      const program = await client.registro.accounts.programaFidelidad.fetch(programPda);
+      if (program.data.concesionario !== concesionario) {
+        throw new Error("El programa de fidelización no corresponde a este concesionario.");
+      }
+
+      const catalogInfo = await client.rpc.getAccountInfo(catalogPda, { encoding: "base64" }).send();
+      let activeServices: Service[] = [];
+      if (catalogInfo.value) {
+        const catalog = await client.registro.accounts.catalogoServicios.fetch(catalogPda);
+        if (catalog.data.concesionario !== concesionario) {
+          throw new Error("El catálogo de servicios no corresponde a este concesionario.");
+        }
+        activeServices = catalog.data.servicios.filter((item) => item.activo);
+      }
+      setCatalogReady(Boolean(catalogInfo.value));
 
       const customerDiscriminator = getBase58Decoder().decode(getClienteDiscriminatorBytes()) as Base58EncodedBytes;
       const saleDiscriminator = getBase58Decoder().decode(getVentaDiscriminatorBytes()) as Base58EncodedBytes;
@@ -143,7 +160,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       setCustomers(customerRecords.sort((a, b) => a.data.nombreCliente.localeCompare(b.data.nombreCliente)));
       setSales(saleRecords);
-      setServices(catalog.data.servicios.filter((item) => item.activo));
+      setServices(activeServices);
       setMint(program.data.mint);
       setSelectedCustomer((current) => customerRecords.some((item) => item.address === current) ? current : "");
       setSelectedSale((current) => saleRecords.some((item) => item.address === current) ? current : "");
@@ -298,7 +315,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       toast.error("Conecta la wallet propietaria del concesionario.");
       return;
     }
-    if (!selectedCustomerRecord || !selectedSaleRecord || !saleDetails || !selectedServiceRecord || !wallet || balance === null || !mint) {
+    if (!catalogReady || !selectedCustomerRecord || !selectedSaleRecord || !saleDetails || !selectedServiceRecord || !wallet || balance === null || !mint) {
       toast.error("Selecciona un cliente con venta, moto, servicio y wallet vinculada.");
       return;
     }
@@ -424,7 +441,9 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         <button type="button" onClick={() => void loadChainData()} disabled={loading || busy} className="rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] font-semibold text-[#424950] disabled:opacity-50">Actualizar blockchain</button>
       </div>
 
-      {loading ? <p className="mt-4 text-xs text-[#68717b]">Consultando clientes, ventas y catálogo en Solana…</p> : (
+      {!loading && !catalogReady && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] leading-relaxed text-amber-900">El programa Token-2022 existe, pero todavía no se ha inicializado el catálogo de servicios de este concesionario. Inicialízalo en la sección <strong>Catálogo de servicios</strong> y luego pulsa <strong>Actualizar blockchain</strong> aquí.</div>}
+
+      {loading ? <p className="mt-4 text-xs text-[#68717b]">Consultando clientes, ventas y configuración en Solana…</p> : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="text-[10px] font-semibold text-[#68717b]">Cliente registrado en el concesionario
             <select value={selectedCustomer} onChange={(event) => { setSelectedCustomer(event.target.value); setReceipt(null); }} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
@@ -457,7 +476,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       {selectedServiceRecord && <p className="mt-3 text-[10px] text-[#68717b]">El canje quemará {selectedServiceRecord.puntos.toLocaleString("es-VE")} puntos del mint {shortAddress(mint)}. La garantía cubierta no consume puntos; Solana vuelve a validar todas las cuentas y condiciones al ejecutar.</p>}
 
-      <button type="button" onClick={() => void startRedemption()} disabled={busy || loading || checking || !selectedCustomer || !selectedSale || !selectedService || !wallet || balance === null || !saleDetails || !mileage || Boolean(session)} className="mt-4 w-full rounded-lg bg-[#e60012] px-4 py-3 text-[11px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Preparando canje…" : "Generar QR para autorizar el canje"}</button>
+      <button type="button" onClick={() => void startRedemption()} disabled={!catalogReady || busy || loading || checking || !selectedCustomer || !selectedSale || !selectedService || !wallet || balance === null || !saleDetails || !mileage || Boolean(session)} className="mt-4 w-full rounded-lg bg-[#e60012] px-4 py-3 text-[11px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Preparando canje…" : "Generar QR para autorizar el canje"}</button>
 
       {session && <div className="mt-4 flex flex-col items-center rounded-xl border border-[#e2e5e8] p-4 text-center">
         <p className="text-[10px] font-bold text-[#252a30]">Escanea para autorizar la quema de puntos</p>
