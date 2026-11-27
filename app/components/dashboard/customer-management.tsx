@@ -11,7 +11,7 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
-import { deriveClientePda, deriveProgramaFidelidadPda, deriveToken2022Ata, deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
+import { deriveAsociacionClientePda, deriveClientePda, deriveProgramaFidelidadPda, deriveToken2022Ata, deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
 import { CustomerWalletLink } from "./customer-wallet-link";
 import { type Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
@@ -207,10 +207,13 @@ export function CustomerManagement({
       const owner = address(connected.account.address);
       const [cliente] = await deriveClientePda(owner, id);
       const existing = await client.registro.accounts.cliente.fetch(cliente).catch(() => null);
+      const dealer = address(concesionario);
+      const [asociacionCliente] = await deriveAsociacionClientePda(dealer, cliente);
       const instruction = client.registro.instructions.registrarCliente({
         owner: connected.signer,
-        concesionario: address(concesionario),
+        concesionario: dealer,
         cliente,
+        asociacionCliente,
         nombreConcesionario,
         cedulaCliente: id,
         nombreCliente: normalizedName,
