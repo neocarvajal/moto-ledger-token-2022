@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local customer association migration artifacts
+customer-association-migration-report.json
+scripts/customer-association-mapping.json
