@@ -250,9 +250,28 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 
 ### Configurar Upstash Redis
 
-1. Entra en [Upstash Console](https://console.upstash.com/).
-2. Crea una base de datos **Redis**.
-3. Abre la base de datos y copia la **REST URL** y el **REST Token**. Utiliza el token estándar con permisos de lectura y escritura, no uno de solo lectura.
+1. Entra en [Upstash Console](https://console.upstash.com/) y crea una base de datos **Redis**.
+2. En la consola de la base de datos, abre la sección **CLI** o ejecuta los comandos ACL con las credenciales administrativas.
+3. Crea un token de contraseña seguro con `ACL GENTOKEN` y utiliza el valor generado para crear un usuario dedicado a MotoLedger. La regla ACL recomendada es:
+
+   ```redis
+   user MOTOLEDGER on ~moto-ledger:wallet-link:* +@all
+   ```
+
+   Si lo creas mediante `ACL SETUSER`, aplica la contraseña generada y la misma regla de acceso. Por ejemplo:
+
+   ```redis
+   ACL SETUSER MOTOLEDGER on >TOKEN_GENERADO ~moto-ledger:wallet-link:* +@all -flushall -flushdb -swapdb
+   ```
+
+   El patrón `~moto-ledger:wallet-link:*` limita el acceso del usuario a las claves temporales de vinculación QR. Se excluyen además `FLUSHALL`, `FLUSHDB` y `SWAPDB`, porque son comandos globales que no quedan restringidos por el patrón de claves.
+4. Genera el token REST de ese usuario con:
+
+   ```redis
+   ACL RESTTOKEN MOTOLEDGER TOKEN_GENERADO
+   ```
+
+5. Copia la **REST URL** de la base de datos y utiliza el resultado de `ACL RESTTOKEN` como `UPSTASH_REDIS_REST_TOKEN`. No uses el token de solo lectura ni el token estándar de `default` para esta configuración.
 
 Redis se utiliza únicamente para intercambiar temporalmente la información necesaria para vincular la wallet del comprador mediante QR. Las sesiones expiran a los cinco minutos. **No almacena los registros del concesionario ni reemplaza a Solana**: los datos del negocio permanecen on-chain.
 
