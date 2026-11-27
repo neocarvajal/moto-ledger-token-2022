@@ -11,14 +11,15 @@ function hasSignature(value: Uint8Array | null | undefined) {
 export async function POST(request: Request, context: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await context.params;
-    const body = (await request.json()) as { transaction?: unknown };
+    const body = (await request.json()) as { transaction?: unknown; lastValidBlockHeight?: unknown };
     if (typeof body.transaction !== "string" || body.transaction.length < 100 ||
-        body.transaction.length > 20_000 || !/^[A-Za-z0-9+/]+=*$/.test(body.transaction)) {
+        body.transaction.length > 20_000 || !/^[A-Za-z0-9+/]+=*$/.test(body.transaction) ||
+        typeof body.lastValidBlockHeight !== "string" || !/^\\d+$/.test(body.lastValidBlockHeight)) {
       return NextResponse.json({ error: "Transacción preparada inválida." }, { status: 400 });
     }
 
     const session = await getServiceRedemptionSession(token);
-    if (!session || session.status !== "waiting_transaction") {
+    if (!session || session.status !== "ready_to_prepare") {
       return NextResponse.json({ error: "La solicitud ya no acepta una transacción." }, { status: 409 });
     }
 
@@ -34,6 +35,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const updated = await updateServiceRedemptionSession(token, (current) => ({
       ...current,
       transaction: body.transaction as string,
+      lastValidBlockHeight: body.lastValidBlockHeight as string,
       status: "waiting_customer_signature",
     }));
     if (!updated) return NextResponse.json({ error: "La solicitud expiró." }, { status: 404 });
