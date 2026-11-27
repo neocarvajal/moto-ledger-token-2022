@@ -11,6 +11,7 @@ import { getMotoDecoder, getMotoDiscriminatorBytes } from "../../lib/moto-ledger
 import { getDemoMotorcycleGroups } from "../../lib/moto-ledger/demo-motorcycles";
 import {
   deriveGarantiaPda,
+  deriveKilometrajeMotoPda,
   deriveMotoPda,
 } from "../../lib/moto-ledger/pdas";
 
@@ -135,6 +136,7 @@ export function MotorcycleRegistration({
         const placa = `D${concesionario.slice(-4).toUpperCase()}${String(index + 1).padStart(2, "0")}`;
         const [moto] = await deriveMotoPda(serial, dealerAddress);
         const [garantia] = await deriveGarantiaPda(serial);
+        const [kilometrajeMoto] = await deriveKilometrajeMotoPda(moto);
         const existing = await client.registro.accounts.moto.fetch(moto).catch(() => null);
         if (existing) {
           if (
@@ -151,7 +153,7 @@ export function MotorcycleRegistration({
 
         try {
           const instruction = client.registro.instructions.registrarMoto({
-            owner: connected.signer, concesionario: dealerAddress, garantia, moto, serial, placa,
+            owner: connected.signer, concesionario: dealerAddress, garantia, moto, kilometrajeMoto, serial, placa,
             marca: item.marca, modelo: item.modelo, color: item.color,
           });
           const result = await instruction.sendTransaction();
@@ -198,11 +200,13 @@ export function MotorcycleRegistration({
       const dealerAddress = address(concesionario);
       const [moto] = await deriveMotoPda(serial.trim(), dealerAddress);
       const [garantia] = await deriveGarantiaPda(serial.trim());
+      const [kilometrajeMoto] = await deriveKilometrajeMotoPda(moto);
       const instruction = client.registro.instructions.registrarMoto({
         owner: connected.signer,
         concesionario: dealerAddress,
         garantia,
         moto,
+        kilometrajeMoto,
         serial: serial.trim(),
         placa: placa.trim().toUpperCase(),
         marca: marca.trim(),
