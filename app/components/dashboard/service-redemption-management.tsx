@@ -48,7 +48,7 @@ type SelectedSale = Sale & {
   };
 };
 type Service = { id: number; nombre: string; descripcion: string; puntos: bigint; activo: boolean };
-type RedemptionSession = { token: string; url: string; expiresAt: number; idCanje: string };
+type RedemptionSession = { token: string; url: string; expiresAt: number; idCanje: string; status?: string };
 type Receipt = { signature: string; address: string; points: bigint };
 
 function shortAddress(value: string) {
@@ -83,11 +83,26 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const [session, setSession] = useState<RedemptionSession | null>(null);
   const [now, setNow] = useState(Date.now());
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
   const sendingRef = useRef(false);
 
   const selectedCustomerRecord = customers.find((item) => item.address === selectedCustomer) ?? null;
   const selectedSaleRecord = sales.find((item) => item.address === selectedSale) ?? null;
   const selectedServiceRecord = services.find((item) => String(item.id) === selectedService) ?? null;
+
+  useEffect(() => {
+    if (!showQrModal && !showCancelConfirm) return;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousDocumentOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousDocumentOverflow;
+    };
+  }, [showQrModal, showCancelConfirm]);
 
   const loadChainData = useCallback(async () => {
     if (!connected?.account.address) {
@@ -251,6 +266,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
           return response.json() as Promise<{ status: string; signedTransaction: string | null; idCanje: string; lastValidBlockHeight: string }>;
         })
         .then((data) => {
+          setSession((current) => current ? { ...current, status: data.status } : current);
           if (data.status === "signed" && data.signedTransaction && !sendingRef.current) {
             sendingRef.current = true;
             void (async () => {
@@ -292,6 +308,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 setReceipt({ signature, address: receiptPda, points: receiptData.puntos });
                 toast.success("Canje registrado en Solana y puntos quemados.");
                 setSession(null);
+                setShowQrModal(false);
+                setShowCancelConfirm(false);
                 await loadChainData();
                 await loadCustomerBalance();
               } catch (error) {
@@ -339,6 +357,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     }
 
     setBusy(true);
+    setQrError(null);
+    setShowQrModal(true);
     try {
       const [programaFidelidad] = await deriveProgramaFidelidadPda(address(concesionario));
       const [catalogoServicios] = await deriveCatalogoServiciosPda(address(concesionario));
@@ -419,11 +439,13 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       const responsePayload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(responsePayload.error ?? "No se pudo preparar la transacción de canje.");
       const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, "");
-      setSession({ token: tokenPayload.token, url: `${publicUrl}/canjear-servicio/${tokenPayload.token}`, expiresAt: Date.now() + 300_000, idCanje: idCanje.toString() });
+      setSession({ token: tokenPayload.token, url: `${publicUrl}/canjear-servicio/${tokenPayload.token}`, expiresAt: Date.now() + 300_000, idCanje: idCanje.toString(), status: "waiting_customer_signature" });
       setReceipt(null);
     } catch (error) {
       console.error("Service redemption preparation:", error);
-      toast.error(error instanceof Error ? error.message : "No se pudo preparar el canje.");
+      const message = error instanceof Error ? error.message : "No se pudo preparar el canje.";
+      setQrError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -479,14 +501,87 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       <button type="button" onClick={() => void startRedemption()} disabled={!catalogReady || busy || loading || checking || !selectedCustomer || !selectedSale || !selectedService || !wallet || balance === null || !saleDetails || !mileage || Boolean(session)} className="mt-4 w-full rounded-lg bg-[#e60012] px-4 py-3 text-[11px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Preparando canje…" : "Generar QR para autorizar el canje"}</button>
 
-      {session && <div className="mt-4 flex flex-col items-center rounded-xl border border-[#e2e5e8] p-4 text-center">
-        <p className="text-[10px] font-bold text-[#252a30]">Escanea para autorizar la quema de puntos</p>
-        <div className="mt-3 rounded-lg bg-white p-2"><QRCodeSVG value={session.url} size={208} level="H" includeMargin /></div>
-        <a href={session.url} target="_blank" rel="noreferrer" className="mt-3 break-all text-[10px] text-[#d90011] underline">{session.url}</a>
-        <p className="mt-2 font-mono text-xs font-bold tabular-nums text-[#252a30]">{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</p>
-        <p className="mt-2 max-w-sm text-[10px] leading-relaxed text-[#858d96]">El QR dura 5 minutos. La transacción tiene una vigencia de bloque más corta; si caduca antes de firmar, genera un nuevo QR.</p>
-        <button type="button" onClick={() => { void (async () => { try { const response = await fetch(`/api/service-redemption/${session.token}`, { method: "DELETE", cache: "no-store" }); const payload = await response.json() as { error?: string }; if (!response.ok) throw new Error(payload.error ?? "No se pudo cancelar el QR."); setSession(null); } catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo cancelar el QR."); } })(); }} className="mt-3 rounded-lg border border-red-200 px-3 py-2 text-[10px] font-semibold text-red-600">Cancelar solicitud y cerrar QR</button>
-      </div>}
+      {showQrModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto overscroll-contain bg-[#171b20]/55 p-4 backdrop-blur-md">
+          <section role="dialog" aria-modal="true" aria-labelledby="service-redemption-qr-title" className="my-auto max-h-[92vh] w-full max-w-2xl touch-pan-y overflow-y-auto overscroll-contain rounded-2xl border border-[#e9ebee] bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[#eff0f2] px-5 py-4 sm:px-6">
+              <div>
+                <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">FIDELIZACIÓN · TOKEN-2022</p>
+                <h2 id="service-redemption-qr-title" className="mt-1 text-[17px] font-bold text-[#252a30]">Autorizar canje de puntos</h2>
+                <p className="mt-1 text-[10px] text-[#858d96]">{selectedCustomerRecord?.data.nombreCliente ?? "Cliente"} · {selectedServiceRecord?.nombre ?? "Servicio"}</p>
+              </div>
+              <button type="button" onClick={() => setShowCancelConfirm(true)} aria-label="Cerrar solicitud de canje" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa]">✕</button>
+            </div>
+            {!session ? (
+              <div className="p-8 text-center">
+                <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#f2c6ca] border-t-[#e60012]" />
+                <p className="mt-4 text-[12px] font-semibold text-[#252a30]">{busy ? "Preparando solicitud segura…" : "No se pudo preparar la solicitud"}</p>
+                {qrError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-[10px] text-red-700">{qrError}</p>}
+                {qrError && <button type="button" onClick={() => { setShowQrModal(false); setQrError(null); }} className="mt-4 rounded-lg border border-[#e2e5e8] px-4 py-2 text-[10px] font-semibold text-[#424950]">Cerrar</button>}
+              </div>
+            ) : (
+              <div className="grid gap-6 p-5 sm:grid-cols-[190px_1fr] sm:p-6">
+                <div className="flex flex-col items-center">
+                  <div className="rounded-xl border border-[#e9ebee] bg-white p-3 shadow-sm"><QRCodeSVG value={session.url} size={164} level="M" includeMargin /></div>
+                  <p className="mt-3 text-center text-[10px] font-bold text-[#252a30]">Escanea con la wallet del cliente</p>
+                  <a href={session.url} target="_blank" rel="noreferrer" className="mt-1 break-all text-center text-[9px] text-[#d90011] underline">{session.url}</a>
+                  <p className={`mt-3 text-[11px] font-bold tabular-nums ${remaining <= 30 ? "text-red-600" : "text-[#68717b]"}`}>Tiempo de sesión: {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] leading-relaxed text-[#737b84]">El cliente escanea el QR, conecta la wallet vinculada y autoriza la quema. El concesionario enviará la transacción y verificará el recibo directamente en Solana.</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-lg border border-[#ccebd9] bg-[#f3fbf6] p-3">
+                      <p className="text-[9px] font-bold tracking-wider text-[#168354]">1 · SOLICITUD PREPARADA</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">Servicio: {selectedServiceRecord?.nombre} · {selectedServiceRecord?.puntos.toLocaleString("es-VE")} puntos.</p>
+                    </div>
+                    <div className={`rounded-lg border p-3 ${session.status === "signed" ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
+                      <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">2 · FIRMA DEL CLIENTE</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session.status === "signed" ? "Firma recibida correctamente." : "Esperando que el cliente escanee y firme desde su wallet…"}</p>
+                    </div>
+                    <div className={`rounded-lg border p-3 ${receipt ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
+                      <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">3 · CONFIRMACIÓN EN SOLANA</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{receipt ? "Canje confirmado y recibo verificado en blockchain." : "Pendiente de envío y confirmación on-chain."}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] leading-relaxed text-amber-900">
+                    La sesión QR dura hasta 5 minutos. La transacción usa un blockhash de Solana con una vigencia menor, que empieza a contar antes de que el cliente firme. Si caduca, habrá que generar una nueva solicitud; los 5 minutos no extienden la vigencia de la transacción.
+                  </div>
+                  {receipt && <button type="button" onClick={() => setShowQrModal(false)} className="mt-4 rounded-lg bg-[#252a30] px-4 py-2.5 text-[10px] font-semibold text-white">Cerrar ventana</button>}
+                  {!receipt && <button type="button" onClick={() => setShowCancelConfirm(true)} disabled={session.status === "signed"} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-[10px] font-bold text-red-700 shadow-sm transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">Cancelar proceso y cerrar</button>}
+                </div>
+              </div>
+            )}
+          </section>
+          {showCancelConfirm && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#171b20]/65 p-4 backdrop-blur-sm">
+              <section role="alertdialog" aria-modal="true" aria-labelledby="cancel-service-redemption-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl">
+                <div className="border-b border-red-100 bg-red-50 px-5 py-4">
+                  <p className="text-[9px] font-bold tracking-[0.16em] text-red-700">CONFIRMACIÓN REQUERIDA</p>
+                  <h3 id="cancel-service-redemption-title" className="mt-1 text-[16px] font-bold text-[#252a30]">¿Cancelar el canje?</h3>
+                </div>
+                <div className="space-y-3 p-5">
+                  <p className="text-[11px] leading-relaxed text-[#535c66]">Se cerrará esta solicitud y el QR dejará de estar disponible. No se quemarán puntos si el cliente todavía no ha firmado.</p>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowCancelConfirm(false)} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#424950]">Volver</button>
+                    <button type="button" onClick={() => { void (async () => {
+                      try {
+                        if (session) {
+                          const response = await fetch(`/api/service-redemption/${session.token}`, { method: "DELETE", cache: "no-store" });
+                          const payload = await response.json() as { error?: string };
+                          if (!response.ok) throw new Error(payload.error ?? "No se pudo cancelar el QR.");
+                        }
+                        setSession(null); setShowCancelConfirm(false); setShowQrModal(false); setQrError(null);
+                      } catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo cancelar la solicitud."); }
+                    })(); }} className="rounded-lg bg-red-600 px-4 py-2.5 text-[10px] font-bold text-white hover:bg-red-700">Sí, cancelar solicitud</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+        </div>
+      )}
+
+
 
       {receipt && <div className="mt-4 rounded-lg border border-[#ccebdc] bg-[#f3fbf6] p-4 text-xs">
         <p className="font-bold text-[#168451]">Canje confirmado en blockchain</p>
