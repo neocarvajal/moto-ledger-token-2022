@@ -239,7 +239,7 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 
 ## Requisitos e instalación
 
-> **Para probar la versión desplegada no necesitas instalar nada ni configurar Redis.** La aplicación ya tiene las variables de entorno configuradas en Vercel. Esta sección es únicamente para ejecutar MotoLedger en tu equipo.
+> **Para probar la versión desplegada no necesitas instalar nada ni configurar Redis/Upstash ni Pinata/IPFS.** La aplicación ya tiene esas integraciones y sus variables de entorno configuradas en Vercel. Esta sección es únicamente para ejecutar MotoLedger en tu equipo.
 
 ### Requisitos
 
