@@ -1,0 +1,459 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  address,
+  appendTransactionMessageInstruction,
+  assertIsTransactionWithBlockhashLifetime,
+  createNoopSigner,
+  createTransactionMessage,
+  getBase58Decoder,
+  getBase64Decoder,
+  getBase64Encoder,
+  getBase64EncodedWireTransaction,
+  partiallySignTransactionMessageWithSigners,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  type Base58EncodedBytes,
+  type Base64EncodedWireTransaction,
+} from "@solana/kit";
+import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
+import { TOKEN_2022_PROGRAM_ADDRESS } from "@solana-program/token-2022";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
+import { useAppClient } from "../../lib/client-provider";
+import { useCluster } from "../cluster-context";
+import {
+  deriveCanjeServicioPda,
+  deriveCatalogoServiciosPda,
+  deriveClientePda,
+  deriveProgramaFidelidadPda,
+  deriveToken2022Ata,
+  deriveWalletClientePda,
+} from "../../lib/moto-ledger/pdas";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
+import { getClienteDecoder, getClienteDiscriminatorBytes, type Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
+import { getVentaDecoder, getVentaDiscriminatorBytes, type Venta } from "../../lib/moto-ledger/src/generated/accounts/venta";
+import { EstadoGarantia } from "../../lib/moto-ledger/src/generated/types/estadoGarantia";
+
+type Customer = { address: string; data: Cliente };
+type Sale = { address: string; data: Venta };
+type SelectedSale = Sale & {
+  serial: string;
+  modelo: string;
+  garantia: {
+    fechaVencimiento: bigint;
+    kilometrajeMaximo: bigint;
+    estado: EstadoGarantia;
+  };
+};
+type Service = { id: number; nombre: string; descripcion: string; puntos: bigint; activo: boolean };
+type RedemptionSession = { token: string; url: string; expiresAt: number };
+type Receipt = { signature: string; address: string; points: bigint };
+
+function shortAddress(value: string) {
+  return value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-7)}` : value;
+}
+
+function parseMileage(value: string) {
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 0) {
+    throw new Error("Introduce un kilometraje válido.");
+  }
+  return BigInt(value);
+}
+
+export function ServiceRedemptionManagement({ concesionario, nombreConcesionario }: { concesionario: string; nombreConcesionario: string }) {
+  const client = useAppClient();
+  const connected = useConnectedWallet(client);
+  const { cluster } = useCluster();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [selectedSale, setSelectedSale] = useState("");
+  const [selectedService, setSelectedService] = useState("");
+  const [mileage, setMileage] = useState("");
+  const [mint, setMint] = useState("");
+  const [wallet, setWallet] = useState("");
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [session, setSession] = useState<RedemptionSession | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const sendingRef = useRef(false);
+
+  const selectedCustomerRecord = customers.find((item) => item.address === selectedCustomer) ?? null;
+  const selectedSaleRecord = sales.find((item) => item.address === selectedSale) ?? null;
+  const selectedServiceRecord = services.find((item) => String(item.id) === selectedService) ?? null;
+
+  const loadChainData = useCallback(async () => {
+    if (!connected?.account.address) {
+      setCustomers([]);
+      setSales([]);
+      setServices([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const dealer = await client.registro.accounts.concesionario.fetch(address(concesionario));
+      if (dealer.data.owner !== connected.account.address) throw new Error("La wallet conectada no es propietaria del concesionario seleccionado.");
+
+      const [programPda] = await deriveProgramaFidelidadPda(address(concesionario));
+      const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
+      const [program, catalog] = await Promise.all([
+        client.registro.accounts.programaFidelidad.fetch(programPda),
+        client.registro.accounts.catalogoServicios.fetch(catalogPda),
+      ]);
+      if (program.data.concesionario !== concesionario || catalog.data.concesionario !== concesionario) {
+        throw new Error("La configuración de fidelización o el catálogo no corresponde a este concesionario.");
+      }
+
+      const customerDiscriminator = getBase58Decoder().decode(getClienteDiscriminatorBytes()) as Base58EncodedBytes;
+      const saleDiscriminator = getBase58Decoder().decode(getVentaDiscriminatorBytes()) as Base58EncodedBytes;
+      const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
+      const dealerFilter = address(concesionario) as Base58EncodedBytes;
+      const [customerAccounts, saleAccounts] = await Promise.all([
+        client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+          encoding: "base64",
+          filters: [
+            { memcmp: { offset: 0n, bytes: customerDiscriminator, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: ownerFilter, encoding: "base58" } },
+          ],
+        }).send(),
+        client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+          encoding: "base64",
+          filters: [
+            { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: dealerFilter, encoding: "base58" } },
+          ],
+        }).send(),
+      ]);
+      const customerRecords: Customer[] = customerAccounts.map((item) => ({
+        address: item.pubkey,
+        data: getClienteDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
+      }));
+      const saleRecords: Sale[] = saleAccounts.map((item) => ({
+        address: item.pubkey,
+        data: getVentaDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
+      })).filter((sale) => sale.data.concesionario === concesionario &&
+        customerRecords.some((customer) => customer.address === sale.data.cliente));
+
+      setCustomers(customerRecords.sort((a, b) => a.data.nombreCliente.localeCompare(b.data.nombreCliente)));
+      setSales(saleRecords);
+      setServices(catalog.data.servicios.filter((item) => item.activo));
+      setMint(program.data.mint);
+      setSelectedCustomer((current) => customerRecords.some((item) => item.address === current) ? current : "");
+      setSelectedSale((current) => saleRecords.some((item) => item.address === current) ? current : "");
+    } catch (error) {
+      console.error("Blockchain redemption data:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo consultar la configuración on-chain.");
+    } finally {
+      setLoading(false);
+    }
+  }, [client, concesionario, connected?.account.address]);
+
+  useEffect(() => { void loadChainData(); }, [loadChainData]);
+
+  const customerSales = useMemo(
+    () => sales.filter((sale) => sale.data.cliente === selectedCustomer),
+    [sales, selectedCustomer]
+  );
+
+  useEffect(() => {
+    setSelectedSale((current) => customerSales.some((sale) => sale.address === current) ? current : customerSales[0]?.address ?? "");
+  }, [customerSales]);
+
+  const [saleDetails, setSaleDetails] = useState<SelectedSale | null>(null);
+  useEffect(() => {
+    let active = true;
+    setSaleDetails(null);
+    if (!selectedSaleRecord) return;
+    void (async () => {
+      try {
+        const moto = await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto));
+        if (moto.data.concesionario !== concesionario || moto.data.garantia === undefined) throw new Error("La moto no pertenece al concesionario.");
+        const warranty = await client.registro.accounts.garantia.fetch(address(moto.data.garantia));
+        if (warranty.data.moto !== selectedSaleRecord.data.moto || warranty.data.concesionario !== concesionario) throw new Error("La garantía no coincide con la venta.");
+        if (active) setSaleDetails({
+          ...selectedSaleRecord,
+          serial: moto.data.serial,
+          modelo: `${moto.data.marca} ${moto.data.modelo}`,
+          garantia: {
+            fechaVencimiento: warranty.data.fechaVencimiento,
+            kilometrajeMaximo: warranty.data.kilometrajeMaximo,
+            estado: warranty.data.estado,
+          },
+        });
+      } catch (error) {
+        if (active) toast.error(error instanceof Error ? error.message : "No se pudo consultar la garantía on-chain.");
+      }
+    })();
+    return () => { active = false; };
+  }, [client, concesionario, selectedSaleRecord]);
+
+  const loadCustomerBalance = useCallback(async () => {
+    setWallet("");
+    setBalance(null);
+    if (!selectedCustomer || !mint) return;
+    setChecking(true);
+    try {
+      const [walletPda] = await deriveWalletClientePda(address(selectedCustomer));
+      const walletAccount = await client.registro.accounts.walletCliente.fetch(walletPda);
+      if (walletAccount.data.cliente !== selectedCustomer) throw new Error("La wallet vinculada no corresponde al cliente.");
+      const linkedWallet = walletAccount.data.wallet;
+      setWallet(linkedWallet);
+      const [ata] = await deriveToken2022Ata(address(linkedWallet), address(mint));
+      const info = await client.rpc.getAccountInfo(ata, { encoding: "base64" }).send();
+      if (!info.value) {
+        setBalance(0n);
+        return;
+      }
+      const tokenBalance = await client.rpc.getTokenAccountBalance(ata).send();
+      setBalance(BigInt(tokenBalance.value.amount));
+    } catch (error) {
+      console.error("Customer token balance:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo consultar el saldo Token-2022.");
+    } finally {
+      setChecking(false);
+    }
+  }, [client, selectedCustomer, mint]);
+
+  useEffect(() => { void loadCustomerBalance(); }, [loadCustomerBalance]);
+
+  useEffect(() => {
+    if (!session) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const poll = window.setInterval(() => {
+      void fetch(`/api/service-redemption/${session.token}`, { cache: "no-store" })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("La solicitud de canje expiró.");
+          return response.json() as Promise<{ status: string; signedTransaction: string | null }>;
+        })
+        .then((data) => {
+          if (data.status === "signed" && data.signedTransaction && !sendingRef.current) {
+            sendingRef.current = true;
+            void (async () => {
+              try {
+                const signature = await client.rpc.sendTransaction(data.signedTransaction as Base64EncodedWireTransaction, {
+                  encoding: "base64", preflightCommitment: "confirmed", maxRetries: 3n,
+                }).send();
+                let confirmed = false;
+                for (let attempt = 0; attempt < 30; attempt += 1) {
+                  const status = (await client.rpc.getSignatureStatuses([signature]).send()).value[0];
+                  if (status?.err) throw new Error(`Solana rechazó el canje: ${JSON.stringify(status.err)}`);
+                  if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+                    confirmed = true; break;
+                  }
+                  await new Promise((resolve) => window.setTimeout(resolve, 1500));
+                }
+                if (!confirmed) throw new Error("La transacción fue enviada, pero aún no tiene confirmación. Revisa la firma en Explorer.");
+                const idCanje = BigInt(Date.now());
+                // Receipt address is derived from the exact nonce stored in the signed request.
+                const [receiptPda] = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
+                const receiptAccount = await client.registro.accounts.canjeServicio.fetch(receiptPda).catch(() => null);
+                if (!receiptAccount) {
+                  throw new Error(`La transacción confirmó, pero el recibo no coincide con el identificador esperado. Firma: ${signature}`);
+                }
+                setReceipt({ signature, address: receiptPda, points: receiptAccount.data.puntos });
+                toast.success("Canje registrado en Solana y puntos quemados.");
+                setSession(null);
+                await loadChainData();
+                await loadCustomerBalance();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "No se pudo finalizar el canje.");
+              } finally {
+                sendingRef.current = false;
+              }
+            })();
+          }
+        })
+        .catch((error) => toast.error(error instanceof Error ? error.message : "No se pudo consultar el estado del QR."));
+    }, 2000);
+    return () => { window.clearInterval(timer); window.clearInterval(poll); };
+  }, [session, client, selectedCustomer, loadChainData, loadCustomerBalance]);
+
+  const startRedemption = async () => {
+    if (!connected?.signer || !connected.account.address) {
+      toast.error("Conecta la wallet propietaria del concesionario.");
+      return;
+    }
+    if (!selectedCustomerRecord || !selectedSaleRecord || !saleDetails || !selectedServiceRecord || !wallet || balance === null || !mint) {
+      toast.error("Selecciona un cliente con venta, moto, servicio y wallet vinculada.");
+      return;
+    }
+    if (selectedServiceRecord.puntos > balance) {
+      toast.error("El cliente no tiene puntos suficientes.");
+      return;
+    }
+    let km: bigint;
+    try { km = parseMileage(mileage); } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kilometraje inválido.");
+      return;
+    }
+    const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+    const warrantyCovered = saleDetails.garantia.estado === EstadoGarantia.Activa &&
+      nowSeconds <= saleDetails.garantia.fechaVencimiento &&
+      km <= saleDetails.garantia.kilometrajeMaximo;
+    if (warrantyCovered) {
+      toast.error("Este servicio aún está cubierto por la garantía. No se deben consumir puntos.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const [programaFidelidad] = await deriveProgramaFidelidadPda(address(concesionario));
+      const [catalogoServicios] = await deriveCatalogoServiciosPda(address(concesionario));
+      const [walletCliente] = await deriveWalletClientePda(address(selectedCustomer));
+      const [tokenAccount] = await deriveToken2022Ata(address(wallet), address(mint));
+      let idCanje = BigInt(Date.now());
+      let canjeServicio = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const existing = await client.rpc.getAccountInfo(canjeServicio[0], { encoding: "base64" }).send();
+        if (!existing.value) break;
+        idCanje += 1n;
+        canjeServicio = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
+      }
+      const receiptExists = await client.rpc.getAccountInfo(canjeServicio[0], { encoding: "base64" }).send();
+      if (receiptExists.value) throw new Error("No se pudo generar un identificador de canje único. Inténtalo nuevamente.");
+
+      const token = await fetch("/api/service-redemption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          owner: connected.account.address,
+          concesionario,
+          cliente: selectedCustomer,
+          clienteNombre: selectedCustomerRecord.data.nombreCliente,
+          clienteCedula: String(selectedCustomerRecord.data.cedulaCliente),
+          walletAddress: wallet,
+          mint,
+          servicioId: selectedServiceRecord.id,
+          servicioNombre: selectedServiceRecord.nombre,
+          puntos: selectedServiceRecord.puntos.toString(),
+          kilometrajeActual: km.toString(),
+          idCanje: idCanje.toString(),
+          cluster,
+        }),
+      });
+      const tokenPayload = await token.json() as { token?: string; error?: string };
+      if (!token.ok || !tokenPayload.token) throw new Error(tokenPayload.error ?? "No se pudo crear el QR de canje.");
+
+      const instruction = client.registro.instructions.canjearServicio({
+        owner: connected.signer,
+        wallet: createNoopSigner(address(wallet)),
+        concesionario: address(concesionario),
+        programaFidelidad,
+        catalogoServicios,
+        cliente: address(selectedCustomer),
+        walletCliente,
+        venta: address(selectedSaleRecord.address),
+        moto: address(selectedSaleRecord.data.moto),
+        garantia: address(saleDetails.garantia ? (await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto))).data.garantia : selectedSaleRecord.data.moto),
+        mint: address(mint),
+        tokenAccount,
+        canjeServicio: canjeServicio[0],
+        tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+        servicioId: selectedServiceRecord.id,
+        kilometrajeActual: km,
+        idCanje,
+      });
+      const latestBlockhash = await client.rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
+      const message = pipe(
+        createTransactionMessage({ version: 0 }),
+        (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
+        (tx) => appendTransactionMessageInstruction(instruction, tx),
+        (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx),
+      );
+      const partiallySigned = await partiallySignTransactionMessageWithSigners(message);
+      assertIsTransactionWithBlockhashLifetime(partiallySigned);
+      const ownerSignature = partiallySigned.signatures[address(connected.account.address)];
+      if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) throw new Error("La wallet del concesionario no pudo firmar parcialmente la transacción.");
+      const response = await fetch(`/api/service-redemption/${tokenPayload.token}/transaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ transaction: getBase64EncodedWireTransaction(partiallySigned) }),
+      });
+      const responsePayload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(responsePayload.error ?? "No se pudo preparar la transacción de canje.");
+      const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, "");
+      setSession({ token: tokenPayload.token, url: `${publicUrl}/canjear-servicio/${tokenPayload.token}`, expiresAt: Date.now() + 300_000 });
+      setReceipt(null);
+    } catch (error) {
+      console.error("Service redemption preparation:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo preparar el canje.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remaining = session ? Math.max(0, Math.ceil((session.expiresAt - now) / 1000)) : 0;
+
+  return (
+    <section className="mt-5 rounded-xl border border-[#e9ebee] bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">TOKEN-2022 · POSVENTA</p>
+          <h3 className="mt-2 text-[14px] font-bold text-[#252a30]">Canje de puntos por servicios</h3>
+          <p className="mt-1 text-[10px] text-[#858d96]">Los datos se consultan desde Solana. El QR solo transporta la solicitud temporal de firma.</p>
+        </div>
+        <button type="button" onClick={() => void loadChainData()} disabled={loading || busy} className="rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] font-semibold text-[#424950] disabled:opacity-50">Actualizar blockchain</button>
+      </div>
+
+      {loading ? <p className="mt-4 text-xs text-[#68717b]">Consultando clientes, ventas y catálogo en Solana…</p> : (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="text-[10px] font-semibold text-[#68717b]">Cliente registrado en el concesionario
+            <select value={selectedCustomer} onChange={(event) => { setSelectedCustomer(event.target.value); setReceipt(null); }} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+              <option value="">Selecciona un cliente</option>
+              {customers.filter((customer) => sales.some((sale) => sale.data.cliente === customer.address)).map((customer) => <option key={customer.address} value={customer.address}>{customer.data.nombreCliente} · C.I. {customer.data.cedulaCliente}</option>)}
+            </select>
+          </label>
+          <label className="text-[10px] font-semibold text-[#68717b]">Venta asociada
+            <select value={selectedSale} onChange={(event) => setSelectedSale(event.target.value)} disabled={!customerSales.length} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+              {customerSales.map((sale) => <option key={sale.address} value={sale.address}>{shortAddress(sale.data.moto)} · {new Date(Number(sale.data.fechaVenta) * 1000).toLocaleDateString("es-VE")}</option>)}
+            </select>
+          </label>
+          <label className="text-[10px] font-semibold text-[#68717b]">Servicio fuera de garantía
+            <select value={selectedService} onChange={(event) => setSelectedService(event.target.value)} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+              <option value="">Selecciona un servicio</option>
+              {services.map((service) => <option key={service.id} value={service.id}>{service.nombre} · {service.puntos.toString()} puntos</option>)}
+            </select>
+          </label>
+          <label className="text-[10px] font-semibold text-[#68717b]">Kilometraje actual
+            <input inputMode="numeric" value={mileage} onChange={(event) => setMileage(event.target.value)} placeholder="Ej. 12500" className="mt-1 w-full rounded-lg border border-[#e2e5e8] p-3 text-xs text-[#252a30]" />
+          </label>
+        </div>
+      )}
+
+      {selectedCustomerRecord && <div className="mt-4 rounded-lg bg-[#f7f8fa] p-3 text-xs">
+        <div className="flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Wallet vinculada</span><strong className="font-mono text-[#252a30]">{checking ? "Consultando…" : wallet ? shortAddress(wallet) : "No vinculada"}</strong></div>
+        <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Saldo Token-2022</span><strong className="text-[#252a30]">{balance === null ? "—" : balance.toLocaleString("es-VE") + " puntos"}</strong></div>
+        {saleDetails && <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>}
+      </div>}
+
+      {selectedServiceRecord && <p className="mt-3 text-[10px] text-[#68717b]">El canje quemará {selectedServiceRecord.puntos.toLocaleString("es-VE")} puntos del mint {shortAddress(mint)}. La garantía cubierta no consume puntos; Solana vuelve a validar todas las cuentas y condiciones al ejecutar.</p>}
+
+      <button type="button" onClick={() => void startRedemption()} disabled={busy || loading || checking || !selectedCustomer || !selectedSale || !selectedService || !wallet || balance === null || !saleDetails || !mileage || Boolean(session)} className="mt-4 w-full rounded-lg bg-[#e60012] px-4 py-3 text-[11px] font-bold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Preparando canje…" : "Generar QR para autorizar el canje"}</button>
+
+      {session && <div className="mt-4 flex flex-col items-center rounded-xl border border-[#e2e5e8] p-4 text-center">
+        <p className="text-[10px] font-bold text-[#252a30]">Escanea para autorizar la quema de puntos</p>
+        <div className="mt-3 rounded-lg bg-white p-2"><QRCodeSVG value={session.url} size={208} level="H" includeMargin /></div>
+        <a href={session.url} target="_blank" rel="noreferrer" className="mt-3 break-all text-[10px] text-[#d90011] underline">{session.url}</a>
+        <p className="mt-2 font-mono text-xs font-bold tabular-nums text-[#252a30]">{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</p>
+        <button type="button" onClick={() => setSession(null)} className="mt-3 rounded-lg border border-red-200 px-3 py-2 text-[10px] font-semibold text-red-600">Cerrar QR</button>
+      </div>}
+
+      {receipt && <div className="mt-4 rounded-lg border border-[#ccebdc] bg-[#f3fbf6] p-4 text-xs">
+        <p className="font-bold text-[#168451]">Canje confirmado en blockchain</p>
+        <p className="mt-1 text-[#424950]">{receipt.points.toLocaleString("es-VE")} puntos quemados.</p>
+        <p className="mt-2 break-all font-mono text-[10px] text-[#68717b]">Recibo: {receipt.address}</p>
+        <a className="mt-2 inline-block text-[10px] font-semibold text-[#d90011] underline" href={`https://explorer.solana.com/tx/${receipt.signature}?cluster=${cluster === "mainnet" ? "mainnet-beta" : cluster}`} target="_blank" rel="noreferrer">Ver transacción confirmada ↗</a>
+      </div>}
+    </section>
+  );
+}
