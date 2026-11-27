@@ -313,7 +313,9 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 await loadChainData();
                 await loadCustomerBalance();
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "No se pudo finalizar el canje.");
+                const message = error instanceof Error ? error.message : "No se pudo finalizar el canje.";
+                setQrError(message);
+                toast.error(message);
               } finally {
                 sendingRef.current = false;
               }
