@@ -77,9 +77,14 @@ export function ServicesManagement({
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<ServiceRecord | null>(null);
 
+  const soldMotorcycles = useMemo(
+    () => motorcycles.filter((item) => item.data.vendida),
+    [motorcycles]
+  );
+
   const selectedMotorcycle = useMemo(
-    () => motorcycles.find((item) => item.address === selectedMoto) ?? null,
-    [motorcycles, selectedMoto]
+    () => soldMotorcycles.find((item) => item.address === selectedMoto) ?? null,
+    [soldMotorcycles, selectedMoto]
   );
 
   const loadData = useCallback(async () => {
@@ -130,7 +135,7 @@ export function ServicesManagement({
       setMotorcycles(motoRecords);
       setServices(serviceRecords);
       setSelectedMoto((current) =>
-        motoRecords.some((item) => item.address === current) ? current : ""
+        motoRecords.some((item) => item.address === current && item.data.vendida) ? current : ""
       );
     } catch (error) {
       console.error("No se pudieron cargar los servicios:", error);
@@ -184,6 +189,9 @@ export function ServicesManagement({
       const latestMoto = await client.registro.accounts.moto.fetch(motoAddress);
       if (latestMoto.data.concesionario !== concesionario) {
         throw new Error("La moto ya no pertenece al concesionario seleccionado.");
+      }
+      if (!latestMoto.data.vendida) {
+        throw new Error("Solo se pueden registrar servicios para motos que ya fueron vendidas.");
       }
 
       const [garantia] = await deriveGarantiaPda(latestMoto.data.serial);
@@ -245,9 +253,9 @@ export function ServicesManagement({
         <form onSubmit={handleSubmit} className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="space-y-4">
             <label className="block">
-              <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Moto</span>
-              <select value={selectedMoto} onChange={(event) => setSelectedMoto(event.target.value)} required disabled={motorcycles.length === 0 || busy} className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]">
-                {motorcycles.length === 0 ? <option value="">No hay motos registradas</option> : <><option value="">Selecciona una moto</option>{motorcycles.map((item) => <option key={item.address} value={item.address}>{item.data.marca} {item.data.modelo} · {item.data.serial}{item.data.vendida ? " · Vendida" : ""}</option>)}</>}
+              <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Moto vendida</span>
+              <select value={selectedMoto} onChange={(event) => setSelectedMoto(event.target.value)} required disabled={soldMotorcycles.length === 0 || busy} className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012] disabled:bg-[#f7f8fa]">
+                {soldMotorcycles.length === 0 ? <option value="">No hay motos vendidas</option> : <><option value="">Selecciona una moto vendida</option>{soldMotorcycles.map((item) => <option key={item.address} value={item.address}>{item.data.marca} {item.data.modelo} · {item.data.serial}</option>)}</>}
               </select>
             </label>
 
@@ -307,12 +315,12 @@ export function ServicesManagement({
             </label>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eff0f2] pt-4">
               <p className="text-[9px] text-[#9299a1]">El registro actualiza el contador de servicios de la moto.</p>
-              <button type="submit" disabled={busy || loading || motorcycles.length === 0} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Registrando…" : "Registrar servicio"}</button>
+              <button type="submit" disabled={busy || loading || soldMotorcycles.length === 0} className="rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Registrando…" : "Registrar servicio"}</button>
             </div>
           </div>
         </form>
-        {motorcycles.length === 0 && !loading && (
-          <p className="mt-4 rounded-lg bg-[#fff7f7] p-3 text-[10px] text-[#a34a50]">Registra primero una moto para poder asociarle servicios.</p>
+        {soldMotorcycles.length === 0 && !loading && (
+          <p className="mt-4 rounded-lg bg-[#fff7f7] p-3 text-[10px] text-[#a34a50]">Todavía no hay motos vendidas en este concesionario. El módulo Servicios solo permite registrar trabajos para motos que ya tengan una venta.</p>
         )}
       </section>
 
