@@ -6,6 +6,9 @@ import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
+import { getMotoDecoder, getMotoDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/moto";
+import { getDemoMotorcycles, normalizeMotorcycleModel } from "../../lib/moto-ledger/demo-motorcycles";
 import {
   deriveGarantiaPda,
   deriveMotoPda,
