@@ -53,6 +53,14 @@ export async function deriveClientePda(owner: Address, cedulaCliente: number) {
   });
 }
 
+/** One dealership-specific registration per global customer identity. */
+export async function deriveAsociacionClientePda(concesionario: Address, cliente: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("asociacion_cliente"), key(concesionario), key(cliente)],
+  });
+}
+
 export async function deriveVentaPda(moto: Address) {
   return getProgramDerivedAddress({
     programAddress: REGISTRO_PROGRAM_ADDRESS,
