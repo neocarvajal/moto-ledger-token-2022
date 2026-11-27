@@ -55,7 +55,6 @@ type CustomerRecord = { address: string; data: Cliente };
 type SaleRecord = { address: string; data: Venta; reward?: PuntosVenta; rewardStatus?: "issued" | "none" | "unavailable" };
 type SaleConfirmation = {
   points: bigint | null;
-  tokenName: string | null;
   tokenSymbol: string | null;
   wallet: string | null;
   signature: string | null;
@@ -101,6 +100,7 @@ export function SalesManagement({
   const connected = useConnectedWallet(client);
   const [motorcycles, setMotorcycles] = useState<MotorcycleRecord[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [loyaltyTokenSymbol, setLoyaltyTokenSymbol] = useState<string | null>(null);
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [selectedCustomerAddress, setSelectedCustomerAddress] = useState("");
@@ -127,6 +127,17 @@ export function SalesManagement({
     setLoading(true);
     try {
       const dealerAddress = address(concesionario);
+      setLoyaltyTokenSymbol(null);
+      try {
+        const [loyaltyProgramPda] = await deriveProgramaFidelidadPda(dealerAddress);
+        const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(loyaltyProgramPda);
+        const mintAccount = await fetchMint(client.rpc, loyaltyProgram.data.mint);
+        const extensions = unwrapOption(mintAccount.data.extensions) ?? [];
+        const tokenMetadata = extensions.find((item) => isExtension("TokenMetadata", item));
+        if (tokenMetadata?.symbol) setLoyaltyTokenSymbol(tokenMetadata.symbol);
+      } catch (metadataError) {
+        console.warn("No se pudo consultar el símbolo del mint de fidelización:", metadataError);
+      }
       const motoDiscriminator = getBase58Decoder().decode(
         getMotoDiscriminatorBytes()
       ) as Base58EncodedBytes;
@@ -420,7 +431,6 @@ export function SalesManagement({
       const [puntosVenta] = await derivePuntosVentaPda(venta);
       let result: { context: { signature: string } } | null = null;
       let awardedPoints: bigint | null = null;
-      let awardedTokenName: string | null = null;
       let awardedTokenSymbol: string | null = null;
       let awardedWallet: string | null = null;
       let reconciledOnChain = false;
@@ -436,7 +446,6 @@ export function SalesManagement({
             const extensions = unwrapOption(mintAccount.data.extensions) ?? [];
             const tokenMetadata = extensions.find((item) => isExtension("TokenMetadata", item));
             if (tokenMetadata) {
-              awardedTokenName = tokenMetadata.name;
               awardedTokenSymbol = tokenMetadata.symbol;
             }
           } catch (metadataError) {
@@ -526,7 +535,6 @@ export function SalesManagement({
       }
       setLastSaleConfirmation({
         points: awardedPoints,
-        tokenName: awardedTokenName,
         tokenSymbol: awardedTokenSymbol,
         wallet: awardedWallet,
         signature: result?.context.signature ?? null,
@@ -697,8 +705,7 @@ export function SalesManagement({
                 <p className="text-[9px] font-bold tracking-[0.12em] text-[#16845a]">RECOMPENSA ACREDITADA</p>
                 <div className="mt-1 flex flex-wrap items-baseline gap-2">
                   <p className="text-[28px] font-extrabold leading-tight text-[#176b4b]">{formatAmount(lastSaleConfirmation.points)}</p>
-                  <p className="text-[12px] font-bold text-[#4d7664]">{lastSaleConfirmation.tokenSymbol ?? "puntos"} entregados</p>
-                  {lastSaleConfirmation.tokenName && <p className="w-full text-[10px] text-[#6c8b7b]">{lastSaleConfirmation.tokenName}</p>}
+                  <p className="text-[12px] font-bold text-[#4d7664]"> {lastSaleConfirmation.tokenSymbol ? lastSaleConfirmation.tokenSymbol : "PUNTOS"} </p>
                 </div>
                 {lastSaleConfirmation.wallet && (
                   <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.wallet + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2">
@@ -730,7 +737,7 @@ export function SalesManagement({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
               <thead className="bg-[#fafbfc] text-[9px] font-bold uppercase tracking-wide text-[#9299a1]">
-                <tr><th className="px-6 py-3">Fecha</th><th className="px-4 py-3">Cliente PDA</th><th className="px-4 py-3">Moto PDA</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">Puntos BERA</th><th className="px-6 py-3 text-right">Venta PDA</th><th className="px-4 py-3 text-right">Detalle</th></tr>
+                <tr><th className="px-6 py-3">Fecha</th><th className="px-4 py-3">Cliente PDA</th><th className="px-4 py-3">Moto PDA</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">PUNTOS</th><th className="px-6 py-3 text-right">Venta PDA</th><th className="px-4 py-3 text-right">Detalle</th></tr>
               </thead>
               <tbody className="divide-y divide-[#f0f1f3]">
                 {sales.map((sale) => (
@@ -741,7 +748,7 @@ export function SalesManagement({
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-[#252a30]">{formatAmount(sale.data.precioVenta)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       {sale.reward ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#edf8f2] px-2 py-1 font-bold text-[#16845a]">+{formatAmount(sale.reward.cantidad)} BERA</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#edf8f2] px-2 py-1 font-bold text-[#16845a]">+{formatAmount(sale.reward.cantidad)} {loyaltyTokenSymbol ?? "PUNTOS"}</span>
                       ) : <span className="text-[#a0a6ad]">{sale.rewardStatus === "none" ? "No emitidos" : "No verificado"}</span>}
                     </td>
                     <td className="px-6 py-3 text-right"><a href={`https://explorer.solana.com/address/${sale.address}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#68717b] underline decoration-dotted underline-offset-2 hover:text-[#e60012]">{shortAddress(sale.address)} ↗</a></td>
@@ -805,7 +812,7 @@ export function SalesManagement({
                 </div>
                 {saleDetails.sale.reward ? (
                   <>
-                    <p className="mt-2 text-[25px] font-extrabold text-[#176b4b]">+{formatAmount(saleDetails.sale.reward.cantidad)} BERA</p>
+                    <p className="mt-2 text-[25px] font-extrabold text-[#176b4b]">+{formatAmount(saleDetails.sale.reward.cantidad)} {loyaltyTokenSymbol ?? "PUNTOS"}</p>
                     <div className="mt-2 grid gap-2 text-[10px] text-[#68717b] sm:grid-cols-2">
                       <p>Fecha de emisión: <strong className="text-[#252a30]">{new Date(Number(saleDetails.sale.reward.fechaEmision) * 1000).toLocaleString("es-VE")}</strong></p>
                       <p>Wallet receptora: <a href={"https://explorer.solana.com/address/" + saleDetails.sale.reward.wallet + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[#16845a] underline decoration-dotted">{shortAddress(saleDetails.sale.reward.wallet)} ↗</a></p>
