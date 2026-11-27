@@ -56,7 +56,6 @@ export function MotorcycleRegistration({
       }
 
       const demoGroups = getDemoMotorcycleGroups();
-      const demoMotorcycles = demoGroups.flat();
       const demoGroupByCode = new Map<string, number>();
       demoGroups.forEach((group, groupIndex) => {
         group.forEach((item) => demoGroupByCode.set(item.code, groupIndex));
