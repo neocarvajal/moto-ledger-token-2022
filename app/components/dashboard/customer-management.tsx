@@ -16,6 +16,7 @@ import { CustomerWalletLink } from "./customer-wallet-link";
 import { type Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { getAsociacionClienteDecoder, getAsociacionClienteDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/asociacionCliente";
+import { getDemoCustomerGroups } from "../../lib/moto-ledger/demo-customers";
 
 type CustomerRecord = { address: ReturnType<typeof address>; data: Cliente };
 
@@ -177,18 +178,71 @@ export function CustomerManagement({
       const owner = address(connected.account.address);
       const dealer = address(concesionario);
 
-      // El identificador de demostración depende del concesionario para evitar
-      // reutilizar la misma identidad global en otros concesionarios.
+      const demoGroups = getDemoCustomerGroups();
+      const groupNames = demoGroups.map((group) => new Set(group.map((item) => item.nombre)));
+      const associationDiscriminator = getBase58Decoder().decode(
+        getAsociacionClienteDiscriminatorBytes()
+      ) as Base58EncodedBytes;
+      const allAssociations = await client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+        encoding: "base64",
+        filters: [{
+          memcmp: {
+            offset: 0n,
+            bytes: associationDiscriminator,
+            encoding: "base58",
+          },
+        }],
+      }).send();
+      const decodedAssociations = allAssociations.map((item) =>
+        getAsociacionClienteDecoder().decode(
+          getBase64Encoder().encode(item.account.data[0])
+        )
+      );
+      const ownerAssociations = decodedAssociations.filter(
+        (association) => association.owner === owner && association.activo
+      );
+      const usedGroups = new Set<number>();
+      const currentDealerGroups = new Set<number>();
+
+      await Promise.all(ownerAssociations.map(async (association) => {
+        try {
+          const account = await client.registro.accounts.cliente.fetch(
+            address(association.cliente)
+          );
+          const groupIndex = groupNames.findIndex((names) =>
+            names.has(account.data.nombreCliente)
+          );
+          if (groupIndex < 0) return;
+          if (association.concesionario === dealer) {
+            currentDealerGroups.add(groupIndex);
+          } else {
+            usedGroups.add(groupIndex);
+          }
+        } catch {
+          // Ignore stale associations whose customer account cannot be read.
+        }
+      }));
+
+      if (currentDealerGroups.size > 1) {
+        throw new Error("Este concesionario contiene clientes de varios grupos de demostración. Revisa el directorio antes de volver a precargar.");
+      }
+      const selectedGroupIndex = currentDealerGroups.size === 1
+        ? [...currentDealerGroups][0]
+        : demoGroups.findIndex((_, index) => !usedGroups.has(index));
+      if (selectedGroupIndex < 0) {
+        throw new Error("Los cuatro grupos de clientes de demostración ya están asignados a otros concesionarios de esta wallet. Registra clientes manualmente.");
+      }
+
+      const demoCustomers = demoGroups[selectedGroupIndex];
+      toast.info(`Grupo de clientes ${selectedGroupIndex + 1} de ${demoGroups.length}: ${demoCustomers.map((item) => item.nombre).join(", ")}.`);
+
+      // Las cédulas sintéticas son únicas por concesionario y por integrante.
+      // Nunca se reutiliza automáticamente una identidad global existente.
       const dealerHash = [...concesionario].reduce(
         (hash, character) => (Math.imul(hash, 31) + character.charCodeAt(0)) >>> 0,
         2166136261
       );
       const baseCedula = 10000000 + (dealerHash % 80000000);
-      const demoCustomers = [
-        { nombre: "Carlos Mendoza", offset: 0 },
-        { nombre: "María González", offset: 1 },
-        { nombre: "José Rodríguez", offset: 2 },
-      ];
 
       for (const demo of demoCustomers) {
         let registered = false;
@@ -365,7 +419,7 @@ export function CustomerManagement({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold text-[#555e68]">Datos de demostración</p>
-              <p className="mt-1 text-[9px] leading-relaxed text-[#9299a1]">Añade hasta 3 clientes de prueba únicamente a este concesionario. No reutiliza clientes existentes.</p>
+              <p className="mt-1 text-[9px] leading-relaxed text-[#9299a1]">Hay 4 grupos de 3 clientes. Cada concesionario de la misma wallet recibe automáticamente un grupo distinto.</p>
             </div>
             <button type="button" onClick={() => void handlePreloadCustomers()} disabled={busy !== null} className="rounded-lg border border-[#d8dde2] bg-white px-3 py-2 text-[10px] font-semibold text-[#555e68] hover:border-[#e60012] hover:text-[#e60012] disabled:opacity-50">{busy === "preload" ? "Precargando…" : "Precargar 3 clientes"}</button>
           </div>
