@@ -243,12 +243,26 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 
 ## Requisitos e instalación
 
-Para una instalación local, crea una base de datos en [Upstash Redis](https://console.upstash.com/) y configura sus credenciales REST. Consulta la [documentación oficial de Redis REST API](https://upstash.com/docs/redis/features/restapi) para obtener la URL y el token. Usa el **Standard REST Token** (no el Read-Only Token), o un usuario ACL personalizado que permita las operaciones de lectura y escritura que necesita la aplicación. Como mínimo, el usuario debe tener permitido el comando `SET`; si aparece `NOPERM` o `SET` está denegado, revisa sus permisos ACL. Para una regla ACL personalizada que permita las operaciones habituales de lectura y escritura sobre las claves, puedes partir de `+@read +set +del +expire ~*` y ajustarla según las restricciones de tu base de datos.
+> **Para probar la versión desplegada no necesitas instalar nada ni configurar Redis.** La aplicación ya tiene las variables de entorno configuradas en Vercel. Esta sección es únicamente para ejecutar MotoLedger en tu equipo.
+
+### Requisitos
 
 - Node.js **24 o superior** y npm.
-- Wallet compatible con Solana, como Solflare o Phantom.
-- SOL de Devnet para el owner y las wallets que deban pagar rent/fees.
-- Acceso a Solana Devnet.
+- Una wallet compatible con Solana (Solflare o Phantom).
+- SOL de Devnet para las transacciones.
+- Una base de datos gratuita de **Redis en Upstash** para gestionar las sesiones temporales de los QR.
+
+### Configurar Upstash Redis
+
+1. Entra en [Upstash Console](https://console.upstash.com/).
+2. Crea una base de datos **Redis**.
+3. Abre la base de datos y copia la **REST URL** y el **REST Token**. Utiliza el token estándar con permisos de lectura y escritura, no uno de solo lectura.
+
+Redis se utiliza únicamente para intercambiar temporalmente la información necesaria para vincular la wallet del comprador mediante QR. Las sesiones expiran a los cinco minutos. **No almacena los registros del concesionario ni reemplaza a Solana**: los datos del negocio permanecen on-chain.
+
+### Instalar y ejecutar
+
+Clona el repositorio e instala las dependencias:
 
 ```bash
 git clone https://github.com/neocarvajal/moto-ledger-token-2022.git
@@ -256,7 +270,7 @@ cd moto-ledger-token-2022
 npm install
 ```
 
-Crea `.env.local` para la URL pública y el almacenamiento temporal de las sesiones QR:
+Crea un archivo `.env.local` en la raíz del proyecto:
 
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -264,13 +278,15 @@ UPSTASH_REDIS_REST_URL=https://<tu-base-de-datos>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<tu-token-rest>
 ```
 
-Configura Upstash Redis para el intercambio temporal entre el dashboard y el teléfono. Mantén el token como secreto del servidor; nunca uses el prefijo `NEXT_PUBLIC_` para secretos. Para escanear QR desde un teléfono, la aplicación debe ser accesible mediante HTTPS público. Establece `NEXT_PUBLIC_APP_URL` con esa URL y reinicia Next.js después de cambiarla. Las sesiones QR expiran a los cinco minutos.
+Para probar los QR desde un teléfono, la aplicación debe estar disponible mediante una URL HTTPS pública. En ese caso, cambia `NEXT_PUBLIC_APP_URL` por esa URL y reinicia el servidor.
+
+Inicia la aplicación:
 
 ```bash
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000), conecta el owner y selecciona **Devnet**. Puedes obtener SOL desde el [faucet oficial](https://faucet.solana.com/).
+Abre [http://localhost:3000](http://localhost:3000), conecta la wallet owner y selecciona **Devnet**. Puedes obtener SOL desde el [faucet oficial](https://faucet.solana.com/).
 
 ## Arquitectura y cuentas on-chain
 
