@@ -113,6 +113,51 @@ export function DealershipWorkspace({
     void loadDealerships();
   }, [loadDealerships]);
 
+  const refreshDealership = useCallback(async (targetAddress: string) => {
+    const refreshed = await client.registro.accounts.concesionario.fetch(
+      address(targetAddress)
+    );
+    const record = { address: targetAddress, data: refreshed.data };
+
+    setDealership((current) =>
+      current?.address === targetAddress ? record : current
+    );
+    setDealerships((current) =>
+      current.map((item) => item.address === targetAddress ? record : item)
+    );
+
+    return record;
+  }, [client]);
+
+  // Re-read the selected dealership whenever the user enters another module.
+  // This keeps the dashboard aligned with the latest confirmed on-chain state.
+  useEffect(() => {
+    if (!dealership?.address) return;
+
+    let cancelled = false;
+    const selectedAddress = dealership.address;
+
+    void client.registro.accounts.concesionario
+      .fetch(address(selectedAddress))
+      .then((refreshed) => {
+        if (cancelled) return;
+        const record = { address: selectedAddress, data: refreshed.data };
+        setDealership((current) =>
+          current?.address === selectedAddress ? record : current
+        );
+        setDealerships((current) =>
+          current.map((item) => item.address === selectedAddress ? record : item)
+        );
+      })
+      .catch((error) => {
+        console.error("No se pudo actualizar el estado del concesionario:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeModule, client, dealership?.address]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -369,8 +414,7 @@ export function DealershipWorkspace({
             nombreConcesionario={dealership.data.nombreConcesionario}
             onRegistered={async () => {
               setCatalogRefreshKey((current) => current + 1);
-              const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
-              setDealership({ address: dealership.address, data: refreshed.data });
+              await refreshDealership(dealership.address);
             }}
           />
           <div className="mt-4">
@@ -379,8 +423,7 @@ export function DealershipWorkspace({
               refreshKey={catalogRefreshKey}
               nombreConcesionario={dealership.data.nombreConcesionario}
               onDeleted={async () => {
-                const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
-                setDealership({ address: dealership.address, data: refreshed.data });
+                await refreshDealership(dealership.address);
               }}
             />
           </div>
@@ -392,8 +435,7 @@ export function DealershipWorkspace({
             concesionario={dealership.address}
             nombreConcesionario={dealership.data.nombreConcesionario}
             onRegistered={async () => {
-              const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
-              setDealership({ address: dealership.address, data: refreshed.data });
+              await refreshDealership(dealership.address);
             }}
           />
         </div>
@@ -405,8 +447,7 @@ export function DealershipWorkspace({
             concesionario={dealership.address}
             nombreConcesionario={dealership.data.nombreConcesionario}
             onRegistered={async () => {
-              const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
-              setDealership({ address: dealership.address, data: refreshed.data });
+              await refreshDealership(dealership.address);
             }}
           />
         </div>
@@ -429,8 +470,7 @@ export function DealershipWorkspace({
             concesionario={dealership.address}
             data={dealership.data}
             onUpdated={async () => {
-              const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
-              setDealership({ address: dealership.address, data: refreshed.data });
+              await refreshDealership(dealership.address);
             }}
           />
         </div>
@@ -442,8 +482,7 @@ export function DealershipWorkspace({
             concesionario={dealership.address}
             nombreConcesionario={dealership.data.nombreConcesionario}
             onRegistered={async () => {
-              const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
-              setDealership({ address: dealership.address, data: refreshed.data });
+              await refreshDealership(dealership.address);
             }}
           />
         </div>
