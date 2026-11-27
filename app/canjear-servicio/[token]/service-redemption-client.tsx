@@ -153,6 +153,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         <p className="mt-5 text-[9px] font-bold tracking-[0.18em] text-[#e60012]">MOTOLEDGER · CANJE TOKEN-2022</p>
         <h1 className="mt-2 text-xl font-bold text-[#252a30]">Autorizar canje de puntos</h1>
         <p className="mt-2 text-xs leading-relaxed text-[#737b84]">Revisa los datos antes de firmar. Tu wallet autorizará la quema de puntos indicada; no compartas tu frase semilla ni claves privadas.</p>
+        <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">Aunque el QR dure 5 minutos, la transacción puede caducar antes. La vigencia se comprueba en Solana justo antes y después de firmar.</p>
         <div className="mt-5 rounded-xl bg-[#f7f8fa] p-4 text-xs">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2"><p className="text-[9px] font-semibold uppercase text-[#9299a1]">Servicio</p><p className="mt-1 font-bold text-[#252a30]">{session.servicioNombre}</p></div>
