@@ -98,7 +98,12 @@ export function MotorcycleRegistration({
           if (existing.data.concesionario !== dealerAddress) {
             failed += 1;
             toast.error(`El identificador de ${item.marca} ${item.modelo} ya está ocupado por otro concesionario.`);
-          } else { skipped += 1; existingModels.add(modelKey); }
+          } else {
+            skipped += 1;
+            const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
+            registeredDealers.add(dealerAddress);
+            existingModels.set(modelKey, registeredDealers);
+          }
           continue;
         }
 
@@ -109,7 +114,9 @@ export function MotorcycleRegistration({
           });
           const result = await instruction.sendTransaction();
           created += 1;
-          existingModels.add(modelKey);
+          const registeredDealers = existingModels.get(modelKey) ?? new Set<string>();
+          registeredDealers.add(dealerAddress);
+          existingModels.set(modelKey, registeredDealers);
           notifyTransactionSuccess(`${item.marca} ${item.modelo} precargada (${item.transmision.toLowerCase()}).`, result.context.signature);
         } catch (error) {
           failed += 1;
