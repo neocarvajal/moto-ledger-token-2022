@@ -22,7 +22,7 @@ import {
   createSolanaRpc,
   createSolanaRpcSubscriptions,
   getAddressEncoder,
-  getBase58Encoder,
+  getBase58Decoder,
   getBase64Encoder,
   getUtf8Encoder,
   getProgramDerivedAddress,
@@ -46,8 +46,8 @@ const accountDiscriminators = {
   sale: accountDiscriminator("Venta"),
   association: accountDiscriminator("AsociacionCliente"),
 };
-const base58 = getBase58Encoder();
-const readAddress = (bytes, offset) => base58.encode(bytes.subarray(offset, offset + 32));
+const base58 = getBase58Decoder();
+const readAddress = (bytes, offset) => base58.decode(bytes.subarray(offset, offset + 32));
 
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const WS_URL = RPC_URL.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
