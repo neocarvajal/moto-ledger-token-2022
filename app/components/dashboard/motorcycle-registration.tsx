@@ -75,7 +75,7 @@ export function MotorcycleRegistration({
           .map((moto) => moto.concesionario)
           .filter((registeredDealer) => registeredDealer !== dealerAddress)
       )];
-      const ownershipChecks = await Promise.all(
+      await Promise.all(
         otherDealershipAddresses.map(async (registeredDealer) => {
           try {
             const account = await client.registro.accounts.concesionario.fetch(address(registeredDealer));
@@ -87,7 +87,6 @@ export function MotorcycleRegistration({
           }
         })
       );
-      void ownershipChecks;
 
       const existingModels = new Map<string, Set<string>>();
       for (const moto of decodedMotos) {
