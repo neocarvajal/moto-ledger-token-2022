@@ -484,10 +484,10 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
               {customers.filter((customer) => sales.some((sale) => sale.data.cliente === customer.address)).map((customer) => <option key={customer.address} value={customer.address}>{customer.data.nombreCliente} · C.I. {customer.data.cedulaCliente}</option>)}
             </select>
           </label>
-          <label className="text-[10px] font-semibold text-[#68717b]">Venta asociada
+          <label className="text-[10px] font-semibold text-[#68717b]">Moto vendida (venta asociada)
             <select value={selectedSale} onChange={(event) => setSelectedSale(event.target.value)} disabled={!customerSales.length} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
               <option value="">Selecciona una venta</option>
-              {customerSales.map((sale) => <option key={sale.address} value={sale.address}>{shortAddress(sale.data.moto)} · {new Date(Number(sale.data.fechaVenta) * 1000).toLocaleDateString("es-VE")}</option>)}
+              {customerSales.map((sale) => <option key={sale.address} value={sale.address}>Moto {shortAddress(sale.data.moto)} · {new Date(Number(sale.data.fechaVenta) * 1000).toLocaleDateString("es-VE")}</option>)}
             </select>
           </label>
           <label className="text-[10px] font-semibold text-[#68717b]">Servicio fuera de garantía
