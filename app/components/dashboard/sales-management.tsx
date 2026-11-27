@@ -37,9 +37,12 @@ import {
 } from "../../lib/moto-ledger/src/generated/accounts/venta";
 import {
   getClienteDecoder,
-  getClienteDiscriminatorBytes,
   type Cliente,
 } from "../../lib/moto-ledger/src/generated/accounts/cliente";
+import {
+  getAsociacionClienteDecoder,
+  getAsociacionClienteDiscriminatorBytes,
+} from "../../lib/moto-ledger/src/generated/accounts/asociacionCliente";
 import type { Concesionario } from "../../lib/moto-ledger/src/generated/accounts/concesionario";
 import type { PuntosVenta } from "../../lib/moto-ledger/src/generated/accounts/puntosVenta";
 
@@ -226,24 +229,38 @@ export function SalesManagement({
     try {
       const ownerFilter = address(connected.account.address) as Base58EncodedBytes;
       const discriminatorFilter = getBase58Decoder().decode(
-        getClienteDiscriminatorBytes()
+        getAsociacionClienteDiscriminatorBytes()
       ) as Base58EncodedBytes;
+      const dealerFilter = address(concesionario) as Base58EncodedBytes;
       const results = await client.rpc
         .getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
           encoding: "base64",
           filters: [
             { memcmp: { offset: 0n, bytes: discriminatorFilter, encoding: "base58" } },
+            { memcmp: { offset: 40n, bytes: dealerFilter, encoding: "base58" } },
             { memcmp: { offset: 8n, bytes: ownerFilter, encoding: "base58" } },
           ],
         })
         .send();
 
-      const found: CustomerRecord[] = results.map((result) => ({
-        address: result.pubkey,
-        data: getClienteDecoder().decode(
+      const associationRecords = results.map((result) =>
+        getAsociacionClienteDecoder().decode(
           getBase64Encoder().encode(result.account.data[0])
-        ),
-      }));
+        )
+      );
+      const customerAddresses = [...new Set(associationRecords.map((item) => item.cliente))];
+      const found: CustomerRecord[] = (await Promise.all(
+        customerAddresses.map(async (customerAddress) => {
+          try {
+            const account = await client.registro.accounts.cliente.fetch(address(customerAddress));
+            return account.data.owner === connected.account.address
+              ? { address: address(customerAddress), data: account.data }
+              : null;
+          } catch {
+            return null;
+          }
+        })
+      )).filter((item): item is CustomerRecord => item !== null);
       found.sort((a, b) => a.data.idCliente - b.data.idCliente);
       setCustomers(found);
       setSelectedCustomerAddress("");
