@@ -223,7 +223,7 @@ pub mod registro {
             return err!(Errores::ClienteYaAsociado);
         }
 
-        let id_cliente = association.id_cliente;
+        let id_cliente = context.accounts.cliente.id_cliente;
 
         msg!("========================================");
         msg!("       CLIENTE REGISTRADO");
