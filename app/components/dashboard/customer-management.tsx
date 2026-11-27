@@ -171,6 +171,7 @@ export function CustomerManagement({
 
     setBusy("preload");
     let createdCount = 0;
+    let alreadyCount = 0;
     let skippedCount = 0;
     try {
       const owner = address(connected.account.address);
@@ -199,13 +200,19 @@ export function CustomerManagement({
           const existingCustomer = await client.registro.accounts.cliente
             .fetch(cliente)
             .catch(() => null);
-          if (existingCustomer) continue;
 
           const [asociacionCliente] = await deriveAsociacionClientePda(dealer, cliente);
           const associationInfo = await client.rpc
             .getAccountInfo(asociacionCliente, { encoding: "base64" })
             .send();
-          if (associationInfo.value) continue;
+          if (existingCustomer && associationInfo.value) {
+            alreadyCount += 1;
+            registered = true;
+            break;
+          }
+          // Una identidad global existente no se asocia automáticamente aquí:
+          // podría pertenecer a otro concesionario y debe añadirse manualmente.
+          if (existingCustomer || associationInfo.value) continue;
 
           const instruction = client.registro.instructions.registrarCliente({
             owner: connected.signer,
@@ -216,7 +223,8 @@ export function CustomerManagement({
             cedulaCliente: cedulaDemo,
             nombreCliente: demo.nombre,
           });
-          await instruction.sendTransaction();
+          const result = await instruction.sendTransaction();
+          notifyTransactionSuccess("Cliente de demostración registrado.", result.context.signature);
           createdCount += 1;
           registered = true;
           break;
@@ -228,6 +236,9 @@ export function CustomerManagement({
       await onRegistered();
       if (createdCount > 0) {
         toast.success(`Se precargaron ${createdCount} clientes de demostración.`);
+      }
+      if (alreadyCount > 0) {
+        toast.info(`${alreadyCount} cliente(s) de demostración ya estaban registrados; no se duplicaron.`);
       }
       if (skippedCount > 0) {
         toast.info(`${skippedCount} cliente(s) no se pudieron precargar porque no había una cédula de demostración disponible.`);
