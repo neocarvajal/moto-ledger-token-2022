@@ -178,7 +178,7 @@ export function SalesManagement({
       setSerial((current) =>
         motoRecords.some((item) => item.data.serial === current && !item.data.vendida)
           ? current
-          : motoRecords.find((item) => !item.data.vendida)?.data.serial ?? ""
+          : ""
       );
     } catch (error) {
       console.error("No se pudieron cargar las ventas:", error);
@@ -246,12 +246,10 @@ export function SalesManagement({
       }));
       found.sort((a, b) => a.data.idCliente - b.data.idCliente);
       setCustomers(found);
-      const selected = found[0] ?? null;
-      setSelectedCustomerAddress(selected?.address ?? "");
-      setCedula(selected ? String(selected.data.cedulaCliente) : "");
-      setCustomerName(selected?.data.nombreCliente ?? "");
-      if (selected) void checkCustomerWallet(selected.address);
-      else {
+      setSelectedCustomerAddress("");
+      setCedula("");
+      setCustomerName("");
+      {
         setCustomerWalletStatus("idle");
         setCustomerWalletAddress("");
       }
@@ -520,11 +518,11 @@ export function SalesManagement({
           <label className="block sm:col-span-2">
             <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#555e68]">1. Moto disponible</span>
             <select value={serial} onChange={(event) => setSerial(event.target.value)} required className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]">
-              {availableMotorcycles.length === 0 ? <option value="">No hay unidades disponibles</option> : availableMotorcycles.map((item) => (
+              {availableMotorcycles.length === 0 ? <option value="">No hay unidades disponibles</option> : <><option value="">Selecciona una moto</option>{availableMotorcycles.map((item) => (
                 <option key={item.address} value={item.data.serial}>
                   {item.data.marca} {item.data.modelo} · {item.data.serial} · {item.data.placa}
                 </option>
-              ))}
+              ))}</>}
             </select>
             {availableMotorcycles.length === 0 && <span className="mt-1 block text-[9px] text-[#a0a6ad]">Registra una moto antes de crear una venta.</span>}
           </label>
