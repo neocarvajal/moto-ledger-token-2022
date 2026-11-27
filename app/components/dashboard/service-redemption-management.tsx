@@ -49,7 +49,7 @@ type SelectedSale = Sale & {
   };
 };
 type Service = { id: number; nombre: string; descripcion: string; puntos: bigint; activo: boolean };
-type RedemptionSession = { token: string; url: string; expiresAt: number };
+type RedemptionSession = { token: string; url: string; expiresAt: number; idCanje: string };
 type Receipt = { signature: string; address: string; points: bigint };
 
 function shortAddress(value: string) {
@@ -251,8 +251,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   await new Promise((resolve) => window.setTimeout(resolve, 1500));
                 }
                 if (!confirmed) throw new Error("La transacción fue enviada, pero aún no tiene confirmación. Revisa la firma en Explorer.");
-                const idCanje = BigInt(Date.now());
-                // Receipt address is derived from the exact nonce stored in the signed request.
+                const idCanje = BigInt(data.idCanje);
+                // Verify the immutable on-chain receipt using the nonce bound to the QR session.
                 const [receiptPda] = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
                 const receiptAccount = await client.registro.accounts.canjeServicio.fetch(receiptPda).catch(() => null);
                 if (!receiptAccount) {
@@ -277,6 +277,10 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   }, [session, client, selectedCustomer, loadChainData, loadCustomerBalance]);
 
   const startRedemption = async () => {
+    if (cluster === "localnet") {
+      toast.error("El canje por QR requiere una red pública accesible desde el teléfono.");
+      return;
+    }
     if (!connected?.signer || !connected.account.address) {
       toast.error("Conecta la wallet propietaria del concesionario.");
       return;
@@ -382,7 +386,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       const responsePayload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(responsePayload.error ?? "No se pudo preparar la transacción de canje.");
       const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, "");
-      setSession({ token: tokenPayload.token, url: `${publicUrl}/canjear-servicio/${tokenPayload.token}`, expiresAt: Date.now() + 300_000 });
+      setSession({ token: tokenPayload.token, url: `${publicUrl}/canjear-servicio/${tokenPayload.token}`, expiresAt: Date.now() + 300_000, idCanje: idCanje.toString() });
       setReceipt(null);
     } catch (error) {
       console.error("Service redemption preparation:", error);
@@ -400,7 +404,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         <div>
           <p className="text-[9px] font-bold tracking-[0.16em] text-[#e60012]">TOKEN-2022 · POSVENTA</p>
           <h3 className="mt-2 text-[14px] font-bold text-[#252a30]">Canje de puntos por servicios</h3>
-          <p className="mt-1 text-[10px] text-[#858d96]">Los datos se consultan desde Solana. El QR solo transporta la solicitud temporal de firma.</p>
+          <p className="mt-1 text-[10px] text-[#858d96]">{nombreConcesionario} · Los datos se consultan desde Solana. El QR solo transporta la solicitud temporal de firma.</p>
         </div>
         <button type="button" onClick={() => void loadChainData()} disabled={loading || busy} className="rounded-lg border border-[#e2e5e8] px-3 py-2 text-[10px] font-semibold text-[#424950] disabled:opacity-50">Actualizar blockchain</button>
       </div>
