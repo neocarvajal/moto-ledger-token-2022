@@ -230,7 +230,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       void fetch(`/api/service-redemption/${session.token}`, { cache: "no-store" })
         .then(async (response) => {
           if (!response.ok) throw new Error("La solicitud de canje expiró.");
-          return response.json() as Promise<{ status: string; signedTransaction: string | null }>;
+          return response.json() as Promise<{ status: string; signedTransaction: string | null; idCanje: string }>;
         })
         .then((data) => {
           if (data.status === "signed" && data.signedTransaction && !sendingRef.current) {
