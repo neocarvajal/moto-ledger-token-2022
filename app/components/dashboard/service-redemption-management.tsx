@@ -526,8 +526,12 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       {selectedCustomerRecord && <div className="mt-4 rounded-lg bg-[#f7f8fa] p-3 text-xs">
         <div className="flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Wallet vinculada</span><strong className="font-mono text-[#252a30]">{checking ? "Consultando…" : wallet ? shortAddress(wallet) : "No vinculada"}</strong></div>
         <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Saldo Token-2022</span><strong className="text-[#252a30]">{balance === null ? "—" : balance.toLocaleString("es-VE") + " puntos"}</strong></div>
-        {saleDetails && <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>
-        <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Último kilometraje registrado</span><strong className="text-[#252a30]">{saleDetails.kilometrajeActual.toLocaleString("es-VE")} km</strong></div>}
+        {saleDetails && (
+          <>
+            <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>
+            <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Último kilometraje registrado</span><strong className="text-[#252a30]">{saleDetails.kilometrajeActual.toLocaleString("es-VE")} km</strong></div>
+          </>
+        )}
       </div>}
 
       {selectedCustomerRecord && (
