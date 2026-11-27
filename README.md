@@ -254,14 +254,12 @@ Las operaciones que modifican el estado se envían al programa desplegado y requ
 
 The current program stores each customer globally per owner and stores a separate PDA for each dealership/customer relationship. Existing sales provide reliable evidence for reconstructing historical relationships.
 
-After deploying the updated Anchor program and regenerating the Codama clients, run the migration utility from the repository root:
+After deploying the updated Anchor program, run the migration utility from the repository root:
 
 ```bash
 git pull origin main
 npm install
 ```
-
-Then regenerate the Codama clients using the project's existing Codama configuration and workflow before running the migration script.
 
 The script defaults to a **dry run** and writes `customer-association-migration-report.json`:
 
