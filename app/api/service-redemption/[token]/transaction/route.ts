@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { address, getBase64Encoder, getTransactionDecoder } from "@solana/kit";
-import { getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../../lib/service-redemption-store";
+import { claimServiceRedemptionValue, getServiceRedemptionSession, updateServiceRedemptionSession } from "../../../../../lib/service-redemption-store";
 
 export const runtime = "nodejs";
 
@@ -27,6 +27,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         hasSignature(transaction.signatures[address(session.walletAddress)])) {
       return NextResponse.json({ error: "La transacción debe estar firmada por el concesionario y pendiente de la firma del cliente." }, { status: 400 });
     }
+
+    const claimed = await claimServiceRedemptionValue(token, "transaction", body.transaction);
+    if (!claimed) return NextResponse.json({ error: "Ya se publicó una transacción para esta solicitud." }, { status: 409 });
 
     const updated = await updateServiceRedemptionSession(token, (current) => ({
       ...current,
