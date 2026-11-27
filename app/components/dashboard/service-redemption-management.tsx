@@ -197,7 +197,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   );
 
   useEffect(() => {
-    setSelectedSale((current) => customerSales.some((sale) => sale.address === current) ? current : customerSales[0]?.address ?? "");
+    setSelectedSale((current) => customerSales.some((sale) => sale.address === current) ? current : "");
   }, [customerSales]);
 
   const [saleDetails, setSaleDetails] = useState<SelectedSale | null>(null);
@@ -457,13 +457,14 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       {loading ? <p className="mt-4 text-xs text-[#68717b]">Consultando clientes, ventas y configuración en Solana…</p> : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="text-[10px] font-semibold text-[#68717b]">Cliente registrado en el concesionario
-            <select value={selectedCustomer} onChange={(event) => { setSelectedCustomer(event.target.value); setReceipt(null); }} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+            <select value={selectedCustomer} onChange={(event) => { setSelectedCustomer(event.target.value); setSelectedSale(""); setReceipt(null); }} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
               <option value="">Selecciona un cliente</option>
               {customers.filter((customer) => sales.some((sale) => sale.data.cliente === customer.address)).map((customer) => <option key={customer.address} value={customer.address}>{customer.data.nombreCliente} · C.I. {customer.data.cedulaCliente}</option>)}
             </select>
           </label>
           <label className="text-[10px] font-semibold text-[#68717b]">Venta asociada
             <select value={selectedSale} onChange={(event) => setSelectedSale(event.target.value)} disabled={!customerSales.length} className="mt-1 w-full rounded-lg border border-[#e2e5e8] bg-white p-3 text-xs text-[#252a30]">
+              <option value="">Selecciona una venta</option>
               {customerSales.map((sale) => <option key={sale.address} value={sale.address}>{shortAddress(sale.data.moto)} · {new Date(Number(sale.data.fechaVenta) * 1000).toLocaleDateString("es-VE")}</option>)}
             </select>
           </label>
