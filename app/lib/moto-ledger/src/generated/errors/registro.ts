@@ -93,6 +93,10 @@ export const REGISTRO_ERROR__CONTADOR_INVALIDO = 0x1794; // 6036
 export const REGISTRO_ERROR__CLIENTE_SIN_COMPRAS = 0x1795; // 6037
 /** MetadataCidInvalido: El CID debe contener entre 1 y 100 caracteres alfanuméricos */
 export const REGISTRO_ERROR__METADATA_CID_INVALIDO = 0x1796; // 6038
+/** KilometrajeMotoInvalido: El registro de kilometraje no corresponde a esta moto o concesionario */
+export const REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO = 0x1797; // 6039
+/** KilometrajeDecreciente: El kilometraje no puede ser inferior al último valor registrado */
+export const REGISTRO_ERROR__KILOMETRAJE_DECRECIENTE = 0x1798; // 6040
 
 export type RegistroError =
   | typeof REGISTRO_ERROR__ASOCIACION_CLIENTE_INACTIVA
@@ -113,8 +117,10 @@ export type RegistroError =
   | typeof REGISTRO_ERROR__GARANTIA_NO_INICIADA
   | typeof REGISTRO_ERROR__GARANTIA_VENCIDA
   | typeof REGISTRO_ERROR__ID_CANJE_INVALIDO
+  | typeof REGISTRO_ERROR__KILOMETRAJE_DECRECIENTE
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO
   | typeof REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO
+  | typeof REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO
   | typeof REGISTRO_ERROR__METADATA_CID_INVALIDO
   | typeof REGISTRO_ERROR__MINT_INVALIDO
   | typeof REGISTRO_ERROR__MINT_NO_TRANSFERIBLE
@@ -156,8 +162,10 @@ if (process.env["NODE_ENV"] !== "production") {
     [REGISTRO_ERROR__GARANTIA_NO_INICIADA]: `La garantia aun no ha comenzado`,
     [REGISTRO_ERROR__GARANTIA_VENCIDA]: `La garantia ha vencido`,
     [REGISTRO_ERROR__ID_CANJE_INVALIDO]: `El identificador del canje debe ser mayor a cero`,
+    [REGISTRO_ERROR__KILOMETRAJE_DECRECIENTE]: `El kilometraje no puede ser inferior al último valor registrado`,
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_EXCEDIDO]: `El kilometraje supera el limite de la garantia`,
     [REGISTRO_ERROR__KILOMETRAJE_GARANTIA_INVALIDO]: `El kilometraje maximo debe ser mayor a cero`,
+    [REGISTRO_ERROR__KILOMETRAJE_MOTO_INVALIDO]: `El registro de kilometraje no corresponde a esta moto o concesionario`,
     [REGISTRO_ERROR__METADATA_CID_INVALIDO]: `El CID debe contener entre 1 y 100 caracteres alfanuméricos`,
     [REGISTRO_ERROR__MINT_INVALIDO]: `El mint no coincide con el configurado para este concesionario`,
     [REGISTRO_ERROR__MINT_NO_TRANSFERIBLE]: `El mint debe tener activa la extension NonTransferable de Token-2022`,

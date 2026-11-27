@@ -66,6 +66,7 @@ export type CanjearServicioInstruction<
   TAccountWalletCliente extends string | AccountMeta<string> = string,
   TAccountVenta extends string | AccountMeta<string> = string,
   TAccountMoto extends string | AccountMeta<string> = string,
+  TAccountKilometrajeMoto extends string | AccountMeta<string> = string,
   TAccountGarantia extends string | AccountMeta<string> = string,
   TAccountMint extends string | AccountMeta<string> = string,
   TAccountTokenAccount extends string | AccountMeta<string> = string,
@@ -108,6 +109,9 @@ export type CanjearServicioInstruction<
       TAccountMoto extends string
         ? ReadonlyAccount<TAccountMoto>
         : TAccountMoto,
+      TAccountKilometrajeMoto extends string
+        ? WritableAccount<TAccountKilometrajeMoto>
+        : TAccountKilometrajeMoto,
       TAccountGarantia extends string
         ? ReadonlyAccount<TAccountGarantia>
         : TAccountGarantia,
@@ -188,6 +192,8 @@ export type CanjearServicioInput<
     InstructionAccountInput,
   TAccountVenta extends InstructionAccountInput = InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput = InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput = InstructionAccountInput,
   TAccountMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountTokenAccount extends InstructionAccountInput =
@@ -208,6 +214,7 @@ export type CanjearServicioInput<
   walletCliente: TAccountWalletCliente;
   venta: TAccountVenta;
   moto: TAccountMoto;
+  kilometrajeMoto: TAccountKilometrajeMoto;
   garantia: TAccountGarantia;
   mint: TAccountMint;
   tokenAccount: TAccountTokenAccount;
@@ -229,6 +236,7 @@ export function getCanjearServicioInstruction<
   TAccountWalletCliente extends InstructionAccountInput,
   TAccountVenta extends InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput,
   TAccountMint extends InstructionAccountInput,
   TAccountTokenAccount extends InstructionAccountInput,
@@ -247,6 +255,7 @@ export function getCanjearServicioInstruction<
     TAccountWalletCliente,
     TAccountVenta,
     TAccountMoto,
+    TAccountKilometrajeMoto,
     TAccountGarantia,
     TAccountMint,
     TAccountTokenAccount,
@@ -294,6 +303,10 @@ export function getCanjearServicioInstruction<
   ResolvedInstructionAccountMeta<
     TAccountMoto,
     InstructionAccountInputAddress<TAccountMoto>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountKilometrajeMoto,
+    InstructionAccountInputAddress<TAccountKilometrajeMoto>
   >,
   ResolvedInstructionAccountMeta<
     TAccountGarantia,
@@ -362,6 +375,11 @@ export function getCanjearServicioInstruction<
     },
     venta: { value: input.venta ?? null, isSigner: false, isWritable: false },
     moto: { value: input.moto ?? null, isSigner: false, isWritable: false },
+    kilometrajeMoto: {
+      value: input.kilometrajeMoto ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     garantia: {
       value: input.garantia ?? null,
       isSigner: false,
@@ -418,6 +436,7 @@ export function getCanjearServicioInstruction<
       getAccountMeta("walletCliente", accounts.walletCliente),
       getAccountMeta("venta", accounts.venta),
       getAccountMeta("moto", accounts.moto),
+      getAccountMeta("kilometrajeMoto", accounts.kilometrajeMoto),
       getAccountMeta("garantia", accounts.garantia),
       getAccountMeta("mint", accounts.mint),
       getAccountMeta("tokenAccount", accounts.tokenAccount),
@@ -468,6 +487,10 @@ export function getCanjearServicioInstruction<
       InstructionAccountInputAddress<TAccountMoto>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountKilometrajeMoto,
+      InstructionAccountInputAddress<TAccountKilometrajeMoto>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountGarantia,
       InstructionAccountInputAddress<TAccountGarantia>
     >,
@@ -509,12 +532,13 @@ export type ParsedCanjearServicioInstruction<
     walletCliente: TAccountMetas[6];
     venta: TAccountMetas[7];
     moto: TAccountMetas[8];
-    garantia: TAccountMetas[9];
-    mint: TAccountMetas[10];
-    tokenAccount: TAccountMetas[11];
-    canjeServicio: TAccountMetas[12];
-    tokenProgram: TAccountMetas[13];
-    systemProgram: TAccountMetas[14];
+    kilometrajeMoto: TAccountMetas[9];
+    garantia: TAccountMetas[10];
+    mint: TAccountMetas[11];
+    tokenAccount: TAccountMetas[12];
+    canjeServicio: TAccountMetas[13];
+    tokenProgram: TAccountMetas[14];
+    systemProgram: TAccountMetas[15];
   };
   data: CanjearServicioInstructionData;
 };
@@ -527,12 +551,12 @@ export function parseCanjearServicioInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedCanjearServicioInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 15) {
+  if (instruction.accounts.length < 16) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 15,
+        expectedAccountMetas: 16,
       }
     );
   }
@@ -554,6 +578,7 @@ export function parseCanjearServicioInstruction<
       walletCliente: getNextAccount(),
       venta: getNextAccount(),
       moto: getNextAccount(),
+      kilometrajeMoto: getNextAccount(),
       garantia: getNextAccount(),
       mint: getNextAccount(),
       tokenAccount: getNextAccount(),

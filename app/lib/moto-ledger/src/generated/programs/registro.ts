@@ -41,6 +41,7 @@ import {
   getClienteCodec,
   getConcesionarioCodec,
   getGarantiaCodec,
+  getKilometrajeMotoCodec,
   getMetadataFidelidadCodec,
   getMotoCodec,
   getProgramaFidelidadCodec,
@@ -62,6 +63,8 @@ import {
   type ConcesionarioArgs,
   type Garantia,
   type GarantiaArgs,
+  type KilometrajeMoto,
+  type KilometrajeMotoArgs,
   type MetadataFidelidad,
   type MetadataFidelidadArgs,
   type Moto,
@@ -177,6 +180,7 @@ export enum RegistroAccount {
   RegistroGlobal,
   Concesionario,
   Moto,
+  KilometrajeMoto,
   Garantia,
   Cliente,
   AsociacionCliente,
@@ -287,6 +291,17 @@ export function identifyRegistroAccount(
     )
   ) {
     return RegistroAccount.Moto;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([63, 87, 70, 218, 123, 102, 225, 46])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.KilometrajeMoto;
   }
   if (
     containsBytes(
@@ -856,6 +871,8 @@ export type RegistroPluginAccounts = {
   concesionario: ReturnType<typeof getConcesionarioCodec> &
     SelfFetchFunctions<ConcesionarioArgs, Concesionario>;
   moto: ReturnType<typeof getMotoCodec> & SelfFetchFunctions<MotoArgs, Moto>;
+  kilometrajeMoto: ReturnType<typeof getKilometrajeMotoCodec> &
+    SelfFetchFunctions<KilometrajeMotoArgs, KilometrajeMoto>;
   garantia: ReturnType<typeof getGarantiaCodec> &
     SelfFetchFunctions<GarantiaArgs, Garantia>;
   cliente: ReturnType<typeof getClienteCodec> &
@@ -1008,6 +1025,10 @@ export function registroProgram(
           ),
           concesionario: addSelfFetchFunctions(client, getConcesionarioCodec()),
           moto: addSelfFetchFunctions(client, getMotoCodec()),
+          kilometrajeMoto: addSelfFetchFunctions(
+            client,
+            getKilometrajeMotoCodec()
+          ),
           garantia: addSelfFetchFunctions(client, getGarantiaCodec()),
           cliente: addSelfFetchFunctions(client, getClienteCodec()),
           asociacionCliente: addSelfFetchFunctions(

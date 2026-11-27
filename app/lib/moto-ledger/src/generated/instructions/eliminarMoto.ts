@@ -62,6 +62,7 @@ export type EliminarMotoInstruction<
   TAccountOwner extends string | AccountMeta<string> = string,
   TAccountConcesionario extends string | AccountMeta<string> = string,
   TAccountMoto extends string | AccountMeta<string> = string,
+  TAccountKilometrajeMoto extends string | AccountMeta<string> = string,
   TAccountGarantia extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
@@ -80,6 +81,9 @@ export type EliminarMotoInstruction<
       TAccountMoto extends string
         ? WritableAccount<TAccountMoto>
         : TAccountMoto,
+      TAccountKilometrajeMoto extends string
+        ? WritableAccount<TAccountKilometrajeMoto>
+        : TAccountKilometrajeMoto,
       TAccountGarantia extends string
         ? WritableAccount<TAccountGarantia>
         : TAccountGarantia,
@@ -141,6 +145,8 @@ export type EliminarMotoInput<
   TAccountConcesionario extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput = InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput = InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
@@ -148,6 +154,7 @@ export type EliminarMotoInput<
   owner: TAccountOwner;
   concesionario: TAccountConcesionario;
   moto: TAccountMoto;
+  kilometrajeMoto: TAccountKilometrajeMoto;
   garantia: TAccountGarantia;
   systemProgram?: TAccountSystemProgram;
   nombreConcesionario: EliminarMotoInstructionDataArgs["nombreConcesionario"];
@@ -158,6 +165,7 @@ export function getEliminarMotoInstruction<
   TAccountOwner extends InstructionSignerInput,
   TAccountConcesionario extends InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof REGISTRO_PROGRAM_ADDRESS,
@@ -166,6 +174,7 @@ export function getEliminarMotoInstruction<
     TAccountOwner,
     TAccountConcesionario,
     TAccountMoto,
+    TAccountKilometrajeMoto,
     TAccountGarantia,
     TAccountSystemProgram
   >,
@@ -185,6 +194,10 @@ export function getEliminarMotoInstruction<
   ResolvedInstructionAccountMeta<
     TAccountMoto,
     InstructionAccountInputAddress<TAccountMoto>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountKilometrajeMoto,
+    InstructionAccountInputAddress<TAccountKilometrajeMoto>
   >,
   ResolvedInstructionAccountMeta<
     TAccountGarantia,
@@ -215,6 +228,11 @@ export function getEliminarMotoInstruction<
       isWritable: true,
     },
     moto: { value: input.moto ?? null, isSigner: false, isWritable: true },
+    kilometrajeMoto: {
+      value: input.kilometrajeMoto ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     garantia: {
       value: input.garantia ?? null,
       isSigner: false,
@@ -245,6 +263,7 @@ export function getEliminarMotoInstruction<
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("concesionario", accounts.concesionario),
       getAccountMeta("moto", accounts.moto),
+      getAccountMeta("kilometrajeMoto", accounts.kilometrajeMoto),
       getAccountMeta("garantia", accounts.garantia),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
@@ -267,6 +286,10 @@ export function getEliminarMotoInstruction<
       InstructionAccountInputAddress<TAccountMoto>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountKilometrajeMoto,
+      InstructionAccountInputAddress<TAccountKilometrajeMoto>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountGarantia,
       InstructionAccountInputAddress<TAccountGarantia>
     >,
@@ -286,8 +309,9 @@ export type ParsedEliminarMotoInstruction<
     owner: TAccountMetas[0];
     concesionario: TAccountMetas[1];
     moto: TAccountMetas[2];
-    garantia: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
+    kilometrajeMoto: TAccountMetas[3];
+    garantia: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
   };
   data: EliminarMotoInstructionData;
 };
@@ -300,12 +324,12 @@ export function parseEliminarMotoInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedEliminarMotoInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 6) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 5,
+        expectedAccountMetas: 6,
       }
     );
   }
@@ -321,6 +345,7 @@ export function parseEliminarMotoInstruction<
       owner: getNextAccount(),
       concesionario: getNextAccount(),
       moto: getNextAccount(),
+      kilometrajeMoto: getNextAccount(),
       garantia: getNextAccount(),
       systemProgram: getNextAccount(),
     },

@@ -63,6 +63,7 @@ export type RegistrarMotoInstruction<
   TAccountConcesionario extends string | AccountMeta<string> = string,
   TAccountGarantia extends string | AccountMeta<string> = string,
   TAccountMoto extends string | AccountMeta<string> = string,
+  TAccountKilometrajeMoto extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -83,6 +84,9 @@ export type RegistrarMotoInstruction<
       TAccountMoto extends string
         ? WritableAccount<TAccountMoto>
         : TAccountMoto,
+      TAccountKilometrajeMoto extends string
+        ? WritableAccount<TAccountKilometrajeMoto>
+        : TAccountKilometrajeMoto,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -148,6 +152,8 @@ export type RegistrarMotoInput<
     InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput = InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput = InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
 > = {
@@ -155,6 +161,7 @@ export type RegistrarMotoInput<
   concesionario: TAccountConcesionario;
   garantia: TAccountGarantia;
   moto: TAccountMoto;
+  kilometrajeMoto: TAccountKilometrajeMoto;
   systemProgram?: TAccountSystemProgram;
   serial: RegistrarMotoInstructionDataArgs["serial"];
   placa: RegistrarMotoInstructionDataArgs["placa"];
@@ -168,6 +175,7 @@ export function getRegistrarMotoInstruction<
   TAccountConcesionario extends InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof REGISTRO_PROGRAM_ADDRESS,
 >(
@@ -176,6 +184,7 @@ export function getRegistrarMotoInstruction<
     TAccountConcesionario,
     TAccountGarantia,
     TAccountMoto,
+    TAccountKilometrajeMoto,
     TAccountSystemProgram
   >,
   config?: {
@@ -198,6 +207,10 @@ export function getRegistrarMotoInstruction<
   ResolvedInstructionAccountMeta<
     TAccountMoto,
     InstructionAccountInputAddress<TAccountMoto>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountKilometrajeMoto,
+    InstructionAccountInputAddress<TAccountKilometrajeMoto>
   >,
   ResolvedInstructionAccountMeta<
     TAccountSystemProgram,
@@ -229,6 +242,11 @@ export function getRegistrarMotoInstruction<
       isWritable: true,
     },
     moto: { value: input.moto ?? null, isSigner: false, isWritable: true },
+    kilometrajeMoto: {
+      value: input.kilometrajeMoto ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     systemProgram: {
       value: input.systemProgram ?? null,
       isSigner: false,
@@ -255,6 +273,7 @@ export function getRegistrarMotoInstruction<
       getAccountMeta("concesionario", accounts.concesionario),
       getAccountMeta("garantia", accounts.garantia),
       getAccountMeta("moto", accounts.moto),
+      getAccountMeta("kilometrajeMoto", accounts.kilometrajeMoto),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getRegistrarMotoInstructionDataEncoder().encode(
@@ -280,6 +299,10 @@ export function getRegistrarMotoInstruction<
       InstructionAccountInputAddress<TAccountMoto>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountKilometrajeMoto,
+      InstructionAccountInputAddress<TAccountKilometrajeMoto>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
     >
@@ -296,7 +319,8 @@ export type ParsedRegistrarMotoInstruction<
     concesionario: TAccountMetas[1];
     garantia: TAccountMetas[2];
     moto: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
+    kilometrajeMoto: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
   };
   data: RegistrarMotoInstructionData;
 };
@@ -309,12 +333,12 @@ export function parseRegistrarMotoInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedRegistrarMotoInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 6) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 5,
+        expectedAccountMetas: 6,
       }
     );
   }
@@ -331,6 +355,7 @@ export function parseRegistrarMotoInstruction<
       concesionario: getNextAccount(),
       garantia: getNextAccount(),
       moto: getNextAccount(),
+      kilometrajeMoto: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getRegistrarMotoInstructionDataDecoder().decode(instruction.data),

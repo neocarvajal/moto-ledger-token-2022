@@ -64,6 +64,7 @@ export type ReclamarGarantiaInstruction<
   TAccountConcesionario extends string | AccountMeta<string> = string,
   TAccountMoto extends string | AccountMeta<string> = string,
   TAccountGarantia extends string | AccountMeta<string> = string,
+  TAccountKilometrajeMoto extends string | AccountMeta<string> = string,
   TAccountReclamacion extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
@@ -85,6 +86,9 @@ export type ReclamarGarantiaInstruction<
       TAccountGarantia extends string
         ? ReadonlyAccount<TAccountGarantia>
         : TAccountGarantia,
+      TAccountKilometrajeMoto extends string
+        ? WritableAccount<TAccountKilometrajeMoto>
+        : TAccountKilometrajeMoto,
       TAccountReclamacion extends string
         ? WritableAccount<TAccountReclamacion>
         : TAccountReclamacion,
@@ -155,6 +159,8 @@ export type ReclamarGarantiaInput<
     InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput = InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput = InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountReclamacion extends InstructionAccountInput = InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
@@ -163,6 +169,7 @@ export type ReclamarGarantiaInput<
   concesionario: TAccountConcesionario;
   moto: TAccountMoto;
   garantia: TAccountGarantia;
+  kilometrajeMoto: TAccountKilometrajeMoto;
   reclamacion: TAccountReclamacion;
   systemProgram?: TAccountSystemProgram;
   nombreConcesionario: ReclamarGarantiaInstructionDataArgs["nombreConcesionario"];
@@ -176,6 +183,7 @@ export function getReclamarGarantiaInstruction<
   TAccountConcesionario extends InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput,
   TAccountGarantia extends InstructionAccountInput,
+  TAccountKilometrajeMoto extends InstructionAccountInput,
   TAccountReclamacion extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof REGISTRO_PROGRAM_ADDRESS,
@@ -185,6 +193,7 @@ export function getReclamarGarantiaInstruction<
     TAccountConcesionario,
     TAccountMoto,
     TAccountGarantia,
+    TAccountKilometrajeMoto,
     TAccountReclamacion,
     TAccountSystemProgram
   >,
@@ -208,6 +217,10 @@ export function getReclamarGarantiaInstruction<
   ResolvedInstructionAccountMeta<
     TAccountGarantia,
     InstructionAccountInputAddress<TAccountGarantia>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountKilometrajeMoto,
+    InstructionAccountInputAddress<TAccountKilometrajeMoto>
   >,
   ResolvedInstructionAccountMeta<
     TAccountReclamacion,
@@ -243,6 +256,11 @@ export function getReclamarGarantiaInstruction<
       isSigner: false,
       isWritable: false,
     },
+    kilometrajeMoto: {
+      value: input.kilometrajeMoto ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     reclamacion: {
       value: input.reclamacion ?? null,
       isSigner: false,
@@ -274,6 +292,7 @@ export function getReclamarGarantiaInstruction<
       getAccountMeta("concesionario", accounts.concesionario),
       getAccountMeta("moto", accounts.moto),
       getAccountMeta("garantia", accounts.garantia),
+      getAccountMeta("kilometrajeMoto", accounts.kilometrajeMoto),
       getAccountMeta("reclamacion", accounts.reclamacion),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
@@ -300,6 +319,10 @@ export function getReclamarGarantiaInstruction<
       InstructionAccountInputAddress<TAccountGarantia>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountKilometrajeMoto,
+      InstructionAccountInputAddress<TAccountKilometrajeMoto>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountReclamacion,
       InstructionAccountInputAddress<TAccountReclamacion>
     >,
@@ -320,8 +343,9 @@ export type ParsedReclamarGarantiaInstruction<
     concesionario: TAccountMetas[1];
     moto: TAccountMetas[2];
     garantia: TAccountMetas[3];
-    reclamacion: TAccountMetas[4];
-    systemProgram: TAccountMetas[5];
+    kilometrajeMoto: TAccountMetas[4];
+    reclamacion: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
   };
   data: ReclamarGarantiaInstructionData;
 };
@@ -334,12 +358,12 @@ export function parseReclamarGarantiaInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedReclamarGarantiaInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 7) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 6,
+        expectedAccountMetas: 7,
       }
     );
   }
@@ -356,6 +380,7 @@ export function parseReclamarGarantiaInstruction<
       concesionario: getNextAccount(),
       moto: getNextAccount(),
       garantia: getNextAccount(),
+      kilometrajeMoto: getNextAccount(),
       reclamacion: getNextAccount(),
       systemProgram: getNextAccount(),
     },
