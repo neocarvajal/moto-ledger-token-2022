@@ -45,7 +45,7 @@ const EXECUTE = process.argv.includes("--execute");
 const utf8 = getUtf8Encoder();
 const addressEncoder = getAddressEncoder();
 const seed = (value) => utf8.encode(value);
-const key = (value) => addressEncoder.encode(value as ReturnType<typeof address>);
+const key = (value) => addressEncoder.encode(address(value));
 
 async function deriveAssociation(dealership, customer) {
   return getProgramDerivedAddress({
