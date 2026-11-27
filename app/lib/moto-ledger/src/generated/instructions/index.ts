@@ -18,6 +18,7 @@ export * from "./eliminarMoto";
 export * from "./inicializarCatalogoServicios";
 export * from "./otorgarPuntos";
 export * from "./reclamarGarantia";
+export * from "./registrarAsociacionCliente";
 export * from "./registrarCliente";
 export * from "./registrarConcesionario";
 export * from "./registrarMetadataFidelidad";

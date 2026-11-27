@@ -64,6 +64,7 @@ export type RegistrarVentaInstruction<
   TAccountOwner extends string | AccountMeta<string> = string,
   TAccountConcesionario extends string | AccountMeta<string> = string,
   TAccountCliente extends string | AccountMeta<string> = string,
+  TAccountAsociacionCliente extends string | AccountMeta<string> = string,
   TAccountMoto extends string | AccountMeta<string> = string,
   TAccountVenta extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
@@ -83,6 +84,9 @@ export type RegistrarVentaInstruction<
       TAccountCliente extends string
         ? WritableAccount<TAccountCliente>
         : TAccountCliente,
+      TAccountAsociacionCliente extends string
+        ? ReadonlyAccount<TAccountAsociacionCliente>
+        : TAccountAsociacionCliente,
       TAccountMoto extends string
         ? WritableAccount<TAccountMoto>
         : TAccountMoto,
@@ -155,6 +159,8 @@ export type RegistrarVentaInput<
   TAccountConcesionario extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountCliente extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAsociacionCliente extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput = InstructionAccountInput,
   TAccountVenta extends InstructionAccountInput = InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
@@ -163,6 +169,7 @@ export type RegistrarVentaInput<
   owner: TAccountOwner;
   concesionario: TAccountConcesionario;
   cliente: TAccountCliente;
+  asociacionCliente: TAccountAsociacionCliente;
   moto: TAccountMoto;
   venta: TAccountVenta;
   systemProgram?: TAccountSystemProgram;
@@ -176,6 +183,7 @@ export function getRegistrarVentaInstruction<
   TAccountOwner extends InstructionSignerInput,
   TAccountConcesionario extends InstructionAccountInput,
   TAccountCliente extends InstructionAccountInput,
+  TAccountAsociacionCliente extends InstructionAccountInput,
   TAccountMoto extends InstructionAccountInput,
   TAccountVenta extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
@@ -185,6 +193,7 @@ export function getRegistrarVentaInstruction<
     TAccountOwner,
     TAccountConcesionario,
     TAccountCliente,
+    TAccountAsociacionCliente,
     TAccountMoto,
     TAccountVenta,
     TAccountSystemProgram
@@ -205,6 +214,10 @@ export function getRegistrarVentaInstruction<
   ResolvedInstructionAccountMeta<
     TAccountCliente,
     InstructionAccountInputAddress<TAccountCliente>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAsociacionCliente,
+    InstructionAccountInputAddress<TAccountAsociacionCliente>
   >,
   ResolvedInstructionAccountMeta<
     TAccountMoto,
@@ -243,6 +256,11 @@ export function getRegistrarVentaInstruction<
       isSigner: false,
       isWritable: true,
     },
+    asociacionCliente: {
+      value: input.asociacionCliente ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     moto: { value: input.moto ?? null, isSigner: false, isWritable: true },
     venta: { value: input.venta ?? null, isSigner: false, isWritable: true },
     systemProgram: {
@@ -270,6 +288,7 @@ export function getRegistrarVentaInstruction<
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("concesionario", accounts.concesionario),
       getAccountMeta("cliente", accounts.cliente),
+      getAccountMeta("asociacionCliente", accounts.asociacionCliente),
       getAccountMeta("moto", accounts.moto),
       getAccountMeta("venta", accounts.venta),
       getAccountMeta("systemProgram", accounts.systemProgram),
@@ -291,6 +310,10 @@ export function getRegistrarVentaInstruction<
     ResolvedInstructionAccountMeta<
       TAccountCliente,
       InstructionAccountInputAddress<TAccountCliente>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAsociacionCliente,
+      InstructionAccountInputAddress<TAccountAsociacionCliente>
     >,
     ResolvedInstructionAccountMeta<
       TAccountMoto,
@@ -316,9 +339,10 @@ export type ParsedRegistrarVentaInstruction<
     owner: TAccountMetas[0];
     concesionario: TAccountMetas[1];
     cliente: TAccountMetas[2];
-    moto: TAccountMetas[3];
-    venta: TAccountMetas[4];
-    systemProgram: TAccountMetas[5];
+    asociacionCliente: TAccountMetas[3];
+    moto: TAccountMetas[4];
+    venta: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
   };
   data: RegistrarVentaInstructionData;
 };
@@ -331,12 +355,12 @@ export function parseRegistrarVentaInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedRegistrarVentaInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 7) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 6,
+        expectedAccountMetas: 7,
       }
     );
   }
@@ -352,6 +376,7 @@ export function parseRegistrarVentaInstruction<
       owner: getNextAccount(),
       concesionario: getNextAccount(),
       cliente: getNextAccount(),
+      asociacionCliente: getNextAccount(),
       moto: getNextAccount(),
       venta: getNextAccount(),
       systemProgram: getNextAccount(),

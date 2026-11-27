@@ -35,6 +35,7 @@ import {
   type SelfPlanAndSendFunctions,
 } from "@solana/program-client-core";
 import {
+  getAsociacionClienteCodec,
   getCanjeServicioCodec,
   getCatalogoServiciosCodec,
   getClienteCodec,
@@ -49,6 +50,8 @@ import {
   getServicioCodec,
   getVentaCodec,
   getWalletClienteCodec,
+  type AsociacionCliente,
+  type AsociacionClienteArgs,
   type CanjeServicio,
   type CanjeServicioArgs,
   type CatalogoServicios,
@@ -91,6 +94,7 @@ import {
   getInicializarCatalogoServiciosInstruction,
   getOtorgarPuntosInstruction,
   getReclamarGarantiaInstruction,
+  getRegistrarAsociacionClienteInstruction,
   getRegistrarClienteInstruction,
   getRegistrarConcesionarioInstruction,
   getRegistrarMetadataFidelidadInstruction,
@@ -110,6 +114,7 @@ import {
   parseInicializarCatalogoServiciosInstruction,
   parseOtorgarPuntosInstruction,
   parseReclamarGarantiaInstruction,
+  parseRegistrarAsociacionClienteInstruction,
   parseRegistrarClienteInstruction,
   parseRegistrarConcesionarioInstruction,
   parseRegistrarMetadataFidelidadInstruction,
@@ -140,6 +145,7 @@ import {
   type ParsedInicializarCatalogoServiciosInstruction,
   type ParsedOtorgarPuntosInstruction,
   type ParsedReclamarGarantiaInstruction,
+  type ParsedRegistrarAsociacionClienteInstruction,
   type ParsedRegistrarClienteInstruction,
   type ParsedRegistrarConcesionarioInstruction,
   type ParsedRegistrarMetadataFidelidadInstruction,
@@ -148,6 +154,7 @@ import {
   type ParsedRegistrarVentaInstruction,
   type ParsedVincularWalletClienteInstruction,
   type ReclamarGarantiaInput,
+  type RegistrarAsociacionClienteInput,
   type RegistrarClienteInput,
   type RegistrarConcesionarioInput,
   type RegistrarMetadataFidelidadInput,
@@ -172,6 +179,7 @@ export enum RegistroAccount {
   Moto,
   Garantia,
   Cliente,
+  AsociacionCliente,
   Venta,
   Servicio,
   Reclamacion,
@@ -306,6 +314,17 @@ export function identifyRegistroAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([87, 184, 122, 178, 43, 32, 96, 241])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.AsociacionCliente;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([46, 19, 228, 71, 14, 149, 86, 78])
       ),
       0
@@ -346,6 +365,7 @@ export enum RegistroInstruction {
   ConfigurarGarantia,
   RegistrarMoto,
   RegistrarCliente,
+  RegistrarAsociacionCliente,
   RegistrarVenta,
   RegistrarServicio,
   ReclamarGarantia,
@@ -410,6 +430,17 @@ export function identifyRegistroInstruction(
     )
   ) {
     return RegistroInstruction.RegistrarCliente;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([201, 142, 53, 38, 249, 185, 8, 54])
+      ),
+      0
+    )
+  ) {
+    return RegistroInstruction.RegistrarAsociacionCliente;
   }
   if (
     containsBytes(
@@ -598,6 +629,9 @@ export type ParsedRegistroInstruction<
       instructionType: RegistroInstruction.RegistrarCliente;
     } & ParsedRegistrarClienteInstruction<TProgram>)
   | ({
+      instructionType: RegistroInstruction.RegistrarAsociacionCliente;
+    } & ParsedRegistrarAsociacionClienteInstruction<TProgram>)
+  | ({
       instructionType: RegistroInstruction.RegistrarVenta;
     } & ParsedRegistrarVentaInstruction<TProgram>)
   | ({
@@ -674,6 +708,13 @@ export function parseRegistroInstruction<TProgram extends string>(
       return {
         instructionType: RegistroInstruction.RegistrarCliente,
         ...parseRegistrarClienteInstruction(instruction),
+      };
+    }
+    case RegistroInstruction.RegistrarAsociacionCliente: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: RegistroInstruction.RegistrarAsociacionCliente,
+        ...parseRegistrarAsociacionClienteInstruction(instruction),
       };
     }
     case RegistroInstruction.RegistrarVenta: {
@@ -819,6 +860,8 @@ export type RegistroPluginAccounts = {
     SelfFetchFunctions<GarantiaArgs, Garantia>;
   cliente: ReturnType<typeof getClienteCodec> &
     SelfFetchFunctions<ClienteArgs, Cliente>;
+  asociacionCliente: ReturnType<typeof getAsociacionClienteCodec> &
+    SelfFetchFunctions<AsociacionClienteArgs, AsociacionCliente>;
   venta: ReturnType<typeof getVentaCodec> &
     SelfFetchFunctions<VentaArgs, Venta>;
   servicio: ReturnType<typeof getServicioCodec> &
@@ -847,6 +890,11 @@ export type RegistroPluginInstructions = {
     input: RegistrarClienteInput,
     config?: { programAddress?: Address | HasAddress }
   ) => ReturnType<typeof getRegistrarClienteInstruction> &
+    SelfPlanAndSendFunctions;
+  registrarAsociacionCliente: (
+    input: RegistrarAsociacionClienteInput,
+    config?: { programAddress?: Address | HasAddress }
+  ) => ReturnType<typeof getRegistrarAsociacionClienteInstruction> &
     SelfPlanAndSendFunctions;
   registrarVenta: (
     input: RegistrarVentaInput,
@@ -962,6 +1010,10 @@ export function registroProgram(
           moto: addSelfFetchFunctions(client, getMotoCodec()),
           garantia: addSelfFetchFunctions(client, getGarantiaCodec()),
           cliente: addSelfFetchFunctions(client, getClienteCodec()),
+          asociacionCliente: addSelfFetchFunctions(
+            client,
+            getAsociacionClienteCodec()
+          ),
           venta: addSelfFetchFunctions(client, getVentaCodec()),
           servicio: addSelfFetchFunctions(client, getServicioCodec()),
           reclamacion: addSelfFetchFunctions(client, getReclamacionCodec()),
@@ -995,6 +1047,14 @@ export function registroProgram(
             addSelfPlanAndSendFunctions(
               client,
               getRegistrarClienteInstruction(input, {
+                programAddress:
+                  instructionConfig?.programAddress ?? config.programAddress,
+              })
+            ),
+          registrarAsociacionCliente: (input, instructionConfig) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRegistrarAsociacionClienteInstruction(input, {
                 programAddress:
                   instructionConfig?.programAddress ?? config.programAddress,
               })

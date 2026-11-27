@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./asociacionCliente";
 export * from "./canjeServicio";
 export * from "./catalogoServicios";
 export * from "./cliente";
