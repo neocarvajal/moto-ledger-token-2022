@@ -341,6 +341,7 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
         <div className="xl:col-span-2">
           <MotorcycleRegistration
             concesionario={dealership.address}
+            nombreConcesionario={dealership.data.nombreConcesionario}
             onRegistered={async () => {
               setCatalogRefreshKey((current) => current + 1);
               const refreshed = await client.registro.accounts.concesionario.fetch(address(dealership.address));
