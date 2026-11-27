@@ -135,15 +135,17 @@ Los siguientes videos muestran la interacción coordinada entre el dashboard y l
 
 Muestra el flujo desde el dashboard del concesionario (wallet owner conectada) y el teléfono del comprador: generar el QR, abrir el enlace en el móvil, conectar la wallet del comprador, firmar la solicitud y completar la autorización del owner sin cerrar la sesión del dashboard.
 
-<!-- Sustituir el marcador por el enlace del video de vinculación de wallet. -->
-**Video:** [Agregar aquí el enlace del video de vinculación de wallet]
+[![Demostración: vinculación de la wallet del cliente](https://img.youtube.com/vi/51ciyN25H2g/hqdefault.jpg)](https://youtu.be/51ciyN25H2g)
+
+**Ver video:** [Vinculación de la wallet del cliente](https://youtu.be/51ciyN25H2g)
 
 **2. Reclamo de servicios y quema de puntos**
 
 Muestra el proceso de canje de un servicio: seleccionar cliente, venta y servicio desde el dashboard owner, indicar el kilometraje, generar y escanear el QR, abrirlo en el teléfono/ventana del comprador y firmar con su wallet. El owner permanece conectado y completa su parte desde el dashboard. La demostración incluye la quema de los tokens Token-2022 y el registro del canje en Solana.
 
-<!-- Sustituir el marcador por el enlace del video de canje y quema de tokens. -->
-**Video:** [Agregar aquí el enlace del video de reclamo de servicios y quema de tokens]
+[![Demostración: canje de servicio y quema de puntos](https://img.youtube.com/vi/SMV7OkRrnyk/hqdefault.jpg)](https://youtu.be/SMV7OkRrnyk)
+
+**Ver video:** [Reclamo de servicio y canje de puntos](https://youtu.be/SMV7OkRrnyk)
 
 **Importante:** la primera venta habilita la vinculación, pero no genera puntos si aún no existe wallet vinculada. La segunda venta debe usar otra moto. El concesionario debe tener su mint y programa de fidelización configurados antes de intentar emitir recompensas.
 
