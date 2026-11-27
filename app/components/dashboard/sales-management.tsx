@@ -85,10 +85,12 @@ export function SalesManagement({
   concesionario,
   nombreConcesionario,
   onRegistered,
+  onNavigate,
 }: {
   concesionario: string;
   nombreConcesionario: string;
   onRegistered: () => Promise<void>;
+  onNavigate: (id: string) => void;
 }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
@@ -99,6 +101,7 @@ export function SalesManagement({
   const [selectedCustomerAddress, setSelectedCustomerAddress] = useState("");
   const [customerWalletStatus, setCustomerWalletStatus] = useState<"idle" | "loading" | "linked" | "unlinked" | "error">("idle");
   const [customerWalletAddress, setCustomerWalletAddress] = useState("");
+  const [loyaltyProgramAvailable, setLoyaltyProgramAvailable] = useState(false);
   const [serial, setSerial] = useState("");
   const [cedula, setCedula] = useState("");
   const [price, setPrice] = useState("");
@@ -199,9 +202,15 @@ export function SalesManagement({
   const checkCustomerWallet = useCallback(async (customerPda: string) => {
     setCustomerWalletStatus("loading");
     setCustomerWalletAddress("");
+    setLoyaltyProgramAvailable(false);
     try {
       const [walletCliente] = await deriveWalletClientePda(address(customerPda));
-      const walletInfo = await client.rpc.getAccountInfo(walletCliente, { encoding: "base64" }).send();
+      const [programaFidelidad] = await deriveProgramaFidelidadPda(address(concesionario));
+      const [walletInfo, programInfo] = await Promise.all([
+        client.rpc.getAccountInfo(walletCliente, { encoding: "base64" }).send(),
+        client.rpc.getAccountInfo(programaFidelidad, { encoding: "base64" }).send(),
+      ]);
+      setLoyaltyProgramAvailable(Boolean(programInfo.value));
       if (!walletInfo.value) {
         setCustomerWalletStatus("unlinked");
         return;
@@ -213,7 +222,7 @@ export function SalesManagement({
       console.error("No se pudo consultar la wallet vinculada del cliente:", error);
       setCustomerWalletStatus("error");
     }
-  }, [client]);
+  }, [client, concesionario]);
 
   const loadCustomers = useCallback(async () => {
     if (!connected?.account.address) {
@@ -398,6 +407,10 @@ export function SalesManagement({
         client.rpc.getAccountInfo(walletCliente, { encoding: "base64" }).send(),
         client.rpc.getAccountInfo(programaFidelidad, { encoding: "base64" }).send(),
       ]);
+      const customerHasPreviousSale = sales.some((sale) => sale.data.cliente === cliente);
+      if (customerHasPreviousSale && loyaltyInfo.value && !walletInfo.value) {
+        throw new Error("Este cliente ya califica para fidelización. Vincula su wallet desde el módulo Clientes antes de registrar otra venta.");
+      }
 
       const [puntosVenta] = await derivePuntosVentaPda(venta);
       let result: { context: { signature: string } } | null = null;
@@ -599,25 +612,29 @@ export function SalesManagement({
               <button type="button" onClick={() => void handleCustomerLookup()} disabled={!cedula} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">Verificar cliente</button>
             </div>
             {customerName && <p className="mt-2 text-[10px] font-semibold text-[#16845a]">✓ {customerName} · Cliente verificado en Solana</p>}
-            {customerName && sales.some((sale) => sale.data.cliente === selectedCustomerAddress) && (
-              <div className={`mt-3 flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between ${customerWalletStatus === "linked" ? "border-[#ccebdc] bg-[#f0faf5]" : customerWalletStatus === "unlinked" ? "border-[#f2dfb8] bg-[#fffaf0]" : "border-[#e8eaed] bg-[#f8f9fa]"}`}>
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${customerWalletStatus === "linked" ? "bg-[#16845a]" : customerWalletStatus === "unlinked" ? "bg-[#c58a20]" : "bg-[#9aa1a9]"}`} />
+            {customerName && sales.some((sale) => sale.data.cliente === selectedCustomerAddress) && loyaltyProgramAvailable && (
+              <div className={`mt-3 rounded-lg border px-3 py-3 ${customerWalletStatus === "linked" ? "border-[#ccebdc] bg-[#f0faf5]" : customerWalletStatus === "unlinked" ? "border-[#f2dfb8] bg-[#fffaf0]" : "border-[#e8eaed] bg-[#f8f9fa]"}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[10px] font-semibold text-[#454d56]">
                     {customerWalletStatus === "loading" ? "Consultando wallet del cliente…" :
-                      customerWalletStatus === "linked" ? "Wallet configurada" :
-                      customerWalletStatus === "unlinked" ? "Wallet no configurada" :
+                      customerWalletStatus === "linked" ? "Wallet configurada · Puede recibir puntos" :
+                      customerWalletStatus === "unlinked" ? "Wallet no configurada · Vinculación requerida" :
                       customerWalletStatus === "error" ? "No se pudo consultar el estado de la wallet" :
                       "Estado de wallet pendiente de consulta"}
                   </span>
+                  {customerWalletStatus === "linked" && customerWalletAddress && (
+                    <a href={`https://explorer.solana.com/address/${customerWalletAddress}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2 hover:text-[#116b49]">
+                      {shortAddress(customerWalletAddress)} ↗
+                    </a>
+                  )}
                 </div>
-                {customerWalletStatus === "linked" && customerWalletAddress && (
-                  <a href={`https://explorer.solana.com/address/${customerWalletAddress}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2 hover:text-[#116b49]">
-                    {shortAddress(customerWalletAddress)} ↗
-                  </a>
-                )}
                 {customerWalletStatus === "unlinked" && (
-                  <span className="text-[9px] text-[#8b6a2c]">La venta podrá registrarse, pero no recibirá puntos.</span>
+                  <>
+                    <p className="mt-2 text-[10px] leading-relaxed text-[#8b6a2c]">Este cliente ya participa en el programa de fidelización. Para asegurar que reciba los puntos de su próxima compra, primero debes vincular su wallet.</p>
+                    <button type="button" onClick={() => onNavigate("customers")} className="mt-3 inline-flex min-h-9 items-center justify-center rounded-lg bg-[#e60012] px-4 py-2 text-[10px] font-bold text-white transition hover:bg-[#c90010]">
+                      Ir a Clientes para vincular wallet
+                    </button>
+                  </>
                 )}
               </div>
             )}
@@ -630,10 +647,16 @@ export function SalesManagement({
             <span className="mt-1 block text-[9px] text-[#9aa1a9]">Monto entero registrado en la cuenta on-chain, sin decimales.</span>
           </label>
           <div className="flex flex-col-reverse gap-3 border-t border-[#eff0f2] pt-5 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[9px] leading-relaxed text-[#9299a1]">La operación se registra en Solana. Si el cliente tiene wallet vinculada y el programa está activo, también se emitirán sus puntos.</p>
-            <button type="submit" disabled={busy || loading || availableMotorcycles.length === 0} className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-lg bg-[#e60012] px-7 py-3 text-[11px] font-bold text-white shadow-[0_4px_12px_rgba(230,0,18,0.16)] transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[210px]">
-              {busy ? "Registrando venta…" : "Confirmar venta"}
-            </button>
+            <p className="text-[9px] leading-relaxed text-[#9299a1]">Cuando el cliente ya participa en fidelización, su wallet debe estar vinculada para continuar con una nueva venta.</p>
+            {customerName && sales.some((sale) => sale.data.cliente === selectedCustomerAddress) && loyaltyProgramAvailable && customerWalletStatus === "unlinked" ? (
+              <button type="button" onClick={() => onNavigate("customers")} className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-lg bg-[#e60012] px-7 py-3 text-[11px] font-bold text-white transition hover:bg-[#c90010] sm:w-auto sm:min-w-[250px]">
+                Ir a Clientes y vincular wallet
+              </button>
+            ) : (
+              <button type="submit" disabled={busy || loading || availableMotorcycles.length === 0 || (Boolean(customerName && sales.some((sale) => sale.data.cliente === selectedCustomerAddress) && loyaltyProgramAvailable) && customerWalletStatus !== "linked")} className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-lg bg-[#e60012] px-7 py-3 text-[11px] font-bold text-white shadow-[0_4px_12px_rgba(230,0,18,0.16)] transition hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[210px]">
+                {busy ? "Registrando venta…" : "Confirmar venta"}
+              </button>
+            )}
           </div>
         </form>
 
