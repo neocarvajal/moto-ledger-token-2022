@@ -28,6 +28,7 @@ export async function validateRedemptionIntentOnChain(client: AppClient, intent:
   const service = catalog.data.servicios.find((item) => item.id === intent.servicioId);
   if (
     dealer.data.owner !== intent.owner ||
+    customer.data.owner !== intent.owner ||
     program.data.concesionario !== intent.concesionario ||
     program.data.mint !== intent.mint ||
     catalog.data.concesionario !== intent.concesionario ||
