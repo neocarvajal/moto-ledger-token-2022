@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { address, getBase64Encoder, getTransactionDecoder, getBase64EncodedWireTransaction } from "@solana/kit";
 import { useConnectedWallet, useConnect, useWallets } from "@solana/kit-plugin-wallet/react";
-import { useAppClient } from "../../../lib/client-provider";
-import { useCluster } from "../../../components/cluster-context";
-import { validateRedemptionIntentOnChain } from "../../../lib/service-redemption-chain-validation";
+import { useAppClient } from "../../lib/client-provider";
+import { useCluster } from "../../components/cluster-context";
+import { validateRedemptionIntentOnChain } from "../../lib/service-redemption-chain-validation";
 
 type Session = {
   owner: string;
