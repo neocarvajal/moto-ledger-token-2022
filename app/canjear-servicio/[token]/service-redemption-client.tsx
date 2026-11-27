@@ -167,15 +167,33 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
             <div className="col-span-2"><p className="text-[9px] font-semibold uppercase text-[#9299a1]">Wallet que debe firmar</p><p className="mt-1 break-all font-mono text-[#424950]">{session.walletAddress}</p></div>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-[#e9ebee] p-3 text-xs">
-          <span className="text-[#68717b]">Tiempo restante</span>
-          <strong className={remaining <= 30 ? "font-mono text-red-600" : "font-mono text-[#252a30]"}>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</strong>
-        </div>
+        {!completionVerified && (
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-[#e9ebee] p-3 text-xs">
+            <span className="text-[#68717b]">Tiempo restante</span>
+            <strong className={remaining <= 30 ? "font-mono text-red-600" : "font-mono text-[#252a30]"}>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</strong>
+          </div>
+        )}
         {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
         {expired || session.status === "cancelled" ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">La solicitud expiró o fue cancelada. Solicita un nuevo QR en el concesionario.</p>
         ) : session.status === "signed" && completionVerified ? (
-          <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Canje confirmado en Solana. El recibo fue verificado y los puntos fueron quemados.</p>
+          <div className="mt-5 rounded-xl border border-[#ccebd9] bg-[#f3fbf6] p-6 text-center">
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+              <span className="absolute inset-0 animate-ping rounded-full bg-[#d8f4e4] opacity-60" />
+              <span className="relative flex h-16 w-16 animate-bounce items-center justify-center rounded-full bg-[#e7f8ee] text-3xl font-bold text-[#168354]">✓</span>
+            </div>
+            <h2 className="mt-5 text-lg font-bold text-[#252a30]">¡Canje completado!</h2>
+            <p className="mt-2 text-xs leading-relaxed text-[#527363]">La transacción fue confirmada y el recibo verificado directamente en Solana. Los puntos ya fueron quemados de tu saldo.</p>
+            <div className="mt-5 rounded-lg border border-[#dcefe3] bg-white p-4 text-left">
+              <p className="text-[9px] font-bold tracking-wider text-[#168354]">SERVICIO CANJEADO</p>
+              <p className="mt-1 text-sm font-bold text-[#252a30]">{session.servicioNombre}</p>
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                <span className="text-[#68717b]">Puntos utilizados</span>
+                <strong className="text-[#168354]">{BigInt(session.puntos).toLocaleString("es-VE")} puntos</strong>
+              </div>
+            </div>
+            <p className="mt-4 text-[10px] text-[#68717b]">Ya puedes cerrar esta página con seguridad.</p>
+          </div>
         ) : session.status === "signed" ? (
           <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Firma recibida. Verificando el recibo del canje directamente en Solana…</p>
         ) : cluster !== session.cluster ? (
