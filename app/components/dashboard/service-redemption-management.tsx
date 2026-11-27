@@ -169,12 +169,22 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
             { memcmp: { offset: 8n, bytes: dealerFilter, encoding: "base58" } },
           ],
         }).send(),
+        client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+          encoding: "base64",
+          filters: [
+            { memcmp: { offset: 0n, bytes: redemptionDiscriminator, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: dealerFilter, encoding: "base58" } },
+          ],
+        }).send(),
       ]);
       const customerRecords: Customer[] = customerAccounts.map((item) => ({
         address: item.pubkey,
         data: getClienteDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
       }));
-      const redemptionRecords: RedemptionRecord[] = redemptionAccounts.map((item) => ({\n        address: item.pubkey,\n        data: getCanjeServicioDecoder().decode(getBase64Encoder().encode(item.account.data[0])),\n      })).filter((item) => item.data.concesionario === concesionario);\n      const saleRecords: Sale[] = saleAccounts.map((item) => ({
+      const redemptionRecords: RedemptionRecord[] = redemptionAccounts.map((item) => ({
+        address: item.pubkey,
+        data: getCanjeServicioDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
+      })).filter((item) => item.data.concesionario === concesionario);\n      const saleRecords: Sale[] = saleAccounts.map((item) => ({
         address: item.pubkey,
         data: getVentaDecoder().decode(getBase64Encoder().encode(item.account.data[0])),
       })).filter((sale) => sale.data.concesionario === concesionario &&
@@ -182,6 +192,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
       setCustomers(customerRecords.sort((a, b) => a.data.nombreCliente.localeCompare(b.data.nombreCliente)));
       setSales(saleRecords);
+      setRedemptions(redemptionRecords.sort((a, b) => Number(b.data.fechaCanje - a.data.fechaCanje)));
       setServices(activeServices);
       setMint(program.data.mint);
       setSelectedCustomer((current) => customerRecords.some((item) => item.address === current) ? current : "");
@@ -196,7 +207,12 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
   useEffect(() => { void loadChainData(); }, [loadChainData]);
 
-  const customerRedemptions = useMemo(\n    () => redemptions.filter((item) => item.data.cliente === selectedCustomer),\n    [redemptions, selectedCustomer]\n  );\n\n  const customerSales = useMemo(
+  const customerRedemptions = useMemo(
+    () => redemptions.filter((item) => item.data.cliente === selectedCustomer),
+    [redemptions, selectedCustomer]
+  );
+
+  const customerSales = useMemo(
     () => sales.filter((sale) => sale.data.cliente === selectedCustomer),
     [sales, selectedCustomer]
   );
