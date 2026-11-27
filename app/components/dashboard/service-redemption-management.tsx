@@ -230,13 +230,18 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       void fetch(`/api/service-redemption/${session.token}`, { cache: "no-store" })
         .then(async (response) => {
           if (!response.ok) throw new Error("La solicitud de canje expiró.");
-          return response.json() as Promise<{ status: string; signedTransaction: string | null; idCanje: string }>;
+          return response.json() as Promise<{ status: string; signedTransaction: string | null; idCanje: string; lastValidBlockHeight: string }>;
         })
         .then((data) => {
           if (data.status === "signed" && data.signedTransaction && !sendingRef.current) {
             sendingRef.current = true;
             void (async () => {
               try {
+                const currentBlockHeight = await client.rpc.getBlockHeight({ commitment: "confirmed" }).send();
+                if (currentBlockHeight > BigInt(data.lastValidBlockHeight)) {
+                  setSession(null);
+                  throw new Error("La transacción caducó en Solana antes de recibir la firma. Genera un nuevo QR para continuar.");
+                }
                 const signature = await client.rpc.sendTransaction(data.signedTransaction as Base64EncodedWireTransaction, {
                   encoding: "base64", preflightCommitment: "confirmed", maxRetries: 3n,
                 }).send();
