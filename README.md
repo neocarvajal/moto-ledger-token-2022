@@ -34,7 +34,26 @@ Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node
 
 ## Preparar datos de demostración
 
-La aplicación incluye dos herramientas opcionales para acelerar las pruebas desde el dashboard. Ambas crean registros reales en **Solana Devnet**; no son datos ficticios guardados en el navegador.
+La aplicación incluye herramientas opcionales para configurar la cobertura de posventa y acelerar las pruebas desde el dashboard. Los cambios de configuración y los registros se guardan en **Solana Devnet**; no son datos ficticios guardados en el navegador.
+
+### Configurar la garantía de cada concesionario
+
+Cada concesionario mantiene su propia política de garantía. La wallet owner puede consultar y actualizar estos parámetros desde el módulo **Configuración**:
+
+1. Conecta la wallet owner y selecciona el concesionario que deseas administrar.
+2. Abre **Configuración** en el menú del dashboard.
+3. En la sección **Configuración de garantía**, define:
+   - **Duración de garantía:** cantidad de días de cobertura (entero entre 1 y 65.535).
+   - **Kilometraje máximo cubierto:** límite de kilometraje (entero positivo, sin decimales).
+4. Pulsa **Guardar configuración** y aprueba la transacción con la wallet owner.
+5. Espera la confirmación en Solana. El dashboard actualizará los valores que muestra para ese concesionario.
+
+La configuración se almacena on-chain en la cuenta del concesionario y requiere la firma de su owner. Si administras varios concesionarios, selecciona cada uno y configura sus parámetros por separado. Los valores actuales se muestran en **Estado on-chain**.
+
+> [!IMPORTANT]
+> **La política se aplica a las próximas motos que registres.** Cambiar los días o el kilometraje no modifica retroactivamente las cuentas de garantía de las motos que ya estaban registradas; esas garantías conservan los parámetros con los que fueron creadas. Configura la cobertura antes de registrar o precargar el inventario de demostración.
+
+La garantía de posventa es independiente del programa de puntos Token-2022: el vencimiento de la garantía no elimina ni invalida los puntos que el cliente haya acumulado. Las reglas de canje de puntos se validan por separado.
 
 ### Precargar motocicletas
 
