@@ -284,7 +284,7 @@ export function DealershipWorkspace({
         ) : dealerships.length === 0 && !showCreate ? (
           <div className="mt-5 rounded-lg bg-[#f7f8fa] p-5 text-center">
             <p className="text-[11px] font-semibold text-[#515962]">No encontramos concesionarios para esta wallet.</p>
-            <p className="mt-1 text-[10px] text-[#9aa1a9]">Puedes registrar el primero para comenzar.</p>
+            <p className="mt-1 text-[10px] text-[#9aa1a9]">{activeModule === "settings" ? "Registra tu primer concesionario para comenzar." : "El registro de concesionarios se realiza desde Configuración."}</p>
           </div>
         ) : null}
 
@@ -339,6 +339,17 @@ export function DealershipWorkspace({
               <div className="rounded-lg border border-[#eff0f2] p-3"><p className="text-[9px] text-[#9299a1]">Garantía (días)</p><p className="mt-1 text-[18px] font-bold text-[#252a30]">{dealership.data.duracionGarantiaDias}</p></div>
               <div className="rounded-lg border border-[#eff0f2] p-3"><p className="text-[9px] text-[#9299a1]">Km máximos</p><p className="mt-1 text-[18px] font-bold text-[#252a30]">{dealership.data.kilometrajeMaximo.toLocaleString("es-VE")}</p></div>
             </div>
+            {dealership.data.duracionGarantiaDias < 1 || dealership.data.kilometrajeMaximo < 1n ? (
+              <div className="mt-4 rounded-lg border border-[#f1dfe0] bg-[#fff9f9] p-3">
+                <p className="text-[10px] font-bold text-[#8e343b]">Configuración de garantía pendiente</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-[#95666a]">Define la duración y el kilometraje máximo antes de registrar motos para este concesionario.</p>
+                {activeModule !== "settings" && (
+                  <button type="button" onClick={() => onNavigate("settings")} className="mt-2 rounded-md bg-[#e60012] px-3 py-2 text-[9px] font-semibold text-white hover:bg-[#c90010]">
+                    Configurar garantía
+                  </button>
+                )}
+              </div>
+            ) : null}
             <p className="mt-4 text-[10px] leading-relaxed text-[#737b84]">{dealership.data.totalMotos.toString()} motos · {associatedCustomerCount === null ? "…" : associatedCustomerCount} clientes asociados · {dealership.data.totalVentas.toString()} ventas · {dealership.data.totalServicios.toString()} servicios.</p>
             <p className="mt-2 text-[9px] text-[#a0a6ad]">Cuenta: {shortAddress(dealership.address)}</p>
           </>
