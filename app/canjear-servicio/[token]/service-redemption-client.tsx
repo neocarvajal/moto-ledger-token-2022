@@ -20,6 +20,7 @@ type Session = {
   puntos: string;
   kilometrajeActual: string;
   idCanje: string;
+  lastValidBlockHeight: string;
   cluster: "devnet" | "testnet" | "mainnet" | "localnet";
   transaction: string | null;
   signedTransaction: string | null;
@@ -75,6 +76,10 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     setSigning(true);
     setError(null);
     try {
+      const currentBlockHeight = await client.rpc.getBlockHeight({ commitment: "confirmed" }).send();
+      if (currentBlockHeight > BigInt(session.lastValidBlockHeight)) {
+        throw new Error("La transacción preparada caducó en Solana. Solicita al concesionario que genere un nuevo QR.");
+      }
       await validateRedemptionIntentOnChain(client, session);
       const tx = getTransactionDecoder().decode(getBase64Encoder().encode(session.transaction));
       const signer = connected.signer;
