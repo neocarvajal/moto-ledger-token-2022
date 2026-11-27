@@ -288,7 +288,7 @@ export function DealershipWorkspace({
           </div>
         ) : null}
 
-        {activeModule === "settings" && (showCreate || dealerships.length === 0) ? (
+        {activeModule === "settings" && (showCreate || (dealerships.length === 0 && !loadingDealerships)) ? (
           <form onSubmit={handleCreate} className="mt-5 space-y-4 border-t border-[#eff0f2] pt-5">
             <div>
               <h3 className="text-[12px] font-bold text-[#252a30]">Registrar nuevo concesionario</h3>
@@ -311,7 +311,7 @@ export function DealershipWorkspace({
           <button type="button" onClick={() => setShowCreate(true)} className="mt-4 rounded-lg border border-dashed border-[#d9dde1] px-4 py-2.5 text-[10px] font-semibold text-[#68717b] hover:border-[#e60012] hover:text-[#e60012]">
             + Registrar otro concesionario
           </button>
-        ) : dealerships.length === 0 ? (
+        ) : dealerships.length === 0 && !loadingDealerships ? (
           <div className="mt-5 rounded-lg border border-dashed border-[#e2e5e8] p-5 text-center">
             <p className="text-[11px] font-semibold text-[#515962]">Primero configura tu concesionario.</p>
             <p className="mt-1 text-[10px] text-[#9aa1a9]">El registro y la política de garantía se administran desde Configuración.</p>
