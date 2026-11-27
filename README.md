@@ -280,6 +280,6 @@ export SOLANA_KEYPAIR_PATH="$HOME/.config/solana/id.json"
 npm run migrate:customer-associations -- --execute
 ```
 
-The utility only creates associations for dealerships owned by the configured signer. Run it once per owner wallet if the program contains dealerships controlled by multiple owners. Existing association PDAs are skipped, so rerunning the utility is safe. It does not modify customer accounts, sales, motorcycles, loyalty programs, Token-2022 mints, or token balances.
+The utility only creates associations for dealerships owned by the configured signer. Run it once per owner wallet if the program contains dealerships controlled by multiple owners. Existing association PDAs are skipped, so rerunning the utility is safe. It does not modify customer accounts, sales, motorcycles, loyalty programs, Token-2022 mints, or token balances. Historical migration deliberately leaves the legacy dealership customer counters unchanged to avoid double-counting registrations that were already counted by the old instruction; the dashboard's customer lists now use association PDAs.
 
 **Important:** a customer account with no sale and no verified manual mapping cannot be assigned to a dealership automatically. The original customer-registration instruction did not persist that relationship, so the migration report leaves such customers unresolved instead of guessing.
