@@ -21,6 +21,10 @@ import {
   type Concesionario,
 } from "../../lib/moto-ledger/src/generated/accounts/concesionario";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
+import {
+  getAsociacionClienteDecoder,
+  getAsociacionClienteDiscriminatorBytes,
+} from "../../lib/moto-ledger/src/generated/accounts/asociacionCliente";
 import { MotorcycleRegistration } from "./motorcycle-registration";
 import { MotorcycleCatalog } from "./motorcycle-catalog";
 import { CustomerManagement } from "./customer-management";
@@ -47,6 +51,7 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
   const [loadingDealerships, setLoadingDealerships] = useState(false);
   const [busy, setBusy] = useState<"create" | null>(null);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+  const [associatedCustomerCount, setAssociatedCustomerCount] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -101,6 +106,51 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
   useEffect(() => {
     void loadDealerships();
   }, [loadDealerships]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAssociatedCustomerCount() {
+      if (!dealership?.address || !walletAddress) {
+        setAssociatedCustomerCount(null);
+        return;
+      }
+
+      try {
+        const discriminatorFilter = getBase58Decoder().decode(
+          getAsociacionClienteDiscriminatorBytes()
+        ) as Base58EncodedBytes;
+        const dealerFilter = address(dealership.address) as Base58EncodedBytes;
+        const ownerFilter = address(walletAddress) as Base58EncodedBytes;
+        const results = await client.rpc.getProgramAccounts(
+          REGISTRO_PROGRAM_ADDRESS,
+          {
+            encoding: "base64",
+            filters: [
+              { memcmp: { offset: 0n, bytes: discriminatorFilter, encoding: "base58" } },
+              { memcmp: { offset: 8n, bytes: ownerFilter, encoding: "base58" } },
+              { memcmp: { offset: 40n, bytes: dealerFilter, encoding: "base58" } },
+            ],
+          }
+        ).send();
+
+        const count = results.reduce((total, result) => {
+          const association = getAsociacionClienteDecoder().decode(
+            getBase64Encoder().encode(result.account.data[0])
+          );
+          return total + (association.activo ? 1 : 0);
+        }, 0);
+
+        if (!cancelled) setAssociatedCustomerCount(count);
+      } catch (error) {
+        console.error("No se pudo consultar el total de clientes asociados:", error);
+        if (!cancelled) setAssociatedCustomerCount(null);
+      }
+    }
+
+    void loadAssociatedCustomerCount();
+    return () => { cancelled = true; };
+  }, [client, dealership?.address, walletAddress]);
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -275,7 +325,7 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
               <div className="rounded-lg border border-[#eff0f2] p-3"><p className="text-[9px] text-[#9299a1]">Garantía (días)</p><p className="mt-1 text-[18px] font-bold text-[#252a30]">{dealership.data.duracionGarantiaDias}</p></div>
               <div className="rounded-lg border border-[#eff0f2] p-3"><p className="text-[9px] text-[#9299a1]">Km máximos</p><p className="mt-1 text-[18px] font-bold text-[#252a30]">{dealership.data.kilometrajeMaximo.toLocaleString("es-VE")}</p></div>
             </div>
-            <p className="mt-4 text-[10px] leading-relaxed text-[#737b84]">{dealership.data.totalMotos.toString()} motos · {dealership.data.totalClientes} clientes · {dealership.data.totalVentas.toString()} ventas · {dealership.data.totalServicios.toString()} servicios.</p>
+            <p className="mt-4 text-[10px] leading-relaxed text-[#737b84]">{dealership.data.totalMotos.toString()} motos · {associatedCustomerCount === null ? "…" : associatedCustomerCount} clientes asociados · {dealership.data.totalVentas.toString()} ventas · {dealership.data.totalServicios.toString()} servicios.</p>
             <p className="mt-2 text-[9px] text-[#a0a6ad]">Cuenta: {shortAddress(dealership.address)}</p>
           </>
         ) : (
