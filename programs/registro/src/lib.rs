@@ -254,15 +254,10 @@ pub mod registro {
 
         let association = &mut context.accounts.asociacion_cliente;
         if association.concesionario == Pubkey::default() {
-            let id_local = context.accounts.concesionario.total_clientes
-                .checked_add(1)
-                .ok_or(Errores::ContadorInvalido)?;
-            context.accounts.concesionario.total_clientes = id_local;
             association.set_inner(AsociacionCliente {
                 owner: context.accounts.owner.key(),
                 concesionario: context.accounts.concesionario.key(),
                 cliente: context.accounts.cliente.key(),
-                id_cliente: id_local,
                 fecha_registro: Clock::get()?.unix_timestamp,
                 activo: true,
                 bump: context.bumps.asociacion_cliente,
@@ -1676,7 +1671,6 @@ pub struct AsociacionCliente {
     pub owner: Pubkey,
     pub concesionario: Pubkey,
     pub cliente: Pubkey,
-    pub id_cliente: u32,
     pub fecha_registro: i64,
     pub activo: bool,
     pub bump: u8,
@@ -1684,7 +1678,7 @@ pub struct AsociacionCliente {
 
 impl AsociacionCliente {
     pub const LEN: usize =
-        DISCRIMINATOR + 32 + 32 + 32 + 4 + 8 + 1 + 1;
+        DISCRIMINATOR + 32 + 32 + 32 + 8 + 1 + 1;
 }
 
 #[account]
