@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
-import { deriveGarantiaPda } from "../../lib/moto-ledger/pdas";
+import { deriveGarantiaPda, deriveKilometrajeMotoPda } from "../../lib/moto-ledger/pdas";
 import {
   getMotoDecoder,
   getMotoDiscriminatorBytes,
@@ -105,6 +105,7 @@ export function MotorcycleCatalog({
     setDeleting(motorcycle.address);
     try {
       const [garantia] = await deriveGarantiaPda(motorcycle.data.serial);
+      const [kilometrajeMoto] = await deriveKilometrajeMotoPda(motorcycle.address);
       const latestMoto = await client.registro.accounts.moto.fetch(
         motorcycle.address
       );
@@ -124,6 +125,7 @@ export function MotorcycleCatalog({
         owner: connected.signer,
         concesionario: address(concesionario),
         moto: motorcycle.address,
+        kilometrajeMoto,
         garantia,
         nombreConcesionario,
         serial: latestMoto.data.serial,
