@@ -457,7 +457,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         <div className="mt-3 rounded-lg bg-white p-2"><QRCodeSVG value={session.url} size={208} level="H" includeMargin /></div>
         <a href={session.url} target="_blank" rel="noreferrer" className="mt-3 break-all text-[10px] text-[#d90011] underline">{session.url}</a>
         <p className="mt-2 font-mono text-xs font-bold tabular-nums text-[#252a30]">{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</p>
-        <button type="button" onClick={() => setSession(null)} className="mt-3 rounded-lg border border-red-200 px-3 py-2 text-[10px] font-semibold text-red-600">Cerrar QR</button>
+        <button type="button" onClick={() => { void (async () => { try { const response = await fetch(`/api/service-redemption/${session.token}`, { method: "DELETE", cache: "no-store" }); const payload = await response.json() as { error?: string }; if (!response.ok) throw new Error(payload.error ?? "No se pudo cancelar el QR."); setSession(null); } catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo cancelar el QR."); } })(); }} className="mt-3 rounded-lg border border-red-200 px-3 py-2 text-[10px] font-semibold text-red-600">Cancelar solicitud y cerrar QR</button>
       </div>}
 
       {receipt && <div className="mt-4 rounded-lg border border-[#ccebdc] bg-[#f3fbf6] p-4 text-xs">
