@@ -237,7 +237,7 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 | PDA de concesionario mostrada con ese programa | `8WQjh7p1vmnPRVicWVvS5gXxZmibd5YfTfmkGRwufYKS` | Dirección mostrada durante la revisión de la configuración. |
 | Registro de Juan Perez | [`4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS`](https://explorer.solana.com/tx/4hCUGJUJFynExwZY323trz2aSYGnvgyxNhwqB6iqHpVNPARQrTtR8Ncpz6k7Gjd1UCjKg6r4S9bkdRvz2Xohc5pS?cluster=devnet) | Transacción confirmada de `RegistrarCliente`; logs: BERA MOTORS, Juan Perez y su PDA de cliente. **No es una transacción de emisión de puntos.** |
 
-**Evidencias de fidelización que aún deben adjuntarse para cerrar la demostración:** consulta verificable del saldo de la ATA y evidencia de una operación inválida. La creación del mint MOTO KINGS REWARDS (MKTR), la recepción de puntos por compra y un canje real con quema de 80 puntos ya están documentados arriba. Si el rechazo ocurre en validación local o simulación, se debe indicar esa capa y adjuntar el mensaje; no inventar una firma.
+Las transacciones enlazadas documentan la creación del mint MOTO KINGS REWARDS (MKTR), la recepción de puntos Token-2022 al realizar una compra y el canje de un servicio con quema de 80 puntos. Cada enlace permite consultar directamente la operación en Solana Explorer (Devnet).
 
 - [Creación del mint MOTO KINGS REWARDS (MKTR) en Solana Explorer](https://explorer.solana.com/tx/5ei9biit2dMYH1V7ioArvzmpwGxhbejKBVp5Bat55J39Wx8D3L7N3rgsT5hrgaQcpzaWPvFS8Cc3fkeG6cA6v2GC?cluster=devnet)
 - [Programa MotoLedger en Solana Explorer](https://explorer.solana.com/address/64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj?cluster=devnet)
