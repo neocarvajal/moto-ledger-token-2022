@@ -99,6 +99,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       return;
     }
     setLoading(true);
+    setCatalogReady(false);
     try {
       const dealer = await client.registro.accounts.concesionario.fetch(address(concesionario));
       if (dealer.data.owner !== connected.account.address) throw new Error("La wallet conectada no es propietaria del concesionario seleccionado.");
