@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { address, getBase64Encoder, getTransactionDecoder, getBase64EncodedWireTransaction } from "@solana/kit";
 import { useConnectedWallet, useConnect, useWallets } from "@solana/kit-plugin-wallet/react";
 import { useAppClient } from "../../lib/client-provider";
@@ -45,6 +45,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const [now, setNow] = useState(Date.now());
   const [signing, setSigning] = useState(false);
   const [completionVerified, setCompletionVerified] = useState(false);
+  const readyRequestedRef = useRef<string | null>(null);
 
   const loadSession = useCallback(async () => {
     const response = await fetch(`/api/service-redemption/${token}`, { cache: "no-store" });
@@ -72,6 +73,26 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     }, 2000);
     return () => { window.clearInterval(timer); window.clearInterval(poll); };
   }, [session?.status, session?.expiresAt, loadSession]);
+
+  useEffect(() => {
+    if (!session || session.status !== "waiting_customer_ready" ||
+        connected?.account.address !== session.walletAddress ||
+        readyRequestedRef.current === token) return;
+    readyRequestedRef.current = token;
+    void fetch(`/api/service-redemption/${token}/ready`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ walletAddress: connected.account.address }),
+    }).then(async (response) => {
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "No se pudo avisar al concesionario.");
+      await loadSession();
+    }).catch((cause) => {
+      readyRequestedRef.current = null;
+      setError(cause instanceof Error ? cause.message : "No se pudo avisar al concesionario.");
+    });
+  }, [session?.status, session?.walletAddress, connected?.account.address, token, loadSession]);
 
   useEffect(() => {
     let active = true;
@@ -155,7 +176,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         <p className="mt-5 text-[9px] font-bold tracking-[0.18em] text-[#e60012]">MOTOLEDGER · CANJE TOKEN-2022</p>
         <h1 className="mt-2 text-xl font-bold text-[#252a30]">Autorizar canje de puntos</h1>
         <p className="mt-2 text-xs leading-relaxed text-[#737b84]">Revisa los datos antes de firmar. Tu wallet autorizará la quema de puntos indicada; no compartas tu frase semilla ni claves privadas.</p>
-        <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">Aunque el QR dure 5 minutos, la transacción puede caducar antes. La vigencia se comprueba en Solana justo antes y después de firmar.</p>
+        <p className="mt-2 text-[10px] leading-relaxed text-[#858d96]">La transacción se prepara cuando conectas la wallet vinculada, para que su vigencia no se consuma mientras escaneas el QR.</p>
         <div className="mt-5 rounded-xl bg-[#f7f8fa] p-4 text-xs">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2"><p className="text-[9px] font-semibold uppercase text-[#9299a1]">Servicio</p><p className="mt-1 font-bold text-[#252a30]">{session.servicioNombre}</p></div>
@@ -206,7 +227,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         ) : connected.account.address !== session.walletAddress ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Conecta la wallet vinculada a este cliente: {shortAddress(session.walletAddress)}.</p>
         ) : !canSign ? (
-          <p className="mt-5 rounded-lg bg-[#f7f8fa] p-3 text-xs text-[#68717b]">Esperando que el concesionario prepare y firme la transacción de canje…</p>
+          <p className="mt-5 rounded-lg bg-[#f7f8fa] p-3 text-xs text-[#68717b]">{session.status === "waiting_customer_ready" ? "Wallet conectada. Avisando al concesionario para preparar una transacción nueva…" : "Wallet lista. Esperando que el concesionario prepare la transacción de canje…"}</p>
         ) : (
           <button type="button" disabled={signing} onClick={() => void sign()} className="mt-5 w-full rounded-xl bg-[#e60012] px-4 py-3 text-xs font-bold text-white hover:bg-[#c90010] disabled:opacity-50">{signing ? "Esperando firma…" : `Autorizar quema de ${BigInt(session.puntos).toLocaleString("es-VE")} puntos`}</button>
         )}
