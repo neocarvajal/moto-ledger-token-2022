@@ -26,6 +26,93 @@ export function MotorcycleRegistration({
   const [modelo, setModelo] = useState("");
   const [color, setColor] = useState("");
   const [busy, setBusy] = useState(false);
+  const [preloading, setPreloading] = useState(false);
+
+  const handlePreloadDemoMotorcycles = async () => {
+    if (!connected?.signer) {
+      toast.error("Conecta una wallet con capacidad de firma.");
+      return;
+    }
+    if (busy || preloading) return;
+
+    setPreloading(true);
+    let created = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    try {
+      const dealerAddress = address(concesionario);
+      const dealer = await client.registro.accounts.concesionario.fetch(dealerAddress);
+      if (
+        Number(dealer.data.duracionGarantiaDias) <= 0 ||
+        Number(dealer.data.kilometrajeMaximo) <= 0
+      ) {
+        throw new Error("Configura primero la duración y el kilometraje de la garantía del concesionario.");
+      }
+
+      const demoMotorcycles = [
+        { modelo: "DT150", color: "Negro / Rojo" },
+        { modelo: "BR150", color: "Azul" },
+        { modelo: "SBR", color: "Negro" },
+      ];
+
+      for (const [index, item] of demoMotorcycles.entries()) {
+        // Stable dealership-specific identifiers make the action safe to repeat.
+        const serial = `MLD${concesionario.slice(0, 11).toUpperCase()}${String(index + 1).padStart(3, "0")}`;
+        const placa = `D${concesionario.slice(-5).toUpperCase()}${index + 1}`;
+        const [moto] = await deriveMotoPda(serial, dealerAddress);
+        const [garantia] = await deriveGarantiaPda(serial);
+        const existing = await client.registro.accounts.moto.fetch(moto).catch(() => null);
+
+        if (existing) {
+          if (existing.data.concesionario !== dealerAddress) {
+            failed += 1;
+            toast.error(`No se pudo validar la moto de demostración ${index + 1}.`);
+          } else {
+            skipped += 1;
+          }
+          continue;
+        }
+
+        try {
+          const instruction = client.registro.instructions.registrarMoto({
+            owner: connected.signer,
+            concesionario: dealerAddress,
+            garantia,
+            moto,
+            serial,
+            placa,
+            marca: "BERA",
+            modelo: item.modelo,
+            color: item.color,
+          });
+          const result = await instruction.sendTransaction();
+          created += 1;
+          notifyTransactionSuccess(
+            `Moto BERA ${item.modelo} precargada.`,
+            result.context.signature
+          );
+        } catch (error) {
+          failed += 1;
+          console.error(`No se pudo precargar BERA ${item.modelo}:`, error);
+          toast.error(`No se pudo registrar BERA ${item.modelo}. Puedes volver a intentarlo; las motos ya creadas se omitirán.`);
+        }
+      }
+
+      await onRegistered();
+      if (failed === 0) {
+        toast.success(`Precarga finalizada: ${created} creada(s), ${skipped} ya existente(s).`);
+      } else {
+        toast.warning(`Precarga parcial: ${created} creada(s), ${skipped} existente(s), ${failed} con error.`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "No se pudo precargar el inventario.");
+    } finally {
+      setPreloading(false);
+    }
+  };
+
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -92,6 +179,21 @@ export function MotorcycleRegistration({
         <span className="rounded-md bg-[#f4f5f6] px-2 py-1 text-[9px] font-bold text-[#737b84]">N.I.V. + PDA</span>
       </div>
 
+      <div className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold text-[#424950]">¿Necesitas inventario de prueba?</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Precarga tres motos BERA de demostración. Es opcional y no afecta el registro manual.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handlePreloadDemoMotorcycles()}
+          disabled={busy || preloading}
+          className="shrink-0 rounded-lg border border-[#e60012] bg-white px-3 py-2 text-[10px] font-semibold text-[#d90011] transition hover:bg-[#fff0f1] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {preloading ? "Precargando inventario…" : "Precargar 3 motos"}
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <label className="sm:col-span-2 xl:col-span-3">
           <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Serial N.I.V. (17 caracteres)</span>
@@ -114,7 +216,7 @@ export function MotorcycleRegistration({
           <input value={color} onChange={(e) => setColor(e.target.value)} required placeholder="Rojo" className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]" />
         </label>
         <div className="flex items-end sm:col-span-2 xl:col-span-3">
-          <button type="submit" disabled={busy} className="w-full rounded-lg bg-[#e60012] px-4 py-2.5 text-[11px] font-semibold text-white transition hover:bg-[#c90010] disabled:opacity-50 sm:w-auto">
+          <button type="submit" disabled={busy || preloading} className="w-full rounded-lg bg-[#e60012] px-4 py-2.5 text-[11px] font-semibold text-white transition hover:bg-[#c90010] disabled:opacity-50 sm:w-auto">
             {busy ? "Registrando moto en Solana…" : "Registrar moto"}
           </button>
         </div>
