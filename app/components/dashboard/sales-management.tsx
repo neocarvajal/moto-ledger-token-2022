@@ -599,7 +599,7 @@ export function SalesManagement({
               <button type="button" onClick={() => void handleCustomerLookup()} disabled={!cedula} className="rounded-lg border border-[#e2e5e8] px-4 py-2.5 text-[10px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">Verificar cliente</button>
             </div>
             {customerName && <p className="mt-2 text-[10px] font-semibold text-[#16845a]">✓ {customerName} · Cliente verificado en Solana</p>}
-            {customerName && (
+            {customerName && sales.some((sale) => sale.data.cliente === selectedCustomerAddress) && (
               <div className={`mt-3 flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between ${customerWalletStatus === "linked" ? "border-[#ccebdc] bg-[#f0faf5]" : customerWalletStatus === "unlinked" ? "border-[#f2dfb8] bg-[#fffaf0]" : "border-[#e8eaed] bg-[#f8f9fa]"}`}>
                 <div className="flex items-center gap-2">
                   <span className={`h-2 w-2 shrink-0 rounded-full ${customerWalletStatus === "linked" ? "bg-[#16845a]" : customerWalletStatus === "unlinked" ? "bg-[#c58a20]" : "bg-[#9aa1a9]"}`} />
