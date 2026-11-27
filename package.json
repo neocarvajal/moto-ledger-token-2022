@@ -12,7 +12,7 @@
     "test:devnet": "vitest run tests/moto-ledger/devnet.integration.test.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:agente": "npm --prefix agente run typecheck",
-    "migrate:customer-associations": "node --experimental-strip-types scripts/migrate-customer-associations.mjs"
+    "migrate:customer-associations": "node scripts/migrate-customer-associations.mjs"
   },
   "description": "Next.js, Tailwind, @solana/kit wallet + on-chain actions",
   "keywords": [
