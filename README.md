@@ -275,6 +275,27 @@ Las siguientes direcciones y firmas corresponden a datos compartidos durante las
 
 Redis se utiliza únicamente para intercambiar temporalmente la información necesaria para vincular la wallet del comprador mediante QR. Las sesiones expiran a los cinco minutos. **No almacena los registros del concesionario ni reemplaza a Solana**: los datos del negocio permanecen on-chain.
 
+### Configurar Pinata e IPFS
+
+MotoLedger utiliza [Pinata](https://pinata.cloud/) para subir a IPFS los archivos de metadata y las imágenes asociados al mint Token-2022.
+
+1. Crea una cuenta o inicia sesión en [Pinata](https://pinata.cloud/).
+2. En el panel de Pinata, crea un **API Key** con un JWT que tenga permisos para subir/pinear archivos (pinning/upload). No compartas ese JWT.
+3. En **Gateways**, crea o selecciona un gateway público y copia su dominio. Debe tener el formato `https://<tu-gateway>.mypinata.cloud`.
+4. Configura las variables en el archivo `.env.local`:
+
+   ```env
+   PINATA_JWT=<tu-jwt-de-pinata>
+   NEXT_PUBLIC_GATEWAY_URL=https://<tu-gateway>.mypinata.cloud
+   ```
+
+   `PINATA_JWT` es una credencial privada que utiliza el servidor para autenticar las cargas a Pinata. **No la conviertas en una variable `NEXT_PUBLIC_*`, no la expongas en el navegador ni la subas al repositorio.**
+   
+   `NEXT_PUBLIC_GATEWAY_URL` es el gateway público que utiliza la aplicación para construir los enlaces de lectura de IPFS. Introduce únicamente el origen del gateway, sin añadir `/ipfs/` ni un CID al final.
+5. Guarda los cambios y reinicia el servidor local para que Next.js cargue las variables.
+
+Los archivos se consultan mediante el gateway con la ruta `/ipfs/<CID>`. Por eso, el gateway debe estar activo y ser accesible públicamente para que la metadata y las imágenes puedan visualizarse. Redis y Pinata cumplen funciones distintas: Redis coordina sesiones QR temporales; Pinata aloja el contenido direccionado por CID en IPFS.
+
 ### Instalar y ejecutar
 
 Clona el repositorio e instala las dependencias:
@@ -291,6 +312,8 @@ Crea un archivo `.env.local` en la raíz del proyecto:
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 UPSTASH_REDIS_REST_URL=https://<tu-base-de-datos>.upstash.io
 UPSTASH_REDIS_REST_TOKEN=<tu-token-rest>
+PINATA_JWT=<tu-jwt-de-pinata>
+NEXT_PUBLIC_GATEWAY_URL=https://<tu-gateway>.mypinata.cloud
 ```
 
 Para probar los QR desde un teléfono, la aplicación debe estar disponible mediante una URL HTTPS pública. En ese caso, cambia `NEXT_PUBLIC_APP_URL` por esa URL y reinicia el servidor.
