@@ -25,6 +25,31 @@ Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node
 
 La URL pública utiliza la configuración de servidor ya provisionada para los flujos QR. El evaluador no necesita una cuenta propia de Upstash ni configurar Redis. Si la aplicación desplegada no está disponible temporalmente, o deseas ejecutar y modificar el proyecto en tu entorno, utiliza la instalación local que se documenta más adelante.
 
+## Preparar datos de demostración
+
+La aplicación incluye dos herramientas opcionales para acelerar las pruebas desde el dashboard. Ambas crean registros reales en **Solana Devnet**; no son datos ficticios guardados en el navegador.
+
+### Precargar motocicletas
+
+1. Conecta la wallet owner y selecciona el concesionario que vas a utilizar.
+2. Abre el módulo **Motos**.
+3. Comprueba que el concesionario tenga configurada su garantía.
+4. Pulsa **Precargar 3 motos** y aprueba las transacciones que solicite la wallet.
+5. Espera a que finalice la operación y revisa el inventario del concesionario.
+
+La precarga utiliza un catálogo de demostración según el nombre del concesionario: Motos Toro incluye TORO FOX TR180, CYCLONE RT3S y ASIAWING NC250E; BERA incluye COBRA 150, MILLAN 150 y SBR 150. Consulta primero las motos que ya existen en la cadena y omite los modelos repetidos para ese concesionario. Cada moto y su garantía se crean mediante una transacción independiente que debe firmar el owner. Si el concesionario no coincide con uno de esos catálogos, puedes registrar motos manualmente.
+
+### Precargar clientes
+
+1. Mantén seleccionado el concesionario correspondiente y abre el módulo **Clientes**.
+2. En la sección **Registrar cliente**, pulsa **Precargar 3 clientes**.
+3. Aprueba las transacciones que solicite la wallet.
+4. Al finalizar, actualiza el directorio y comprueba que los clientes aparecen asociados al concesionario seleccionado.
+
+Se crean tres perfiles de demostración con nombres y cédulas sintéticas. La herramienta genera identificadores de prueba diferenciados por concesionario, consulta las cuentas on-chain y evita duplicar los clientes que ya estén asociados allí. Cada cliente se registra en su propia transacción.
+
+**Importante sobre la identidad de clientes:** la cuenta Cliente es global para la wallet owner y la cédula, mientras que la asociación con un concesionario es independiente. La precarga no reutiliza automáticamente una identidad que ya exista en otro concesionario. Si una misma persona debe estar registrada en varios concesionarios, búscala por cédula y realiza manualmente su asociación desde cada concesionario. Para datos reales, utiliza siempre el formulario de registro manual y la cédula correcta.
+
 ## Integración de recompensas con Token-2022
 
 MotoLedger es un proyecto propio al que incorporé un sistema de fidelización conectado con las ventas reales de cada concesionario. Cada concesionario configura su propio mint de puntos bajo **Token-2022**. Los puntos son unidades enteras (0 decimales) y el mint utiliza la extensión **NonTransferable**, por lo que no se pueden transferir entre wallets.
@@ -41,6 +66,24 @@ Para reproducir el recorrido completo utiliza una wallet owner con SOL de Devnet
 6. **Segunda venta con recompensa.** Vuelve a **Ventas**, selecciona la segunda moto y el mismo cliente. Si existe wallet vinculada y el concesionario tiene un programa activo, la aplicación prepara una única transacción con: creación idempotente de la ATA Token-2022, `registrar_venta` y `otorgar_puntos`. Es atómica: si falla una instrucción, no se confirma ninguna. La cantidad se toma de la configuración on-chain `ProgramaFidelidad.puntos_por_venta`.
 7. **Consultar saldo.** En **Clientes**, selecciona el comprador. La ficha consulta `WalletCliente`, deriva la ATA con el programa Token-2022 y obtiene el saldo directamente desde RPC. No se usa un saldo local como fuente de verdad.
 8. **Canjear puntos.** Abre el módulo de **Fidelización / Canje**, selecciona cliente, una de sus ventas, un servicio y el kilometraje actual. El owner inicia el canje y genera un QR; el comprador escanea y firma desde su wallet vinculada. Cuando están ambas firmas, la aplicación envía la transacción. El programa valida cliente, wallet, venta, moto, concesionario, garantía, servicio activo y saldo; después quema los puntos mediante Token-2022 y crea un recibo on-chain `CanjeServicio`.
+
+### Videos demostrativos
+
+Los siguientes videos muestran los dos procesos que requieren la interacción coordinada entre el dashboard y la wallet del comprador. Los enlaces se pueden completar cuando los videos estén publicados.
+
+**1. Vinculación de la wallet del cliente**
+
+Muestra el flujo completo desde el dashboard del concesionario y el dispositivo móvil: generar el QR, abrir el enlace, conectar la wallet del comprador, firmar la solicitud desde el móvil y completar la autorización del owner.
+
+<!-- Sustituir el marcador por el enlace del video de vinculación de wallet. -->
+**Video:** [Agregar aquí el enlace del video de vinculación de wallet]
+
+**2. Reclamo de servicios y quema de puntos**
+
+Muestra el proceso de canje de un servicio: seleccionar cliente, venta y servicio desde el dashboard, indicar el kilometraje, generar y escanear el QR, firmar desde la wallet del comprador y completar la operación. La demostración incluye la quema de los tokens Token-2022 y el registro del canje en Solana.
+
+<!-- Sustituir el marcador por el enlace del video de canje y quema de tokens. -->
+**Video:** [Agregar aquí el enlace del video de reclamo de servicios y quema de tokens]
 
 **Importante:** la primera venta habilita la vinculación, pero no genera puntos si aún no existe wallet vinculada. La segunda venta debe usar otra moto. El concesionario debe tener su mint y programa de fidelización configurados antes de intentar emitir recompensas.
 
