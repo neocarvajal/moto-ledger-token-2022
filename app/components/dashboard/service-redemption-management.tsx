@@ -228,6 +228,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   useEffect(() => {
     let active = true;
     setSaleDetails(null);
+    setMileage("");
     if (!selectedSaleRecord) return;
     void (async () => {
       try {
@@ -435,7 +436,12 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     }
     if (selectedServiceRecord.puntos > balance) { toast.error("El cliente no tiene puntos suficientes."); return; }
     let km: bigint;
-    try { km = parseMileage(mileage); } catch (error) { toast.error(error instanceof Error ? error.message : "Kilometraje inválido."); return; }
+    try {
+      km = parseMileage(mileage);
+      if (km < saleDetails.kilometrajeActual) {
+        throw new Error(`El kilometraje no puede ser inferior al último registrado (${saleDetails.kilometrajeActual.toLocaleString("es-VE")} km).`);
+      }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Kilometraje inválido."); return; }
     const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
     const warrantyCovered = saleDetails.garantia.estado === EstadoGarantia.Activa &&
       nowSeconds <= saleDetails.garantia.fechaVencimiento && km <= saleDetails.garantia.kilometrajeMaximo;
