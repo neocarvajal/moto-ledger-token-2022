@@ -25,7 +25,7 @@ type Session = {
   cluster: "devnet" | "testnet" | "mainnet" | "localnet";
   transaction: string | null;
   signedTransaction: string | null;
-  status: "waiting_transaction" | "waiting_customer_signature" | "signed" | "completed" | "cancelled";
+  status: "waiting_customer_ready" | "ready_to_prepare" | "waiting_customer_signature" | "signed" | "completed" | "cancelled";
   expiresAt: number;
 };
 
