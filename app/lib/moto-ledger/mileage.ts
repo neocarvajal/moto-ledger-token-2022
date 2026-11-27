@@ -6,6 +6,7 @@ import {
 } from "@solana/kit";
 import type { AppClient } from "../solana-client";
 import { REGISTRO_PROGRAM_ADDRESS } from "./src/generated/programs";
+import { deriveKilometrajeMotoPda } from "./pdas";
 import {
   getServicioDecoder,
   getServicioDiscriminatorBytes,
@@ -76,4 +77,29 @@ export async function fetchHistoricalMotorcycleMileage(
   }
 
   return latest;
+}
+
+
+/**
+ * Reads the shared on-chain odometer first. Historical scans are only needed
+ * for motorcycles created before the KilometrajeMoto PDA was introduced.
+ */
+export async function fetchLatestMotorcycleMileage(
+  client: AppClient,
+  moto: Address,
+  concesionario: Address
+): Promise<bigint> {
+  const [mileagePda] = await deriveKilometrajeMotoPda(moto);
+  const info = await client.rpc.getAccountInfo(mileagePda, { encoding: "base64" }).send();
+
+  if (!info.value) {
+    return fetchHistoricalMotorcycleMileage(client, moto, concesionario);
+  }
+
+  const record = await client.registro.accounts.kilometrajeMoto.fetch(mileagePda);
+  if (record.data.moto !== moto || record.data.concesionario !== concesionario) {
+    throw new Error("El registro de kilometraje no corresponde a esta moto o concesionario.");
+  }
+
+  return record.data.kilometrajeActual;
 }
