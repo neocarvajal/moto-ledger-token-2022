@@ -22,6 +22,7 @@ import { TOKEN_2022_PROGRAM_ADDRESS } from "@solana-program/token-2022";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
+import { fetchHistoricalMotorcycleMileage } from "../../lib/moto-ledger/mileage";
 import { useCluster } from "../cluster-context";
 import {
   deriveCanjeServicioPda,
@@ -237,6 +238,11 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         const warranty = await client.registro.accounts.garantia.fetch(address(moto.data.garantia));
         if (warranty.data.moto !== selectedSaleRecord.data.moto || warranty.data.concesionario !== concesionario) throw new Error("La garantía no coincide con la venta.");
         const [kilometrajeMotoPda] = await deriveKilometrajeMotoPda(address(selectedSaleRecord.data.moto));
+        const historicalMileage = await fetchHistoricalMotorcycleMileage(
+          client,
+          address(selectedSaleRecord.data.moto),
+          address(concesionario)
+        );
         const mileageInfo = await client.rpc.getAccountInfo(kilometrajeMotoPda, { encoding: "base64" }).send();
         const mileageRecord = mileageInfo.value
           ? await client.registro.accounts.kilometrajeMoto.fetch(kilometrajeMotoPda)
@@ -245,7 +251,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
             mileageRecord.data.concesionario !== concesionario)) {
           throw new Error("El registro de kilometraje no corresponde a esta moto.");
         }
-        const currentMileage = mileageRecord?.data.kilometrajeActual ?? 0n;
+        const storedMileage = mileageRecord?.data.kilometrajeActual ?? 0n;
+        const currentMileage = storedMileage > historicalMileage ? storedMileage : historicalMileage;
         if (active) {
           setMileage(currentMileage.toString());
           setSaleDetails({
