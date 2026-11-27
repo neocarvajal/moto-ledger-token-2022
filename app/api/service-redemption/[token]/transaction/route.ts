@@ -14,7 +14,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const body = (await request.json()) as { transaction?: unknown; lastValidBlockHeight?: unknown };
     if (typeof body.transaction !== "string" || body.transaction.length < 100 ||
         body.transaction.length > 20_000 || !/^[A-Za-z0-9+/]+=*$/.test(body.transaction) ||
-        typeof body.lastValidBlockHeight !== "string" || !/^\\d+$/.test(body.lastValidBlockHeight)) {
+        typeof body.lastValidBlockHeight !== "string" || !/^\d+$/.test(body.lastValidBlockHeight)) {
       return NextResponse.json({ error: "Transacción preparada inválida." }, { status: 400 });
     }
 
