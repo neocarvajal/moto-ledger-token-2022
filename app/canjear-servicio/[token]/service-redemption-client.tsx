@@ -6,6 +6,7 @@ import { useConnectedWallet, useConnect, useWallets } from "@solana/kit-plugin-w
 import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../../components/cluster-context";
 import { validateRedemptionIntentOnChain } from "../../lib/service-redemption-chain-validation";
+import { deriveCanjeServicioPda } from "../../lib/moto-ledger/pdas";
 
 type Session = {
   owner: string;
@@ -43,6 +44,7 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [signing, setSigning] = useState(false);
+  const [completionVerified, setCompletionVerified] = useState(false);
 
   const loadSession = useCallback(async () => {
     const response = await fetch(`/api/service-redemption/${token}`, { cache: "no-store" });
@@ -71,6 +73,32 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
     return () => { window.clearInterval(timer); window.clearInterval(poll); };
   }, [session?.status, session?.expiresAt, loadSession]);
 
+  useEffect(() => {
+    let active = true;
+    setCompletionVerified(false);
+    if (session?.status !== "completed") return;
+    void (async () => {
+      try {
+        const [receiptPda] = await deriveCanjeServicioPda(address(session.cliente), BigInt(session.idCanje));
+        const receipt = await client.registro.accounts.canjeServicio.fetch(receiptPda);
+        const data = receipt.data;
+        if (
+          data.cliente !== session.cliente ||
+          data.wallet !== session.walletAddress ||
+          data.concesionario !== session.concesionario ||
+          data.mint !== session.mint ||
+          data.idCanje !== BigInt(session.idCanje) ||
+          data.servicioId !== session.servicioId ||
+          data.puntos !== BigInt(session.puntos)
+        ) throw new Error("El estado indica finalización, pero el recibo no coincide con la solicitud en Solana.");
+        if (active) setCompletionVerified(true);
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : "No se pudo verificar el recibo en Solana.");
+      }
+    })();
+    return () => { active = false; };
+  }, [client, session?.status, session?.cliente, session?.idCanje, session?.walletAddress, session?.concesionario, session?.mint, session?.servicioId, session?.puntos]);
+
   const sign = async () => {
     if (!session?.transaction || !connected?.signer || connected.account.address !== session.walletAddress || signing) return;
     setSigning(true);
@@ -87,6 +115,10 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         throw new Error("Esta wallet no permite firmar transacciones preparadas. Usa una wallet compatible con Solana Wallet Standard.");
       }
       const [signed] = await signer.modifyAndSignTransactions([tx]);
+      const blockHeightAfterSignature = await client.rpc.getBlockHeight({ commitment: "confirmed" }).send();
+      if (blockHeightAfterSignature > BigInt(session.lastValidBlockHeight)) {
+        throw new Error("La transacción caducó mientras la wallet esperaba tu firma. Solicita un nuevo QR al concesionario.");
+      }
       const customerSignature = signed.signatures[address(session.walletAddress)];
       if (!customerSignature || customerSignature.every((byte) => byte === 0)) {
         throw new Error("La wallet no devolvió la firma del cliente.");
@@ -139,8 +171,10 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
         {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
         {expired || session.status === "cancelled" ? (
           <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">La solicitud expiró o fue cancelada. Solicita un nuevo QR en el concesionario.</p>
+        ) : session.status === "completed" && completionVerified ? (
+          <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Canje confirmado en Solana. El recibo fue verificado y los puntos fueron quemados.</p>
         ) : session.status === "signed" || session.status === "completed" ? (
-          <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Firma recibida. El concesionario debe finalizar y confirmar el canje en Solana.</p>
+          <p className="mt-5 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">{session.status === "completed" ? "Verificando el recibo del canje directamente en Solana…" : "Firma recibida. El concesionario debe finalizar y confirmar el canje en Solana."}</p>
         ) : cluster !== session.cluster ? (
           <p className="mt-5 text-xs text-[#68717b]">Conectando a {session.cluster}…</p>
         ) : !connected ? (
