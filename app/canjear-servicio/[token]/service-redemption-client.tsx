@@ -40,7 +40,6 @@ export function ServiceRedemptionClient({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
-  const [selected, setSelected] = useState(false);
   const [signing, setSigning] = useState(false);
 
   const loadSession = useCallback(async () => {
