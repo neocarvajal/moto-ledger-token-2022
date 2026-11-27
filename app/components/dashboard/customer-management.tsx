@@ -73,11 +73,14 @@ export function CustomerManagement({
         .send();
 
       const customerAddresses = [...new Set(
-        associations.map((association) =>
-          getAsociacionClienteDecoder().decode(
-            getBase64Encoder().encode(association.account.data[0])
-          ).cliente
-        )
+        associations
+          .map((association) =>
+            getAsociacionClienteDecoder().decode(
+              getBase64Encoder().encode(association.account.data[0])
+            )
+          )
+          .filter((association) => association.activo)
+          .map((association) => association.cliente)
       )];
 
       const records = await Promise.all(
@@ -209,6 +212,10 @@ export function CustomerManagement({
       const existing = await client.registro.accounts.cliente.fetch(cliente).catch(() => null);
       const dealer = address(concesionario);
       const [asociacionCliente] = await deriveAsociacionClientePda(dealer, cliente);
+      const associationInfo = await client.rpc.getAccountInfo(asociacionCliente, { encoding: "base64" }).send();
+      if (associationInfo.value) {
+        throw new Error("Este cliente ya está registrado en el concesionario seleccionado.");
+      }
       const instruction = client.registro.instructions.registrarCliente({
         owner: connected.signer,
         concesionario: dealer,
