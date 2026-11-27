@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   address,
+  unwrapOption,
   getBase58Decoder,
   getBase64Encoder,
   type Base58EncodedBytes,
 } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import {
+  fetchMint,
   getCreateAssociatedTokenIdempotentInstructionAsync,
+  isExtension,
   TOKEN_2022_PROGRAM_ADDRESS,
 } from "@solana-program/token-2022";
 import { toast } from "sonner";
@@ -52,6 +55,8 @@ type CustomerRecord = { address: string; data: Cliente };
 type SaleRecord = { address: string; data: Venta; reward?: PuntosVenta; rewardStatus?: "issued" | "none" | "unavailable" };
 type SaleConfirmation = {
   points: bigint | null;
+  tokenName: string | null;
+  tokenSymbol: string | null;
   wallet: string | null;
   signature: string | null;
   saleAddress: string;
@@ -415,6 +420,8 @@ export function SalesManagement({
       const [puntosVenta] = await derivePuntosVentaPda(venta);
       let result: { context: { signature: string } } | null = null;
       let awardedPoints: bigint | null = null;
+      let awardedTokenName: string | null = null;
+      let awardedTokenSymbol: string | null = null;
       let awardedWallet: string | null = null;
       let reconciledOnChain = false;
 
@@ -424,6 +431,17 @@ export function SalesManagement({
           const loyaltyProgram = await client.registro.accounts.programaFidelidad.fetch(programaFidelidad);
           const customerWallet = linkedWallet.data.wallet;
           const mint = loyaltyProgram.data.mint;
+          try {
+            const mintAccount = await fetchMint(client.rpc, mint);
+            const extensions = unwrapOption(mintAccount.data.extensions) ?? [];
+            const tokenMetadata = extensions.find((item) => isExtension("TokenMetadata", item));
+            if (tokenMetadata) {
+              awardedTokenName = tokenMetadata.name;
+              awardedTokenSymbol = tokenMetadata.symbol;
+            }
+          } catch (metadataError) {
+            console.warn("No se pudo consultar la metadata del mint de fidelización:", metadataError);
+          }
           const [tokenAccount] = await deriveToken2022Ata(customerWallet, mint);
 
           // Idempotent creation is safe whether the customer's Token-2022
@@ -508,6 +526,8 @@ export function SalesManagement({
       }
       setLastSaleConfirmation({
         points: awardedPoints,
+        tokenName: awardedTokenName,
+        tokenSymbol: awardedTokenSymbol,
         wallet: awardedWallet,
         signature: result?.context.signature ?? null,
         saleAddress: venta,
@@ -677,7 +697,7 @@ export function SalesManagement({
                 <p className="text-[9px] font-bold tracking-[0.12em] text-[#16845a]">RECOMPENSA ACREDITADA</p>
                 <div className="mt-1 flex flex-wrap items-baseline gap-2">
                   <p className="text-[28px] font-extrabold leading-tight text-[#176b4b]">{formatAmount(lastSaleConfirmation.points)}</p>
-                  <p className="text-[12px] font-bold text-[#4d7664]">BERA entregados</p>
+                  <p className="text-[12px] font-bold text-[#4d7664]">{lastSaleConfirmation.tokenSymbol ?? "puntos"} entregados</p>\n                  {lastSaleConfirmation.tokenName && <p className="w-full text-[10px] text-[#6c8b7b]">{lastSaleConfirmation.tokenName}</p>}
                 </div>
                 {lastSaleConfirmation.wallet && (
                   <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.wallet + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2">
