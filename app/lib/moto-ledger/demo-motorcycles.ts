@@ -20,8 +20,8 @@ export function getDemoMotorcycles(nombreConcesionario: string): DemoMotorcycle[
   if (normalized.includes("TORO")) {
     return [
       { code: "FX", marca: "TORO", modelo: "FOX TR180", color: "Negro / Rojo", transmision: "Automática" },
-      { code: "TN", marca: "TORO", modelo: "TANK TR180", color: "Negro / Azul", transmision: "Automática" },
-      { code: "RX", marca: "TORO", modelo: "REX TR250", color: "Negro / Rojo", transmision: "Sincrónica" },
+      { code: "C3", marca: "CYCLONE", modelo: "RT3S", color: "Negro", transmision: "Sincrónica" },
+      { code: "A2", marca: "ASIAWING", modelo: "NC250E", color: "Rojo / Negro", transmision: "Sincrónica" },
     ];
   }
 
