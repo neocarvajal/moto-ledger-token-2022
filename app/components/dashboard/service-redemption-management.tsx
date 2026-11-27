@@ -308,7 +308,6 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 setReceipt({ signature, address: receiptPda, points: receiptData.puntos });
                 toast.success("Canje registrado en Solana y puntos quemados.");
                 setSession(null);
-                setShowQrModal(false);
                 setShowCancelConfirm(false);
                 await loadChainData();
                 await loadCustomerBalance();
@@ -512,9 +511,27 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 <h2 id="service-redemption-qr-title" className="mt-1 text-[17px] font-bold text-[#252a30]">Autorizar canje de puntos</h2>
                 <p className="mt-1 text-[10px] text-[#858d96]">{selectedCustomerRecord?.data.nombreCliente ?? "Cliente"} · {selectedServiceRecord?.nombre ?? "Servicio"}</p>
               </div>
-              <button type="button" onClick={() => setShowCancelConfirm(true)} aria-label="Cerrar solicitud de canje" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa]">✕</button>
+              <button type="button" onClick={() => receipt ? setShowQrModal(false) : setShowCancelConfirm(true)} aria-label="Cerrar solicitud de canje" className="rounded-lg border border-[#e2e5e8] px-3 py-1.5 text-[12px] text-[#68717b] hover:bg-[#f7f8fa]">✕</button>
             </div>
-            {!session ? (
+            {receipt ? (
+              <div className="p-8 text-center">
+                <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-[#d8f4e4] opacity-60" />
+                  <span className="relative flex h-16 w-16 animate-bounce items-center justify-center rounded-full bg-[#e7f8ee] text-3xl font-bold text-[#168354]">✓</span>
+                </div>
+                <h3 className="mt-5 text-lg font-bold text-[#252a30]">¡Canje confirmado correctamente!</h3>
+                <p className="mt-2 text-[11px] leading-relaxed text-[#68717b]">La transacción fue confirmada en Solana, el recibo on-chain fue verificado y los puntos se quemaron correctamente.</p>
+                <div className="mx-auto mt-5 max-w-md rounded-xl border border-[#e8ecef] bg-[#fafbfc] p-4 text-left">
+                  <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">CANJE COMPLETADO</p>
+                  <p className="mt-1 text-[12px] font-semibold text-[#252a30]">{selectedServiceRecord?.nombre ?? "Servicio"}</p>
+                  <p className="mt-1 text-[10px] text-[#68717b]">{receipt.points.toLocaleString("es-VE")} puntos quemados · {selectedCustomerRecord?.data.nombreCliente ?? "Cliente"}</p>
+                  <p className="mt-3 break-all font-mono text-[9px] text-[#68717b]">Recibo: {receipt.address}</p>
+                </div>
+                <a className="mt-4 inline-block break-all text-[10px] font-semibold text-[#168354] underline" href={`https://explorer.solana.com/tx/${receipt.signature}?cluster=${cluster === "mainnet" ? "mainnet-beta" : cluster}`} target="_blank" rel="noopener noreferrer">Ver transacción en Solana Explorer ↗</a>
+                <p className="mt-4 text-[10px] text-[#68717b]">El proceso finalizó. Ya puedes cerrar esta ventana.</p>
+                <button type="button" onClick={() => setShowQrModal(false)} className="mt-5 rounded-lg bg-[#252a30] px-5 py-2.5 text-[10px] font-semibold text-white">Cerrar ventana</button>
+              </div>
+            ) : !session ? (
               <div className="p-8 text-center">
                 <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#f2c6ca] border-t-[#e60012]" />
                 <p className="mt-4 text-[12px] font-semibold text-[#252a30]">{busy ? "Preparando solicitud segura…" : "No se pudo preparar la solicitud"}</p>
