@@ -275,7 +275,7 @@ export function SalesManagement({
     } finally {
       setLoadingCustomers(false);
     }
-  }, [checkCustomerWallet, client, connected?.account.address]);
+  }, [checkCustomerWallet, client, connected?.account.address, concesionario]);
 
   useEffect(() => {
     void loadCustomers();
@@ -288,6 +288,11 @@ export function SalesManagement({
     const account = await client.registro.accounts.cliente.fetch(pda);
     if (account.data.owner !== connected.account.address) {
       throw new Error("El cliente no pertenece a la wallet conectada.");
+    }
+    const [associationPda] = await deriveAsociacionClientePda(address(concesionario), pda);
+    const association = await client.registro.accounts.asociacionCliente.fetch(associationPda).catch(() => null);
+    if (!association?.data.activo) {
+      throw new Error("El cliente no está asociado al concesionario seleccionado.");
     }
     setCustomerName(account.data.nombreCliente);
     return { id, pda };
