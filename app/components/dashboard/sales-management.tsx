@@ -704,8 +704,8 @@ export function SalesManagement({
               <div className="mt-4 rounded-lg border border-[#ccebdc] bg-white p-4">
                 <p className="text-[9px] font-bold tracking-[0.12em] text-[#16845a]">RECOMPENSA ACREDITADA</p>
                 <div className="mt-1 flex flex-wrap items-baseline gap-2">
-                  <p className="text-[28px] font-extrabold leading-tight text-[#176b4b]">{formatAmount(lastSaleConfirmation.points)}</p>
-                  <p className="text-[12px] font-bold text-[#4d7664]"> {lastSaleConfirmation.tokenSymbol ? lastSaleConfirmation.tokenSymbol : "PUNTOS"} </p>
+                  <p className="text-[28px] font-extrabold leading-tight text-[#176b4b]">+{formatAmount(lastSaleConfirmation.points)}</p>
+                  <p className="text-[12px] font-bold text-[#4d7664]">{lastSaleConfirmation.tokenSymbol ?? "PUNTOS"}</p>
                 </div>
                 {lastSaleConfirmation.wallet && (
                   <a href={"https://explorer.solana.com/address/" + lastSaleConfirmation.wallet + "?cluster=devnet"} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all font-mono text-[9px] text-[#16845a] underline decoration-dotted underline-offset-2">
