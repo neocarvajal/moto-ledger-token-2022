@@ -249,10 +249,8 @@ export function SalesManagement({
       setSelectedCustomerAddress("");
       setCedula("");
       setCustomerName("");
-      {
-        setCustomerWalletStatus("idle");
-        setCustomerWalletAddress("");
-      }
+      setCustomerWalletStatus("idle");
+      setCustomerWalletAddress("");
     } catch (error) {
       console.error("No se pudieron cargar los clientes para ventas:", error);
       toast.error("No se pudieron consultar los clientes registrados del concesionario en Solana.");
