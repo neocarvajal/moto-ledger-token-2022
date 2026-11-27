@@ -10,6 +10,21 @@
 > **Programa:** `64dHKqRTBciEidqLJqCvTWEGWkR1QqyYDZgomMt9AWCj`  
 > **Aplicación:** [moto-ledger-token-2022.vercel.app](https://moto-ledger-token-2022.vercel.app/)
 
+## Prueba rápida en la aplicación desplegada (recomendada)
+
+Para evaluar el proyecto **no necesitas clonar el repositorio ni configurar Node.js, Redis/Upstash o variables de entorno**. La aplicación ya está desplegada y esos servicios están configurados en el entorno de Vercel.
+
+1. Abre **[MotoLedger – aplicación en vivo](https://moto-ledger-token-2022.vercel.app/)**.
+2. Asegúrate de utilizar **Solana Devnet** en tu wallet y en la aplicación.
+3. Conecta la wallet owner de un concesionario de prueba. Para probar como comprador, utiliza una segunda wallet distinta.
+4. Sigue el [flujo de prueba de extremo a extremo](#flujo-de-prueba-de-extremo-a-extremo) descrito abajo.
+
+**Qué necesitas:** un navegador compatible con una wallet Solana (por ejemplo, Solflare o Phantom), dos wallets para owner y comprador, y SOL de Devnet para pagar las transacciones. No compartas claves privadas ni frases semilla.
+
+**Importante:** la aplicación desplegada utiliza el programa y los datos de **Devnet**, que son compartidos y persistentes. Antes de crear registros, ventas o canjes, revisa si ya existe un concesionario de demostración y si tiene motos disponibles, clientes y un programa de fidelización configurado. No registres datos duplicados ni vendas una moto que ya figure como vendida. Para el flujo completo de recompensa necesitarás dos motos disponibles y un comprador que pueda firmar la vinculación y el canje con su wallet.
+
+La URL pública utiliza la configuración de servidor ya provisionada para los flujos QR. El evaluador no necesita una cuenta propia de Upstash ni configurar Redis. Si la aplicación desplegada no está disponible temporalmente, o deseas ejecutar y modificar el proyecto en tu entorno, utiliza la instalación local que se documenta más adelante.
+
 ## Integración de recompensas con Token-2022
 
 MotoLedger es un proyecto propio al que incorporé un sistema de fidelización conectado con las ventas reales de cada concesionario. Cada concesionario configura su propio mint de puntos bajo **Token-2022**. Los puntos son unidades enteras (0 decimales) y el mint utiliza la extensión **NonTransferable**, por lo que no se pueden transferir entre wallets.
