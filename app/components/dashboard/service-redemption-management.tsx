@@ -87,6 +87,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const sendingRef = useRef(false);
+  const preparingRef = useRef(false);
 
   const selectedCustomerRecord = customers.find((item) => item.address === selectedCustomer) ?? null;
   const selectedSaleRecord = sales.find((item) => item.address === selectedSale) ?? null;
@@ -256,6 +257,67 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
 
   useEffect(() => { void loadCustomerBalance(); }, [loadCustomerBalance]);
 
+  const prepareRedemptionTransaction = useCallback(async (token: string, idCanjeValue: string) => {
+    if (!connected?.signer || !connected.account.address || !selectedCustomerRecord ||
+        !selectedSaleRecord || !selectedServiceRecord || !wallet || !mint) {
+      throw new Error("No están disponibles los datos necesarios para preparar el canje.");
+    }
+    const km = parseMileage(mileage);
+    const idCanje = BigInt(idCanjeValue);
+    const [programaFidelidad] = await deriveProgramaFidelidadPda(address(concesionario));
+    const [catalogoServicios] = await deriveCatalogoServiciosPda(address(concesionario));
+    const [walletCliente] = await deriveWalletClientePda(address(selectedCustomer));
+    const [tokenAccount] = await deriveToken2022Ata(address(wallet), address(mint));
+    const [canjeServicio] = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
+    const existing = await client.rpc.getAccountInfo(canjeServicio, { encoding: "base64" }).send();
+    if (existing.value) throw new Error("El identificador de canje ya existe. Cancela la solicitud y genera un nuevo QR.");
+    const moto = await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto));
+    const instruction = client.registro.instructions.canjearServicio({
+      owner: connected.signer,
+      wallet: createNoopSigner(address(wallet)),
+      concesionario: address(concesionario),
+      programaFidelidad,
+      catalogoServicios,
+      cliente: address(selectedCustomer),
+      walletCliente,
+      venta: address(selectedSaleRecord.address),
+      moto: address(selectedSaleRecord.data.moto),
+      garantia: address(moto.data.garantia),
+      mint: address(mint),
+      tokenAccount,
+      canjeServicio,
+      tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+      servicioId: selectedServiceRecord.id,
+      kilometrajeActual: km,
+      idCanje,
+    });
+    // Start blockhash lifetime only after the customer wallet is ready to sign.
+    const latestBlockhash = await client.rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
+    const message = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
+      (tx) => appendTransactionMessageInstruction(instruction, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx),
+    );
+    const partiallySigned = await partiallySignTransactionMessageWithSigners(message);
+    assertIsTransactionWithBlockhashLifetime(partiallySigned);
+    const ownerSignature = partiallySigned.signatures[address(connected.account.address)];
+    if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) {
+      throw new Error("La wallet del concesionario no pudo firmar parcialmente la transacción.");
+    }
+    const response = await fetch(`/api/service-redemption/${token}/transaction`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+      body: JSON.stringify({
+        transaction: getBase64EncodedWireTransaction(partiallySigned),
+        lastValidBlockHeight: latestBlockhash.value.lastValidBlockHeight.toString(),
+      }),
+    });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(payload.error ?? "No se pudo entregar la transacción al cliente.");
+    setSession((current) => current?.token === token ? { ...current, status: "waiting_customer_signature" } : current);
+  }, [client, connected?.signer, connected?.account.address, selectedCustomerRecord, selectedSaleRecord,
+    selectedServiceRecord, wallet, mint, mileage, concesionario, selectedCustomer]);
+
   useEffect(() => {
     if (!session) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -267,6 +329,15 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         })
         .then((data) => {
           setSession((current) => current ? { ...current, status: data.status } : current);
+          if (data.status === "ready_to_prepare" && !preparingRef.current) {
+            preparingRef.current = true;
+            void prepareRedemptionTransaction(session.token, session.idCanje).catch(async (error) => {
+              const message = error instanceof Error ? error.message : "No se pudo preparar el canje.";
+              setQrError(message); toast.error(message);
+              await fetch(`/api/service-redemption/${session.token}`, { method: "DELETE", cache: "no-store" }).catch(() => undefined);
+              setSession(null);
+            }).finally(() => { preparingRef.current = false; });
+          }
           if (data.status === "signed" && data.signedTransaction && !sendingRef.current) {
             sendingRef.current = true;
             void (async () => {
@@ -274,7 +345,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 const currentBlockHeight = await client.rpc.getBlockHeight({ commitment: "confirmed" }).send();
                 if (currentBlockHeight > BigInt(data.lastValidBlockHeight)) {
                   setSession(null);
-                  throw new Error("La transacción caducó en Solana antes de recibir la firma. Genera un nuevo QR para continuar.");
+                  throw new Error("La transacción caducó en Solana antes de enviarse. Genera un nuevo QR para continuar.");
                 }
                 const signature = await client.rpc.sendTransaction(data.signedTransaction as Base64EncodedWireTransaction, {
                   encoding: "base64", preflightCommitment: "confirmed", maxRetries: 3n,
@@ -283,19 +354,14 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 for (let attempt = 0; attempt < 30; attempt += 1) {
                   const status = (await client.rpc.getSignatureStatuses([signature]).send()).value[0];
                   if (status?.err) throw new Error(`Solana rechazó el canje: ${JSON.stringify(status.err)}`);
-                  if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
-                    confirmed = true; break;
-                  }
+                  if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") { confirmed = true; break; }
                   await new Promise((resolve) => window.setTimeout(resolve, 1500));
                 }
                 if (!confirmed) throw new Error("La transacción fue enviada, pero aún no tiene confirmación. Revisa la firma en Explorer.");
                 const idCanje = BigInt(data.idCanje);
-                // Verify the immutable on-chain receipt using the nonce bound to the QR session.
                 const [receiptPda] = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
                 const receiptAccount = await client.registro.accounts.canjeServicio.fetch(receiptPda).catch(() => null);
-                if (!receiptAccount) {
-                  throw new Error(`La transacción confirmó, pero el recibo no coincide con el identificador esperado. Firma: ${signature}`);
-                }
+                if (!receiptAccount) throw new Error(`La transacción confirmó, pero no se encontró el recibo esperado. Firma: ${signature}`);
                 const receiptData = receiptAccount.data;
                 if (receiptData.cliente !== selectedCustomer || receiptData.wallet !== wallet ||
                     receiptData.concesionario !== concesionario || receiptData.mint !== mint ||
@@ -307,149 +373,70 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 }
                 setReceipt({ signature, address: receiptPda, points: receiptData.puntos });
                 toast.success("Canje registrado en Solana y puntos quemados.");
-                setSession(null);
-                setShowCancelConfirm(false);
-                await loadChainData();
-                await loadCustomerBalance();
+                setSession(null); setShowCancelConfirm(false);
+                await loadChainData(); await loadCustomerBalance();
               } catch (error) {
                 const message = error instanceof Error ? error.message : "No se pudo finalizar el canje.";
-                setQrError(message);
-                toast.error(message);
-              } finally {
-                sendingRef.current = false;
-              }
+                setQrError(message); toast.error(message);
+              } finally { sendingRef.current = false; }
             })();
           }
         })
         .catch((error) => toast.error(error instanceof Error ? error.message : "No se pudo consultar el estado del QR."));
     }, 2000);
     return () => { window.clearInterval(timer); window.clearInterval(poll); };
-  }, [session, client, selectedCustomer, loadChainData, loadCustomerBalance]);
+  }, [session, client, selectedCustomer, wallet, mint, concesionario, selectedServiceRecord, selectedSaleRecord, loadChainData, loadCustomerBalance, prepareRedemptionTransaction]);
 
   const startRedemption = async () => {
-    if (cluster === "localnet") {
-      toast.error("El canje por QR requiere una red pública accesible desde el teléfono.");
-      return;
-    }
-    if (!connected?.signer || !connected.account.address) {
-      toast.error("Conecta la wallet propietaria del concesionario.");
-      return;
-    }
+    if (cluster === "localnet") { toast.error("El canje por QR requiere una red pública accesible desde el teléfono."); return; }
+    if (!connected?.signer || !connected.account.address) { toast.error("Conecta la wallet propietaria del concesionario."); return; }
     if (!catalogReady || !selectedCustomerRecord || !selectedSaleRecord || !saleDetails || !selectedServiceRecord || !wallet || balance === null || !mint) {
-      toast.error("Selecciona un cliente con venta, moto, servicio y wallet vinculada.");
-      return;
+      toast.error("Selecciona un cliente con venta, moto, servicio y wallet vinculada."); return;
     }
-    if (selectedServiceRecord.puntos > balance) {
-      toast.error("El cliente no tiene puntos suficientes.");
-      return;
-    }
+    if (selectedServiceRecord.puntos > balance) { toast.error("El cliente no tiene puntos suficientes."); return; }
     let km: bigint;
-    try { km = parseMileage(mileage); } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Kilometraje inválido.");
-      return;
-    }
+    try { km = parseMileage(mileage); } catch (error) { toast.error(error instanceof Error ? error.message : "Kilometraje inválido."); return; }
     const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
     const warrantyCovered = saleDetails.garantia.estado === EstadoGarantia.Activa &&
-      nowSeconds <= saleDetails.garantia.fechaVencimiento &&
-      km <= saleDetails.garantia.kilometrajeMaximo;
-    if (warrantyCovered) {
-      toast.error("Este servicio aún está cubierto por la garantía. No se deben consumir puntos.");
-      return;
-    }
+      nowSeconds <= saleDetails.garantia.fechaVencimiento && km <= saleDetails.garantia.kilometrajeMaximo;
+    if (warrantyCovered) { toast.error("Este servicio aún está cubierto por la garantía. No se deben consumir puntos."); return; }
 
-    setBusy(true);
-    setQrError(null);
-    setShowQrModal(true);
+    setBusy(true); setQrError(null); setShowQrModal(true); preparingRef.current = false;
     try {
-      const [programaFidelidad] = await deriveProgramaFidelidadPda(address(concesionario));
-      const [catalogoServicios] = await deriveCatalogoServiciosPda(address(concesionario));
-      const [walletCliente] = await deriveWalletClientePda(address(selectedCustomer));
-      const [tokenAccount] = await deriveToken2022Ata(address(wallet), address(mint));
       let idCanje = BigInt(Date.now());
       let canjeServicio = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const existing = await client.rpc.getAccountInfo(canjeServicio[0], { encoding: "base64" }).send();
         if (!existing.value) break;
-        idCanje += 1n;
-        canjeServicio = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
+        idCanje += 1n; canjeServicio = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
       }
       const receiptExists = await client.rpc.getAccountInfo(canjeServicio[0], { encoding: "base64" }).send();
       if (receiptExists.value) throw new Error("No se pudo generar un identificador de canje único. Inténtalo nuevamente.");
-
-      const instruction = client.registro.instructions.canjearServicio({
-        owner: connected.signer,
-        wallet: createNoopSigner(address(wallet)),
-        concesionario: address(concesionario),
-        programaFidelidad,
-        catalogoServicios,
-        cliente: address(selectedCustomer),
-        walletCliente,
-        venta: address(selectedSaleRecord.address),
-        moto: address(selectedSaleRecord.data.moto),
-        garantia: address((await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto))).data.garantia),
-        mint: address(mint),
-        tokenAccount,
-        canjeServicio: canjeServicio[0],
-        tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
-        servicioId: selectedServiceRecord.id,
-        kilometrajeActual: km,
-        idCanje,
-      });
-      const latestBlockhash = await client.rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
-      const message = pipe(
-        createTransactionMessage({ version: 0 }),
-        (tx) => setTransactionMessageFeePayerSigner(connected.signer!, tx),
-        (tx) => appendTransactionMessageInstruction(instruction, tx),
-        (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash.value, tx),
-      );
-      const partiallySigned = await partiallySignTransactionMessageWithSigners(message);
-      assertIsTransactionWithBlockhashLifetime(partiallySigned);
-      const ownerSignature = partiallySigned.signatures[address(connected.account.address)];
-      if (!ownerSignature || ownerSignature.every((byte) => byte === 0)) throw new Error("La wallet del concesionario no pudo firmar parcialmente la transacción.");
-
-      const token = await fetch("/api/service-redemption", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
+      const response = await fetch("/api/service-redemption", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
         body: JSON.stringify({
-          owner: connected.account.address,
-          concesionario,
-          cliente: selectedCustomer,
+          owner: connected.account.address, concesionario, cliente: selectedCustomer,
           clienteNombre: selectedCustomerRecord.data.nombreCliente,
           clienteCedula: String(selectedCustomerRecord.data.cedulaCliente),
-          walletAddress: wallet,
-          mint,
-          servicioId: selectedServiceRecord.id,
-          servicioNombre: selectedServiceRecord.nombre,
-          puntos: selectedServiceRecord.puntos.toString(),
-          kilometrajeActual: km.toString(),
-          idCanje: idCanje.toString(),
-          lastValidBlockHeight: latestBlockhash.value.lastValidBlockHeight.toString(),
-          cluster,
+          walletAddress: wallet, mint, servicioId: selectedServiceRecord.id,
+          servicioNombre: selectedServiceRecord.nombre, puntos: selectedServiceRecord.puntos.toString(),
+          kilometrajeActual: km.toString(), idCanje: idCanje.toString(), cluster,
         }),
       });
-      const tokenPayload = await token.json() as { token?: string; error?: string };
-      if (!token.ok || !tokenPayload.token) throw new Error(tokenPayload.error ?? "No se pudo crear el QR de canje.");
-
-      const response = await fetch(`/api/service-redemption/${tokenPayload.token}/transaction`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ transaction: getBase64EncodedWireTransaction(partiallySigned) }),
+      const payload = await response.json() as { token?: string; error?: string; expiresAt?: number; status?: string };
+      if (!response.ok || !payload.token) throw new Error(payload.error ?? "No se pudo crear el QR de canje.");
+      const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\\/+$/, "");
+      setSession({
+        token: payload.token, url: `${publicUrl}/canjear-servicio/${payload.token}`,
+        expiresAt: payload.expiresAt ?? Date.now() + 300_000, idCanje: idCanje.toString(),
+        status: payload.status ?? "waiting_customer_ready",
       });
-      const responsePayload = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(responsePayload.error ?? "No se pudo preparar la transacción de canje.");
-      const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, "");
-      setSession({ token: tokenPayload.token, url: `${publicUrl}/canjear-servicio/${tokenPayload.token}`, expiresAt: Date.now() + 300_000, idCanje: idCanje.toString(), status: "waiting_customer_signature" });
       setReceipt(null);
     } catch (error) {
       console.error("Service redemption preparation:", error);
       const message = error instanceof Error ? error.message : "No se pudo preparar el canje.";
-      setQrError(message);
-      toast.error(message);
-    } finally {
-      setBusy(false);
-    }
+      setQrError(message); toast.error(message);
+    } finally { setBusy(false); }
   };
 
   const remaining = session ? Math.max(0, Math.ceil((session.expiresAt - now) / 1000)) : 0;
@@ -555,7 +542,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                     </div>
                     <div className={`rounded-lg border p-3 ${session.status === "signed" ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
                       <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">2 · FIRMA DEL CLIENTE</p>
-                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session.status === "signed" ? "Firma recibida correctamente." : "Esperando que el cliente escanee y firme desde su wallet…"}</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#424950]">{session.status === "signed" ? "Firma recibida correctamente." : session.status === "waiting_customer_signature" ? "Transacción nueva preparada. Esperando la firma del cliente…" : session.status === "ready_to_prepare" ? "Wallet del cliente detectada. Preparando transacción nueva…" : "Esperando que el cliente escanee y conecte su wallet…"}</p>
                     </div>
                     <div className={`rounded-lg border p-3 ${receipt ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
                       <p className="text-[9px] font-bold tracking-wider text-[#9299a1]">3 · CONFIRMACIÓN EN SOLANA</p>
