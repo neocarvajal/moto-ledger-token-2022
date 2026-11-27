@@ -9,7 +9,7 @@
  * SOLANA_KEYPAIR_PATH defaults to ~/.config/solana/id.json.
  * SOLANA_RPC_URL defaults to Devnet.
  *
- * Run only after regenerating Codama clients from the updated Anchor IDL.
+ * This utility uses raw account layouts and does not depend on generated Codama clients.
  */
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -24,7 +24,6 @@ import {
   getBase58Encoder,
   getBase64Encoder,
   getUtf8Encoder,
-  getAddressEncoder,
   getProgramDerivedAddress,
   createTransactionMessage,
   setTransactionMessageFeePayerSigner,
@@ -144,7 +143,7 @@ async function main() {
   for (const item of candidates.values()) {
     const dealership = item.dealership;
     const customer = item.customer;
-    const dealer = dealers.get(dealership)!;
+    const dealer = dealers.get(dealership);
     if (dealer.owner !== payer.address) {
       report.push({ dealership, customer, status: "skipped-owner-mismatch" });
       skipped++;
