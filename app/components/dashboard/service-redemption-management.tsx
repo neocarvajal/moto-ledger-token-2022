@@ -537,7 +537,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   <p className="text-[11px] leading-relaxed text-[#737b84]">El cliente escanea el QR, conecta la wallet vinculada y autoriza la quema. El concesionario enviará la transacción y verificará el recibo directamente en Solana.</p>
                   <div className="mt-4 space-y-3">
                     <div className="rounded-lg border border-[#ccebd9] bg-[#f3fbf6] p-3">
-                      <p className="text-[9px] font-bold tracking-wider text-[#168354]">1 · SOLICITUD PREPARADA</p>
+                      <p className="text-[9px] font-bold tracking-wider text-[#168354]">1 · SOLICITUD DE CANJE</p>
                       <p className="mt-1 text-[10px] font-semibold text-[#424950]">Servicio: {selectedServiceRecord?.nombre} · {selectedServiceRecord?.puntos.toLocaleString("es-VE")} puntos.</p>
                     </div>
                     <div className={`rounded-lg border p-3 ${session.status === "signed" ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-[#e9ebee] bg-[#fafbfc]"}`}>
@@ -550,7 +550,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                     </div>
                   </div>
                   <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] leading-relaxed text-amber-900">
-                    La sesión QR dura hasta 5 minutos. La transacción usa un blockhash de Solana con una vigencia menor, que empieza a contar antes de que el cliente firme. Si caduca, habrá que generar una nueva solicitud; los 5 minutos no extienden la vigencia de la transacción.
+                    La transacción se prepara únicamente después de que el cliente escanea el QR y conecta la wallet vinculada. Así, el blockhash comienza a contar justo antes de solicitar la firma.
                   </div>
                   {receipt && <button type="button" onClick={() => setShowQrModal(false)} className="mt-4 rounded-lg bg-[#252a30] px-4 py-2.5 text-[10px] font-semibold text-white">Cerrar ventana</button>}
                   {!receipt && <button type="button" onClick={() => setShowCancelConfirm(true)} disabled={session.status === "signed"} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-[10px] font-bold text-red-700 shadow-sm transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">Cancelar proceso y cerrar</button>}
