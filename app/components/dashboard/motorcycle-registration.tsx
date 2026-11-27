@@ -55,27 +55,35 @@ export function MotorcycleRegistration({
         throw new Error("Configura primero la duración y el kilometraje de la garantía del concesionario.");
       }
 
-      const demoMotorcycles = getDemoMotorcycles(nombreConcesionario);
-      if (demoMotorcycles.length === 0) {
-        throw new Error(`Todavía no hay un catálogo de demostración configurado para "${nombreConcesionario}". Puedes registrar las motos manualmente.`);
-      }
+      const demoMotorcycles = getDemoMotorcycles();
 
-      // Read the selected dealership inventory to avoid inserting duplicate models.
+      // Inspect the complete on-chain inventory. The demo set is shared globally:
+      // once a model belongs to another dealership, it must not be auto-created here.
       const discriminator = getBase58Decoder().decode(getMotoDiscriminatorBytes()) as Base58EncodedBytes;
       const onChainMotos = await client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
         encoding: "base64",
         filters: [{ memcmp: { offset: 0n, bytes: discriminator, encoding: "base58" } }],
       }).send();
-      const existingModels = new Set(
-        onChainMotos
-          .map((item) => getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0])))
-          .filter((item) => item.concesionario === dealerAddress)
-          .map((item) => normalizeMotorcycleModel(item.marca, item.modelo))
-      );
+      const existingModels = new Map<string, string>();
+      for (const item of onChainMotos) {
+        const moto = getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0]));
+        existingModels.set(normalizeMotorcycleModel(moto.marca, moto.modelo), moto.concesionario);
+      }
+
+      const alreadyUsedElsewhere = demoMotorcycles.filter((item) => {
+        const registeredDealer = existingModels.get(normalizeMotorcycleModel(item.marca, item.modelo));
+        return registeredDealer && registeredDealer !== dealerAddress;
+      });
+      if (alreadyUsedElsewhere.length > 0) {
+        const models = alreadyUsedElsewhere.map((item) => `${item.marca} ${item.modelo}`).join(", ");
+        throw new Error(
+          `El catálogo de demostración ya fue utilizado en otro concesionario (${models}). Para cargar motos en este concesionario, regístralas manualmente.`
+        );
+      }
 
       for (const [index, item] of demoMotorcycles.entries()) {
         const modelKey = normalizeMotorcycleModel(item.marca, item.modelo);
-        if (existingModels.has(modelKey)) { skipped += 1; continue; }
+        if (existingModels.get(modelKey) === dealerAddress) { skipped += 1; continue; }
 
         // Stable model-specific serials make repeated runs idempotent.
         const serial = `ML${item.code}${concesionario.slice(0, 11)}01`;
@@ -189,7 +197,7 @@ export function MotorcycleRegistration({
       <div className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-semibold text-[#424950]">¿Necesitas inventario de prueba?</p>
-          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Precarga modelos sugeridos para {nombreConcesionario}. Es opcional y no afecta el registro manual.</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Precarga un único catálogo de 3 motos de demostración, independiente de la marca del concesionario. Solo puede utilizarse una vez en toda la aplicación; para otros concesionarios, registra las motos manualmente.</p>
         </div>
         <button
           type="button"
