@@ -15,6 +15,7 @@ export type ServiceRedemptionSession = {
   puntos: string;
   kilometrajeActual: string;
   idCanje: string;
+  lastValidBlockHeight: string;
   cluster: RedemptionCluster;
   transaction: string | null;
   signedTransaction: string | null;
@@ -85,7 +86,7 @@ export async function createServiceRedemptionSession(
   if (!/^\d+$/.test(input.puntos) || BigInt(input.puntos) <= 0n) {
     throw new Error("La cantidad de puntos no es válida.");
   }
-  if (!/^\d+$/.test(input.kilometrajeActual) || !/^\d+$/.test(input.idCanje)) {
+  if (!/^\d+$/.test(input.kilometrajeActual) || !/^\d+$/.test(input.idCanje) || !/^\d+$/.test(input.lastValidBlockHeight)) {
     throw new Error("Los datos del canje no son válidos.");
   }
   for (const value of [input.owner, input.concesionario, input.cliente, input.walletAddress, input.mint]) {
@@ -140,7 +141,7 @@ export async function updateServiceRedemptionSession(
   const immutableFields: (keyof ServiceRedemptionSession)[] = [
     "owner", "concesionario", "cliente", "clienteNombre", "clienteCedula",
     "walletAddress", "mint", "servicioId", "servicioNombre", "puntos",
-    "kilometrajeActual", "idCanje", "cluster", "createdAt", "expiresAt",
+    "kilometrajeActual", "idCanje", "lastValidBlockHeight", "cluster", "createdAt", "expiresAt",
   ];
   if (immutableFields.some((field) => next[field] !== current[field])) {
     throw new Error("No se puede modificar la intención original del canje.");
