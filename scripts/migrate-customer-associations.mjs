@@ -16,10 +16,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
+  AccountRole,
   address,
   createKeyPairSignerFromBytes,
   createSolanaRpc,
   createSolanaRpcSubscriptions,
+  getAddressEncoder,
   getBase58Encoder,
   getBase64Encoder,
   getUtf8Encoder,
@@ -172,9 +174,9 @@ async function main() {
       const instruction = {
         programAddress: REGISTRO_PROGRAM_ADDRESS,
         accounts: [
-          { address: payer.address, role: 3, signer: payer },
-          { address: address(dealership), role: 1 },
-          { address: address(customer), role: 0 },
+          { address: payer.address, role: AccountRole.WRITABLE_SIGNER, signer: payer },
+          { address: address(dealership), role: AccountRole.READONLY },
+          { address: address(customer), role: AccountRole.READONLY },
           { address: association, role: AccountRole.WRITABLE },
           { address: address("11111111111111111111111111111111"), role: AccountRole.READONLY },
         ],
