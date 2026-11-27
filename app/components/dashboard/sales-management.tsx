@@ -255,13 +255,13 @@ export function SalesManagement({
           try {
             const account = await client.registro.accounts.cliente.fetch(address(customerAddress));
             return account.data.owner === connected.account.address
-              ? { address: address(customerAddress), data: account.data }
+              ? { address: address(customerAddress).toString(), data: account.data }
               : null;
           } catch {
             return null;
           }
         })
-      )).filter((item): item is CustomerRecord => item !== null);
+      )).flatMap((item) => (item ? [item] : []));
       found.sort((a, b) => a.data.idCliente - b.data.idCliente);
       setCustomers(found);
       setSelectedCustomerAddress("");
