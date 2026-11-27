@@ -20,7 +20,7 @@ import {
   getCanjeServicioDiscriminatorBytes,
 } from "./src/generated/accounts/canjeServicio";
 
-function discriminatorFilter(value: Uint8Array) {
+function discriminatorFilter(value: Parameters<ReturnType<typeof getBase58Decoder>["decode"]>[0]) {
   return getBase58Decoder().decode(value) as Base58EncodedBytes;
 }
 
