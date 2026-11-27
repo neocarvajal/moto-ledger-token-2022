@@ -68,6 +68,18 @@ La configuración se almacena on-chain en la cuenta del concesionario y requiere
 
 La garantía de posventa es independiente del programa de puntos Token-2022: el vencimiento de la garantía no elimina ni invalida los puntos que el cliente haya acumulado. Las reglas de canje de puntos se validan por separado.
 
+### Kilometraje compartido por moto
+
+El kilometraje ya no se administra como un dato independiente en cada módulo. Cada moto tiene una PDA `KilometrajeMoto`, derivada con las semillas `kilometraje_moto` y la dirección de la cuenta `Moto`. Esta cuenta almacena el último kilometraje conocido y la fecha de su actualización, sin modificar el layout de las cuentas `Moto` existentes.
+
+- **Inventario:** las motos nuevas crean su registro de kilometraje en la misma transacción de registro, con un valor inicial de 0 km.
+- **Servicios:** al seleccionar una moto vendida, se consulta el último kilometraje on-chain y se precarga el formulario. El nuevo registro puede conservarlo o aumentarlo.
+- **Fidelización:** al seleccionar la venta y su moto, el canje muestra y precarga el mismo kilometraje compartido.
+- **Garantía:** los servicios y reclamaciones de garantía utilizan ese mismo registro y siguen validando los límites de días y kilómetros definidos para la moto.
+- **Validación:** el programa rechaza cualquier operación que intente registrar un kilometraje inferior al último valor guardado. El historial de servicios, reclamaciones y canjes conserva el kilometraje que tenía cada operación.
+
+Las motos registradas antes de esta actualización no necesitan migrar ni recrear sus cuentas. Como su PDA de kilometraje todavía puede no existir, la aplicación calcula el mayor kilometraje presente en el historial on-chain de servicios, reclamaciones y canjes. Ese valor sirve como referencia para inicializar el registro durante la primera operación posterior a la actualización. A partir de ahí, la cuenta compartida se convierte en la referencia principal.
+
 ### Precargar motocicletas
 
 1. Conecta la wallet owner y selecciona el concesionario que vas a utilizar.
