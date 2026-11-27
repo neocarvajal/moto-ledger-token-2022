@@ -425,7 +425,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       });
       const payload = await response.json() as { token?: string; error?: string; expiresAt?: number; status?: string };
       if (!response.ok || !payload.token) throw new Error(payload.error ?? "No se pudo crear el QR de canje.");
-      const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\\/+$/, "");
+      const publicUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, "");
       setSession({
         token: payload.token, url: `${publicUrl}/canjear-servicio/${payload.token}`,
         expiresAt: payload.expiresAt ?? Date.now() + 300_000, idCanje: idCanje.toString(),
