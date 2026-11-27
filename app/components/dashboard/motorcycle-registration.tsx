@@ -115,7 +115,7 @@ export function MotorcycleRegistration({
         if (existingModels.get(modelKey)?.has(dealerAddress)) { skipped += 1; continue; }
 
         // Stable model-specific serials make repeated runs idempotent.
-        const serial = `ML${item.code}${concesionario.slice(0, 11)}01`;
+        const serial = `ML${item.code}${concesionario.slice(0, 10)}01`;
         const placa = `D${concesionario.slice(-4).toUpperCase()}${String(index + 1).padStart(2, "0")}`;
         const [moto] = await deriveMotoPda(serial, dealerAddress);
         const [garantia] = await deriveGarantiaPda(serial);
