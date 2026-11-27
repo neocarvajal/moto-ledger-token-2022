@@ -2270,6 +2270,17 @@ pub struct EliminarMoto<'info> {
 
     #[account(
         mut,
+        init_if_needed,
+        payer = owner,
+        close = owner,
+        space = KilometrajeMoto::LEN,
+        seeds = [b"kilometraje_moto", moto.key().as_ref()],
+        bump
+    )]
+    pub kilometraje_moto: Account<'info, KilometrajeMoto>,
+
+    #[account(
+        mut,
         close = owner,
         seeds = [
             b"garantia",
