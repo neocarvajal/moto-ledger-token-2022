@@ -174,20 +174,56 @@ pub mod registro {
             Errores::CedulaInvalida
         );
         
-        context.accounts.concesionario.total_clientes =
-            context.accounts.concesionario.total_clientes
+        let owner = context.accounts.owner.key();
+        let cliente = &mut context.accounts.cliente;
+
+        if cliente.owner == Pubkey::default() {
+            let id_global = context.accounts.concesionario.total_clientes
                 .checked_add(1)
                 .ok_or(Errores::ContadorInvalido)?;
+            cliente.set_inner(Cliente {
+                owner,
+                id_cliente: id_global,
+                nombre_cliente: nombre_cliente.clone(),
+                cedula_cliente,
+                total_motos_cliente: 0,
+            });
+        } else {
+            require_keys_eq!(cliente.owner, owner, Errores::Unauthorized);
+            require!(cliente.cedula_cliente == cedula_cliente, Errores::CedulaInvalida);
+        }
 
-        let id_cliente = context.accounts.concesionario.total_clientes;
+        let association = &mut context.accounts.asociacion_cliente;
+        if association.concesionario == Pubkey::default() {
+            let id_local = context.accounts.concesionario.total_clientes
+                .checked_add(1)
+                .ok_or(Errores::ContadorInvalido)?;
+            context.accounts.concesionario.total_clientes = id_local;
+            association.set_inner(AsociacionCliente {
+                owner,
+                concesionario: context.accounts.concesionario.key(),
+                cliente: context.accounts.cliente.key(),
+                id_cliente: id_local,
+                fecha_registro: Clock::get()?.unix_timestamp,
+                activo: true,
+                bump: context.bumps.asociacion_cliente,
+            });
+        } else {
+            require_keys_eq!(
+                association.concesionario,
+                context.accounts.concesionario.key(),
+                Errores::AsociacionClienteInvalida
+            );
+            require_keys_eq!(
+                association.cliente,
+                context.accounts.cliente.key(),
+                Errores::AsociacionClienteInvalida
+            );
+            require!(association.activo, Errores::AsociacionClienteInactiva);
+            return err!(Errores::ClienteYaAsociado);
+        }
 
-        context.accounts.cliente.set_inner(Cliente {
-            owner: context.accounts.owner.key(),
-            id_cliente,
-            nombre_cliente: nombre_cliente.clone(),
-            cedula_cliente,
-            total_motos_cliente: 0,
-        });
+        let id_cliente = association.id_cliente;
 
         msg!("========================================");
         msg!("       CLIENTE REGISTRADO");
@@ -201,6 +237,49 @@ pub mod registro {
         msg!("Total clientes: {}", context.accounts.concesionario.total_clientes);
         msg!("Estado: Registrado exitosamente");
         msg!("========================================");
+
+        Ok(())
+    }
+
+    /// Creates the dealership-specific relationship for a previously registered global customer.
+    /// Used by the migration utility and by future customer onboarding flows.
+    pub fn registrar_asociacion_cliente(
+        context: Context<RegistrarAsociacionCliente>,
+    ) -> Result<()> {
+        require_keys_eq!(
+            context.accounts.cliente.owner,
+            context.accounts.owner.key(),
+            Errores::Unauthorized
+        );
+
+        let association = &mut context.accounts.asociacion_cliente;
+        if association.concesionario == Pubkey::default() {
+            let id_local = context.accounts.concesionario.total_clientes
+                .checked_add(1)
+                .ok_or(Errores::ContadorInvalido)?;
+            context.accounts.concesionario.total_clientes = id_local;
+            association.set_inner(AsociacionCliente {
+                owner: context.accounts.owner.key(),
+                concesionario: context.accounts.concesionario.key(),
+                cliente: context.accounts.cliente.key(),
+                id_cliente: id_local,
+                fecha_registro: Clock::get()?.unix_timestamp,
+                activo: true,
+                bump: context.bumps.asociacion_cliente,
+            });
+        } else {
+            require_keys_eq!(
+                association.concesionario,
+                context.accounts.concesionario.key(),
+                Errores::AsociacionClienteInvalida
+            );
+            require_keys_eq!(
+                association.cliente,
+                context.accounts.cliente.key(),
+                Errores::AsociacionClienteInvalida
+            );
+            require!(association.activo, Errores::AsociacionClienteInactiva);
+        }
 
         Ok(())
     }
@@ -1321,6 +1400,12 @@ pub enum Errores {
     NombreClienteInvalido,
     #[msg("La cedula del cliente debe ser mayor a cero")]
     CedulaInvalida,
+    #[msg("El cliente ya esta asociado a este concesionario")]
+    ClienteYaAsociado,
+    #[msg("La asociacion entre cliente y concesionario no es valida")]
+    AsociacionClienteInvalida,
+    #[msg("La asociacion del cliente con este concesionario esta inactiva")]
+    AsociacionClienteInactiva,
     #[msg("El precio de venta debe ser mayor a cero")]
     PrecioVentaInvalido,
     #[msg("La descripcion del servicio no puede superar los 100 caracteres")]
@@ -1587,6 +1672,22 @@ impl Cliente {
 }
 
 #[account]
+pub struct AsociacionCliente {
+    pub owner: Pubkey,
+    pub concesionario: Pubkey,
+    pub cliente: Pubkey,
+    pub id_cliente: u32,
+    pub fecha_registro: i64,
+    pub activo: bool,
+    pub bump: u8,
+}
+
+impl AsociacionCliente {
+    pub const LEN: usize =
+        DISCRIMINATOR + 32 + 32 + 32 + 4 + 8 + 1 + 1;
+}
+
+#[account]
 pub struct Venta {
     pub concesionario: Pubkey,
     pub cliente: Pubkey,
@@ -1758,7 +1859,7 @@ pub struct RegistrarCliente<'info> {
     pub concesionario: Account<'info, Concesionario>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         space = Cliente::LEN,
         seeds = [
@@ -1769,6 +1870,45 @@ pub struct RegistrarCliente<'info> {
         bump
     )]
     pub cliente: Account<'info, Cliente>,
+
+    #[account(
+        init_if_needed,
+        payer = owner,
+        space = AsociacionCliente::LEN,
+        seeds = [b"asociacion_cliente", concesionario.key().as_ref(), cliente.key().as_ref()],
+        bump
+    )]
+    pub asociacion_cliente: Account<'info, AsociacionCliente>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RegistrarAsociacionCliente<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
+    #[account(
+        seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()],
+        bump,
+        constraint = cliente.owner == owner.key() @ Errores::Unauthorized
+    )]
+    pub cliente: Account<'info, Cliente>,
+
+    #[account(
+        init_if_needed,
+        payer = owner,
+        space = AsociacionCliente::LEN,
+        seeds = [b"asociacion_cliente", concesionario.key().as_ref(), cliente.key().as_ref()],
+        bump
+    )]
+    pub asociacion_cliente: Account<'info, AsociacionCliente>,
 
     pub system_program: Program<'info, System>,
 }
@@ -1808,6 +1948,16 @@ pub struct RegistrarVenta<'info> {
             @ Errores::Unauthorized
     )]
     pub cliente: Account<'info, Cliente>,
+
+    #[account(
+        seeds = [b"asociacion_cliente", concesionario.key().as_ref(), cliente.key().as_ref()],
+        bump = asociacion_cliente.bump,
+        constraint = asociacion_cliente.owner == owner.key() @ Errores::AsociacionClienteInvalida,
+        constraint = asociacion_cliente.activo @ Errores::AsociacionClienteInactiva,
+        constraint = asociacion_cliente.concesionario == concesionario.key() @ Errores::AsociacionClienteInvalida,
+        constraint = asociacion_cliente.cliente == cliente.key() @ Errores::AsociacionClienteInvalida
+    )]
+    pub asociacion_cliente: Account<'info, AsociacionCliente>,
 
     #[account(
         mut,
