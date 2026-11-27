@@ -87,7 +87,7 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
       found.sort((a, b) => a.data.idConcesionario - b.data.idConcesionario);
       setDealerships(found);
       setDealership((current) =>
-        found.find((item) => item.address === current?.address) ?? found[0] ?? null
+        found.find((item) => item.address === current?.address) ?? null
       );
       if (found.length > 0) setShowCreate(false);
     } catch (error) {
@@ -212,6 +212,7 @@ export function DealershipWorkspace({ activeModule }: { activeModule: string }) 
               onChange={(event) => setDealership(dealerships.find((item) => item.address === event.target.value) ?? null)}
               className="w-full rounded-lg border border-[#e2e5e8] bg-white px-3 py-3 text-[12px] text-[#252a30] outline-none focus:border-[#e60012]"
             >
+              <option value="">Selecciona un concesionario</option>
               {dealerships.map((item) => (
                 <option key={item.address} value={item.address}>
                   {item.data.nombreConcesionario} · {item.data.rifConcesionario}
