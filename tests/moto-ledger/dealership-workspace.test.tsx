@@ -139,7 +139,7 @@ describe("MotoLedger dealership workspace", () => {
 
   it("asks for a wallet before showing dealership operations", () => {
     mocks.activeWallet = null;
-    render(<DealershipWorkspace activeModule="overview" />);
+    render(<DealershipWorkspace activeModule="overview" onNavigate={() => {}} />);
 
     expect(screen.getByText("Conecta tu wallet para comenzar")).toBeTruthy();
     expect(mocks.client.rpc.getProgramAccounts).not.toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe("MotoLedger dealership workspace", () => {
 
   it("loads and sorts the connected wallet's dealerships", async () => {
     setAccountResults();
-    render(<DealershipWorkspace activeModule="workspace" />);
+    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /BERA MOTORS/ })).toBeTruthy();
@@ -172,7 +172,7 @@ describe("MotoLedger dealership workspace", () => {
 
   it("changes the selected dealership from the selector", async () => {
     setAccountResults();
-    render(<DealershipWorkspace activeModule="workspace" />);
+    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
 
     const selector = await screen.findByRole("combobox");
     fireEvent.change(selector, { target: { value: "dealership-b" } });
@@ -189,7 +189,7 @@ describe("MotoLedger dealership workspace", () => {
       context: { signature: "signature-123" },
     });
 
-    render(<DealershipWorkspace activeModule="workspace" />);
+    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
     fireEvent.change(screen.getByLabelText("Nombre del concesionario"), {
       target: { value: "NUEVO MOTOR" },
     });
@@ -227,7 +227,7 @@ describe("MotoLedger dealership workspace", () => {
       data: mocks.dealershipA,
     });
 
-    render(<DealershipWorkspace activeModule="workspace" />);
+    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
     fireEvent.change(screen.getByLabelText("Nombre del concesionario"), {
       target: { value: "BERA MOTORS" },
     });
@@ -246,7 +246,7 @@ describe("MotoLedger dealership workspace", () => {
 
   it("rejects registration when the wallet cannot sign", async () => {
     mocks.activeWallet = { account: mocks.connected.account, signer: undefined } as never;
-    render(<DealershipWorkspace activeModule="workspace" />);
+    render(<DealershipWorkspace activeModule="workspace" onNavigate={() => {}} />);
     fireEvent.change(screen.getByLabelText("Nombre del concesionario"), {
       target: { value: "NUEVO MOTOR" },
     });
