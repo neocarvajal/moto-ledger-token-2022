@@ -15,7 +15,7 @@ import { deriveClientePda, deriveProgramaFidelidadPda, deriveToken2022Ata, deriv
 import { CustomerWalletLink } from "./customer-wallet-link";
 import { type Cliente } from "../../lib/moto-ledger/src/generated/accounts/cliente";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
-import { getVentaDecoder, getVentaDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/venta";
+import { getAsociacionClienteDecoder, getAsociacionClienteDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/asociacionCliente";
 
 type CustomerRecord = { address: ReturnType<typeof address>; data: Cliente };
 
@@ -59,23 +59,23 @@ export function CustomerManagement({
       const ownerAddress = address(connected.account.address);
       const dealerAddress = address(concesionario);
       const discriminatorFilter = getBase58Decoder().decode(
-        getVentaDiscriminatorBytes()
+        getAsociacionClienteDiscriminatorBytes()
       ) as Base58EncodedBytes;
       const dealerFilter = dealerAddress as Base58EncodedBytes;
-      const sales = await client.rpc
+      const associations = await client.rpc
         .getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
           encoding: "base64",
           filters: [
             { memcmp: { offset: 0n, bytes: discriminatorFilter, encoding: "base58" } },
-            { memcmp: { offset: 8n, bytes: dealerFilter, encoding: "base58" } },
+            { memcmp: { offset: 40n, bytes: dealerFilter, encoding: "base58" } },
           ],
         })
         .send();
 
       const customerAddresses = [...new Set(
-        sales.map((sale) =>
-          getVentaDecoder().decode(
-            getBase64Encoder().encode(sale.account.data[0])
+        associations.map((association) =>
+          getAsociacionClienteDecoder().decode(
+            getBase64Encoder().encode(association.account.data[0])
           ).cliente
         )
       )];
@@ -207,16 +207,6 @@ export function CustomerManagement({
       const owner = address(connected.account.address);
       const [cliente] = await deriveClientePda(owner, id);
       const existing = await client.registro.accounts.cliente.fetch(cliente).catch(() => null);
-      if (existing) {
-        const record = { address: cliente, data: existing.data };
-        setCustomer(record);
-        setCustomers((current) =>
-          current.some((item) => item.address === cliente)
-            ? current.map((item) => item.address === cliente ? record : item)
-            : [...current, record].sort((a, b) => a.data.idCliente - b.data.idCliente)
-        );
-        throw new Error("Ya existe un cliente con esa cédula para esta wallet.");
-      }
       const instruction = client.registro.instructions.registrarCliente({
         owner: connected.signer,
         concesionario: address(concesionario),
@@ -232,6 +222,9 @@ export function CustomerManagement({
       );
       const created = await client.registro.accounts.cliente.fetch(cliente);
       const record = { address: cliente, data: created.data };
+      if (existing && existing.data.nombreCliente !== created.data.nombreCliente) {
+        toast.info("El cliente ya existía; se añadió su asociación al concesionario sin modificar sus datos globales.");
+      }
       setCustomer(record);
       setCustomers((current) =>
         [...current.filter((item) => item.address !== cliente), record]
