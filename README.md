@@ -248,3 +248,41 @@ npm run ci           # Build, typecheck, lint, formato y tests
 MotoLedger se encuentra en desarrollo sobre Devnet. El dashboard integra la gestión de concesionarios, inventario, clientes, ventas, servicios y configuración de garantía. El código del programa y el IDL ya incluyen la base on-chain del sistema de fidelización con Token-2022; la integración completa de sus flujos en la interfaz y su validación con transacciones Devnet están pendientes. El módulo de reclamaciones y la gestión completa del ciclo de garantías también están pendientes de implementación.
 
 Las operaciones que modifican el estado se envían al programa desplegado y requieren firma de la wallet correspondiente. La disponibilidad real de cada función depende de que la versión actualizada del programa esté desplegada y de que el flujo haya sido probado en la red. Las nuevas instrucciones de fidelización documentadas en este README no deben interpretarse como evidencia de que ya se hayan emitido puntos en Devnet.
+
+
+## Customer-to-dealership association migration
+
+The current program stores each customer globally per owner and stores a separate PDA for each dealership/customer relationship. Existing sales provide reliable evidence for reconstructing historical relationships.
+
+After deploying the updated Anchor program and regenerating the Codama clients, run the migration utility from the repository root:
+
+```bash
+git pull origin main
+npm install
+npm run codama
+```
+
+If the repository's Codama command is not configured in your local setup, regenerate the clients using the existing Codama workflow before running the migration script.
+
+The script defaults to a **dry run** and writes `customer-association-migration-report.json`:
+
+```bash
+npm run migrate:customer-associations
+```
+
+Review the report. It lists candidate associations, missing related accounts, and global customers whose dealership cannot be inferred from on-chain sales. For those customers, create a verified mapping based on your records using `scripts/customer-association-mapping.example.json`, then set:
+
+```bash
+export CUSTOMER_ASSOCIATION_MAPPING=scripts/customer-association-mapping.json
+```
+
+To submit the missing association transactions, use the owner keypair that controls the dealerships:
+
+```bash
+export SOLANA_KEYPAIR_PATH="$HOME/.config/solana/id.json"
+npm run migrate:customer-associations -- --execute
+```
+
+The utility only creates associations for dealerships owned by the configured signer. Run it once per owner wallet if the program contains dealerships controlled by multiple owners. Existing association PDAs are skipped, so rerunning the utility is safe. It does not modify customer accounts, sales, motorcycles, loyalty programs, Token-2022 mints, or token balances.
+
+**Important:** a customer account with no sale and no verified manual mapping cannot be assigned to a dealership automatically. The original customer-registration instruction did not persist that relationship, so the migration report leaves such customers unresolved instead of guessing.
