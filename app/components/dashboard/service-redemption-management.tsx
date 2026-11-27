@@ -8,7 +8,6 @@ import {
   createNoopSigner,
   createTransactionMessage,
   getBase58Decoder,
-  getBase64Decoder,
   getBase64Encoder,
   getBase64EncodedWireTransaction,
   partiallySignTransactionMessageWithSigners,
@@ -258,7 +257,16 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 if (!receiptAccount) {
                   throw new Error(`La transacción confirmó, pero el recibo no coincide con el identificador esperado. Firma: ${signature}`);
                 }
-                setReceipt({ signature, address: receiptPda, points: receiptAccount.data.puntos });
+                const receiptData = receiptAccount.data;
+                if (receiptData.cliente !== selectedCustomer || receiptData.wallet !== wallet ||
+                    receiptData.concesionario !== concesionario || receiptData.mint !== mint ||
+                    receiptData.idCanje !== idCanje || receiptData.servicioId !== selectedServiceRecord?.id ||
+                    receiptData.puntos !== selectedServiceRecord?.puntos ||
+                    receiptData.venta !== selectedSaleRecord?.address ||
+                    receiptData.moto !== selectedSaleRecord?.data.moto) {
+                  throw new Error(`El recibo on-chain no coincide con la intención firmada. Firma: ${signature}`);
+                }
+                setReceipt({ signature, address: receiptPda, points: receiptData.puntos });
                 toast.success("Canje registrado en Solana y puntos quemados.");
                 setSession(null);
                 await loadChainData();
