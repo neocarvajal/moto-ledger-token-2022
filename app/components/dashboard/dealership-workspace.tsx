@@ -464,6 +464,7 @@ export function DealershipWorkspace({
           <SalesManagement
             concesionario={dealership.address}
             nombreConcesionario={dealership.data.nombreConcesionario}
+            onNavigate={onNavigate}
             onRegistered={async () => {
               await refreshDealership(dealership.address);
             }}
