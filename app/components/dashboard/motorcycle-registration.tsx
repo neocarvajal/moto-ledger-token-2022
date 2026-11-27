@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { address } from "@solana/kit";
+import { address, getBase64Encoder, getBase58Decoder, type Base58EncodedBytes } from "@solana/kit";
 import { useConnectedWallet } from "@solana/kit-plugin-wallet/react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
@@ -13,9 +13,11 @@ import {
 
 export function MotorcycleRegistration({
   concesionario,
+  nombreConcesionario,
   onRegistered,
 }: {
   concesionario: string;
+  nombreConcesionario: string;
   onRegistered: () => Promise<void>;
 }) {
   const client = useAppClient();
@@ -50,55 +52,57 @@ export function MotorcycleRegistration({
         throw new Error("Configura primero la duración y el kilometraje de la garantía del concesionario.");
       }
 
-      const demoMotorcycles = [
-        { modelo: "DT150", color: "Negro / Rojo" },
-        { modelo: "BR150", color: "Azul" },
-        { modelo: "SBR", color: "Negro" },
-      ];
+      const demoMotorcycles = getDemoMotorcycles(nombreConcesionario);
+      if (demoMotorcycles.length === 0) {
+        throw new Error(`Todavía no hay un catálogo de demostración configurado para "${nombreConcesionario}". Puedes registrar las motos manualmente.`);
+      }
+
+      // Read the selected dealership inventory to avoid inserting duplicate models.
+      const discriminator = getBase58Decoder().decode(getMotoDiscriminatorBytes()) as Base58EncodedBytes;
+      const onChainMotos = await client.rpc.getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+        encoding: "base64",
+        filters: [{ memcmp: { offset: 0n, bytes: discriminator, encoding: "base58" } }],
+      }).send();
+      const existingModels = new Set(
+        onChainMotos
+          .map((item) => getMotoDecoder().decode(getBase64Encoder().encode(item.account.data[0])))
+          .filter((item) => item.concesionario === dealerAddress)
+          .map((item) => normalizeMotorcycleModel(item.marca, item.modelo))
+      );
 
       for (const [index, item] of demoMotorcycles.entries()) {
-        // Stable dealership-specific identifiers make the action safe to repeat.
-        const serial = `MLD${concesionario.slice(0, 11).toUpperCase()}${String(index + 1).padStart(3, "0")}`;
-        const placa = `D${concesionario.slice(-5).toUpperCase()}${index + 1}`;
+        const modelKey = normalizeMotorcycleModel(item.marca, item.modelo);
+        if (existingModels.has(modelKey)) { skipped += 1; continue; }
+
+        // Stable model-specific serials make repeated runs idempotent.
+        const serial = `ML${item.code}${concesionario.slice(0, 11)}01`;
+        const placa = `D${concesionario.slice(-4).toUpperCase()}${String(index + 1).padStart(2, "0")}`;
         const [moto] = await deriveMotoPda(serial, dealerAddress);
         const [garantia] = await deriveGarantiaPda(serial);
         const existing = await client.registro.accounts.moto.fetch(moto).catch(() => null);
-
         if (existing) {
           if (existing.data.concesionario !== dealerAddress) {
             failed += 1;
-            toast.error(`No se pudo validar la moto de demostración ${index + 1}.`);
-          } else {
-            skipped += 1;
-          }
+            toast.error(`El identificador de ${item.marca} ${item.modelo} ya está ocupado por otro concesionario.`);
+          } else { skipped += 1; existingModels.add(modelKey); }
           continue;
         }
 
         try {
           const instruction = client.registro.instructions.registrarMoto({
-            owner: connected.signer,
-            concesionario: dealerAddress,
-            garantia,
-            moto,
-            serial,
-            placa,
-            marca: "BERA",
-            modelo: item.modelo,
-            color: item.color,
+            owner: connected.signer, concesionario: dealerAddress, garantia, moto, serial, placa,
+            marca: item.marca, modelo: item.modelo, color: item.color,
           });
           const result = await instruction.sendTransaction();
           created += 1;
-          notifyTransactionSuccess(
-            `Moto BERA ${item.modelo} precargada.`,
-            result.context.signature
-          );
+          existingModels.add(modelKey);
+          notifyTransactionSuccess(`${item.marca} ${item.modelo} precargada (${item.transmision.toLowerCase()}).`, result.context.signature);
         } catch (error) {
           failed += 1;
-          console.error(`No se pudo precargar BERA ${item.modelo}:`, error);
-          toast.error(`No se pudo registrar BERA ${item.modelo}. Puedes volver a intentarlo; las motos ya creadas se omitirán.`);
+          console.error(`No se pudo precargar ${item.marca} ${item.modelo}:`, error);
+          toast.error(`No se pudo registrar ${item.marca} ${item.modelo}. Puedes reintentar; las unidades ya creadas se omitirán.`);
         }
       }
-
       await onRegistered();
       if (failed === 0) {
         toast.success(`Precarga finalizada: ${created} creada(s), ${skipped} ya existente(s).`);
@@ -182,7 +186,7 @@ export function MotorcycleRegistration({
       <div className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-semibold text-[#424950]">¿Necesitas inventario de prueba?</p>
-          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Precarga tres motos BERA de demostración. Es opcional y no afecta el registro manual.</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-[#858d96]">Precarga modelos sugeridos para {nombreConcesionario}. Es opcional y no afecta el registro manual.</p>
         </div>
         <button
           type="button"
