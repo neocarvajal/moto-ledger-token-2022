@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import {
+  deriveAsociacionClientePda,
   deriveAutoridadFidelidadPda,
   deriveClientePda,
   deriveProgramaFidelidadPda,
@@ -356,6 +357,15 @@ export function SalesManagement({
       const [cliente] = await deriveClientePda(owner, customerId);
       const customer = await client.registro.accounts.cliente.fetch(cliente);
       if (customer.data.owner !== owner) throw new Error("El cliente no pertenece a la wallet conectada.");
+      const [asociacionCliente] = await deriveAsociacionClientePda(dealerAddress, cliente);
+      const associationInfo = await client.rpc.getAccountInfo(asociacionCliente, { encoding: "base64" }).send();
+      if (!associationInfo.value) {
+        throw new Error("Este cliente no está registrado en el concesionario seleccionado. Regístralo o asócialo primero desde el módulo Clientes.");
+      }
+      const association = await client.registro.accounts.asociacionCliente.fetch(asociacionCliente);
+      if (!association.data.activo || association.data.concesionario !== dealerAddress || association.data.cliente !== cliente) {
+        throw new Error("La asociación del cliente con este concesionario no está activa.");
+      }
 
       const motorcycle = motorcycles.find((item) => item.data.serial === serial);
       if (!motorcycle) throw new Error("La moto seleccionada ya no está disponible.");
@@ -366,6 +376,7 @@ export function SalesManagement({
         owner: connected.signer,
         concesionario: dealerAddress,
         cliente,
+        asociacionCliente,
         moto: address(motorcycle.address),
         venta,
         nombreConcesionario,
