@@ -1381,7 +1381,6 @@ pub struct CanjearServicio<'info> {
     pub moto: Account<'info, Moto>,
 
     #[account(
-        mut,
         init_if_needed,
         payer = owner,
         space = KilometrajeMoto::LEN,
@@ -2135,7 +2134,6 @@ pub struct RegistrarServicio<'info> {
     pub garantia: Account<'info, Garantia>,
 
     #[account(
-        mut,
         init_if_needed,
         payer = owner,
         space = KilometrajeMoto::LEN,
@@ -2204,7 +2202,6 @@ pub struct ReclamarGarantia<'info> {
     pub garantia: Account<'info, Garantia>,
 
     #[account(
-        mut,
         init_if_needed,
         payer = owner,
         space = KilometrajeMoto::LEN,
