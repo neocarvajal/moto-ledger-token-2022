@@ -40,6 +40,7 @@ const asociacionCliente = address("LU16b9JNWweojQfLUmNEJNrYvFY8tVnMYRscG1SZxJs")
 const venta = address("AdfybrUm7UX2ZTkJRo9NQLGWooGywtf9RKEegaMwAWp");
 const servicio = address("66VbHcx43C94XVASUtzM6mxy2nwbpPMdwBBLejZ9uNEt");
 const reclamacion = address("LU16b9JNWweojQfLUmNEJNrYvFY8tVnMYRscG1SZxJs");
+const kilometrajeMoto = address("So11111111111111111111111111111111111111112");
 const systemProgram = address("11111111111111111111111111111111");
 
 function expectInstruction(
@@ -118,6 +119,7 @@ describe("MotoLedger Codama instructions", () => {
       concesionario,
       garantia,
       moto,
+      kilometrajeMoto,
       serial: "BER0DT1500BM00003",
       placa: "AB123CD",
       marca: "Bera",
@@ -128,8 +130,8 @@ describe("MotoLedger Codama instructions", () => {
     expectInstruction(
       ix,
       "registrar_moto",
-      [ownerAddress, concesionario, garantia, moto, systemProgram],
-      [3, 1, 1, 1, 0]
+      [ownerAddress, concesionario, garantia, moto, kilometrajeMoto, systemProgram],
+      [3, 1, 1, 1, 1, 0]
     );
     expect(getRegistrarMotoInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
@@ -217,6 +219,7 @@ describe("MotoLedger Codama instructions", () => {
       concesionario,
       moto,
       garantia,
+      kilometrajeMoto,
       servicio,
       nombreConcesionario: "BERA MOTORS",
       serial: "BER0DT1500BM00003",
@@ -229,8 +232,8 @@ describe("MotoLedger Codama instructions", () => {
     expectInstruction(
       ix,
       "registrar_servicio",
-      [ownerAddress, concesionario, moto, garantia, servicio, systemProgram],
-      [3, 1, 1, 0, 1, 0]
+      [ownerAddress, concesionario, moto, garantia, kilometrajeMoto, servicio, systemProgram],
+      [3, 1, 1, 0, 1, 1, 0]
     );
     expect(getRegistrarServicioInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
@@ -249,6 +252,7 @@ describe("MotoLedger Codama instructions", () => {
       concesionario,
       moto,
       garantia,
+      kilometrajeMoto,
       reclamacion,
       nombreConcesionario: "BERA MOTORS",
       serial: "BER0DT1500BM00003",
@@ -259,8 +263,8 @@ describe("MotoLedger Codama instructions", () => {
     expectInstruction(
       ix,
       "reclamar_garantia",
-      [ownerAddress, concesionario, moto, garantia, reclamacion, systemProgram],
-      [3, 1, 1, 0, 1, 0]
+      [ownerAddress, concesionario, moto, garantia, kilometrajeMoto, reclamacion, systemProgram],
+      [3, 1, 1, 0, 1, 1, 0]
     );
     expect(getReclamarGarantiaInstructionDataDecoder().decode(ix.data))
       .toMatchObject({
