@@ -13,6 +13,7 @@ import { useAppClient } from "../../lib/client-provider";
 import { notifyTransactionSuccess } from "../../lib/transaction-toast";
 import {
   deriveGarantiaPda,
+  deriveKilometrajeMotoPda,
   deriveServicioPda,
 } from "../../lib/moto-ledger/pdas";
 import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
@@ -70,6 +71,8 @@ export function ServicesManagement({
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [selectedMoto, setSelectedMoto] = useState("");
   const [mileage, setMileage] = useState("");
+  const [latestMileage, setLatestMileage] = useState<bigint | null>(null);
+  const [mileageLoading, setMileageLoading] = useState(false);
   const [description, setDescription] = useState("");
   const [cost, setCost] = useState("");
   const [serviceType, setServiceType] = useState<TipoServicio | "">("");
@@ -149,6 +152,43 @@ export function ServicesManagement({
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    let active = true;
+    setLatestMileage(null);
+    setMileage("");
+    if (!selectedMotorcycle) return;
+    setMileageLoading(true);
+    void (async () => {
+      try {
+        const motoAddress = address(selectedMotorcycle.address);
+        const [mileagePda] = await deriveKilometrajeMotoPda(motoAddress);
+        const info = await client.rpc.getAccountInfo(mileagePda, { encoding: "base64" }).send();
+        if (!info.value) {
+          if (active) {
+            setLatestMileage(0n);
+            setMileage("0");
+          }
+          return;
+        }
+        const record = await client.registro.accounts.kilometrajeMoto.fetch(mileagePda);
+        if (record.data.moto !== selectedMotorcycle.address ||
+            record.data.concesionario !== concesionario) {
+          throw new Error("El registro de kilometraje no corresponde a esta moto.");
+        }
+        if (active) {
+          setLatestMileage(record.data.kilometrajeActual);
+          setMileage(record.data.kilometrajeActual.toString());
+        }
+      } catch (error) {
+        console.error("Motorcycle mileage:", error);
+        if (active) toast.error(error instanceof Error ? error.message : "No se pudo consultar el kilometraje.");
+      } finally {
+        if (active) setMileageLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [client, concesionario, selectedMotorcycle?.address]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!connected?.signer) {
@@ -177,6 +217,9 @@ export function ServicesManagement({
     let costValue: bigint;
     try {
       mileageValue = parseUnsigned(mileage, "Kilometraje");
+      if (latestMileage !== null && mileageValue < latestMileage) {
+        throw new Error(`El kilometraje no puede ser inferior al último registrado (${latestMileage.toLocaleString("es-VE")} km).`);
+      }
       costValue = parseUnsigned(cost, "Costo");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Revisa los valores introducidos.");
@@ -195,6 +238,7 @@ export function ServicesManagement({
       }
 
       const [garantia] = await deriveGarantiaPda(latestMoto.data.serial);
+      const [kilometrajeMoto] = await deriveKilometrajeMotoPda(motoAddress);
       const warrantyAccount = await client.registro.accounts.garantia.fetch(garantia);
       if (serviceType === TipoServicio.Garantia) {
         const warranty = warrantyAccount.data;
@@ -216,6 +260,7 @@ export function ServicesManagement({
         concesionario: address(concesionario),
         moto: motoAddress,
         garantia,
+        kilometrajeMoto,
         servicio,
         nombreConcesionario,
         serial: latestMoto.data.serial,
@@ -270,6 +315,7 @@ export function ServicesManagement({
                   <p>Placa: <strong className="font-mono text-[#424950]">{selectedMotorcycle.data.placa}</strong></p>
                   <p>Color: <strong className="text-[#424950]">{selectedMotorcycle.data.color}</strong></p>
                   <p>Servicios previos: <strong className="text-[#424950]">{selectedMotorcycle.data.servicios.toString()}</strong></p>
+                  <p className="col-span-2">Último kilometraje: <strong className="text-[#424950]">{latestMileage === null ? "Consultando…" : `${formatAmount(latestMileage)} km`}</strong></p>
                 </div>
                 <div className="mt-3 border-t border-[#e9ebee] pt-3">
                   <p className="text-[9px] font-bold tracking-wide text-[#9299a1]">MOTO PDA</p>
@@ -298,7 +344,8 @@ export function ServicesManagement({
 
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-semibold text-[#555e68]">Kilometraje actual</span>
-              <input value={mileage} onChange={(event) => setMileage(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" required disabled={busy} placeholder="Ej. 1500" className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]" />
+              <input value={mileage} onChange={(event) => setMileage(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" required disabled={busy || mileageLoading || latestMileage === null} placeholder="Ej. 1500" className="w-full rounded-lg border border-[#e2e5e8] px-3 py-2.5 text-[11px] outline-none focus:border-[#e60012]" />
+              <span className="mt-1 block text-[9px] text-[#858d96]">{mileageLoading ? "Consultando kilometraje on-chain…" : latestMileage === 0n ? "Sin lecturas previas. El primer servicio establecerá el kilometraje inicial." : latestMileage !== null ? "Se precarga el último kilometraje. Solo puedes mantenerlo o aumentarlo." : "Selecciona una moto para consultar su kilometraje."}</span>
             </label>
           </div>
 
