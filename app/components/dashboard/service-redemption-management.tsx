@@ -26,6 +26,7 @@ import { useCluster } from "../cluster-context";
 import {
   deriveCanjeServicioPda,
   deriveCatalogoServiciosPda,
+  deriveKilometrajeMotoPda,
   deriveClientePda,
   deriveProgramaFidelidadPda,
   deriveToken2022Ata,
@@ -43,6 +44,7 @@ type RedemptionRecord = { address: string; data: CanjeServicio };
 type SelectedSale = Sale & {
   serial: string;
   modelo: string;
+  kilometrajeActual: bigint;
   garantia: {
     fechaVencimiento: bigint;
     kilometrajeMaximo: bigint;
@@ -233,16 +235,30 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
         if (moto.data.concesionario !== concesionario || moto.data.garantia === undefined) throw new Error("La moto no pertenece al concesionario.");
         const warranty = await client.registro.accounts.garantia.fetch(address(moto.data.garantia));
         if (warranty.data.moto !== selectedSaleRecord.data.moto || warranty.data.concesionario !== concesionario) throw new Error("La garantía no coincide con la venta.");
-        if (active) setSaleDetails({
+        const [kilometrajeMotoPda] = await deriveKilometrajeMotoPda(address(selectedSaleRecord.data.moto));
+        const mileageInfo = await client.rpc.getAccountInfo(kilometrajeMotoPda, { encoding: "base64" }).send();
+        const mileageRecord = mileageInfo.value
+          ? await client.registro.accounts.kilometrajeMoto.fetch(kilometrajeMotoPda)
+          : null;
+        if (mileageRecord && (mileageRecord.data.moto !== selectedSaleRecord.data.moto ||
+            mileageRecord.data.concesionario !== concesionario)) {
+          throw new Error("El registro de kilometraje no corresponde a esta moto.");
+        }
+        const currentMileage = mileageRecord?.data.kilometrajeActual ?? 0n;
+        if (active) {
+          setMileage(currentMileage.toString());
+          setSaleDetails({
           ...selectedSaleRecord,
           serial: moto.data.serial,
           modelo: `${moto.data.marca} ${moto.data.modelo}`,
+          kilometrajeActual: currentMileage,
           garantia: {
             fechaVencimiento: warranty.data.fechaVencimiento,
             kilometrajeMaximo: warranty.data.kilometrajeMaximo,
             estado: warranty.data.estado,
           },
         });
+        }
       } catch (error) {
         if (active) toast.error(error instanceof Error ? error.message : "No se pudo consultar la garantía on-chain.");
       }
@@ -291,6 +307,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     const [walletCliente] = await deriveWalletClientePda(address(selectedCustomer));
     const [tokenAccount] = await deriveToken2022Ata(address(wallet), address(mint));
     const [canjeServicio] = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
+    const [kilometrajeMoto] = await deriveKilometrajeMotoPda(address(selectedSaleRecord.data.moto));
     const existing = await client.rpc.getAccountInfo(canjeServicio, { encoding: "base64" }).send();
     if (existing.value) throw new Error("El identificador de canje ya existe. Cancela la solicitud y genera un nuevo QR.");
     const moto = await client.registro.accounts.moto.fetch(address(selectedSaleRecord.data.moto));
@@ -304,6 +321,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       walletCliente,
       venta: address(selectedSaleRecord.address),
       moto: address(selectedSaleRecord.data.moto),
+      kilometrajeMoto,
       garantia: address(moto.data.garantia),
       mint: address(mint),
       tokenAccount,
@@ -497,7 +515,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
             </select>
           </label>
           <label className="text-[10px] font-semibold text-[#68717b]">Kilometraje actual
-            <input inputMode="numeric" value={mileage} onChange={(event) => setMileage(event.target.value)} placeholder="Ej. 12500" className="mt-1 w-full rounded-lg border border-[#e2e5e8] p-3 text-xs text-[#252a30]" />
+            <input inputMode="numeric" value={mileage} onChange={(event) => setMileage(event.target.value.replace(/[^0-9]/g, ""))} placeholder="Ej. 12500" className="mt-1 w-full rounded-lg border border-[#e2e5e8] p-3 text-xs text-[#252a30]" />
+            <span className="mt-1 block text-[9px] font-normal text-[#858d96]">{saleDetails ? "Se precarga el último kilometraje conocido. No puedes introducir un valor inferior." : "Selecciona una venta para consultar el kilometraje de la moto."}</span>
           </label>
         </div>
       )}
@@ -505,7 +524,8 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       {selectedCustomerRecord && <div className="mt-4 rounded-lg bg-[#f7f8fa] p-3 text-xs">
         <div className="flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Wallet vinculada</span><strong className="font-mono text-[#252a30]">{checking ? "Consultando…" : wallet ? shortAddress(wallet) : "No vinculada"}</strong></div>
         <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Saldo Token-2022</span><strong className="text-[#252a30]">{balance === null ? "—" : balance.toLocaleString("es-VE") + " puntos"}</strong></div>
-        {saleDetails && <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>}
+        {saleDetails && <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Moto / garantía</span><strong className="text-[#252a30]">{saleDetails.modelo} · {saleDetails.garantia.estado === EstadoGarantia.Activa ? "Activa" : "No activa"}</strong></div>
+        <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Último kilometraje registrado</span><strong className="text-[#252a30]">{saleDetails.kilometrajeActual.toLocaleString("es-VE")} km</strong></div>}
       </div>}
 
       {selectedCustomerRecord && (
