@@ -81,6 +81,7 @@ async function main() {
   const dealers = new Map();
   const customers = new Map();
   const sales = [];
+  const existingPairs = [];
   let associationCount = 0;
 
   for (const account of rawAccounts) {
@@ -96,11 +97,15 @@ async function main() {
     } else if (discriminator.every((value, index) => value === saleDisc[index])) {
       sales.push({ dealership: readAddress(bytes, 8), customer: readAddress(bytes, 40) });
     } else if (discriminator.every((value, index) => value === associationDisc[index])) {
+      existingPairs.push({ dealership: readAddress(bytes, 40), customer: readAddress(bytes, 72), source: "existing" });
       associationCount++;
     }
   }
 
   const candidates = new Map();
+  for (const pair of existingPairs) {
+    candidates.set(`${pair.dealership}:${pair.customer}`, pair);
+  }
   const unresolvedSales = [];
   for (const sale of sales) {
     if (!dealers.has(sale.dealership) || !customers.has(sale.customer)) {
