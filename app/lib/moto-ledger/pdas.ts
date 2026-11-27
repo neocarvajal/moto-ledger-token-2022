@@ -46,6 +46,14 @@ export async function deriveMotoPda(serial: string, concesionario: Address) {
   });
 }
 
+/** Shared odometer record for a motorcycle, independent from the legacy Moto layout. */
+export async function deriveKilometrajeMotoPda(moto: Address) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [seed("kilometraje_moto"), key(moto)],
+  });
+}
+
 export async function deriveClientePda(owner: Address, cedulaCliente: number) {
   return getProgramDerivedAddress({
     programAddress: REGISTRO_PROGRAM_ADDRESS,
