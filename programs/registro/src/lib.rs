@@ -823,6 +823,7 @@ pub mod registro {
         kilometraje_actual: u64,
         id_canje: u64,
     ) -> Result<()> {
+        msg!("CanjearServicio checkpoint 0: handler entered");
         require!(id_canje > 0, Errores::IdCanjeInvalido);
         require!(
             context.accounts.cliente.total_motos_cliente > 0,
@@ -873,6 +874,7 @@ pub mod registro {
             Errores::GarantiaNoCorresponde
         );
 
+        msg!("CanjearServicio checkpoint 1: customer, wallet, sale and motorcycle validated");
         let fecha_canje = Clock::get()?.unix_timestamp;
 
         actualizar_kilometraje_moto(
@@ -884,6 +886,7 @@ pub mod registro {
             context.bumps.kilometraje_moto,
         )?;
 
+        msg!("CanjearServicio checkpoint 2: mileage updated");
         require!(
             fecha_canje >= context.accounts.garantia.fecha_inicio,
             Errores::GarantiaNoIniciada
@@ -897,6 +900,7 @@ pub mod registro {
             Errores::CanjeDuranteGarantia
         );
 
+        msg!("CanjearServicio checkpoint 3: warranty checks passed");
         let servicio = context.accounts.catalogo_servicios.servicios
             .iter()
             .find(|servicio| servicio.id == servicio_id)
@@ -906,6 +910,7 @@ pub mod registro {
         let puntos = servicio.puntos;
         let nombre_servicio = servicio.nombre.clone();
 
+        msg!("CanjearServicio checkpoint 4: service loaded");
         require_keys_eq!(
             context.accounts.mint.key(),
             context.accounts.programa_fidelidad.mint,
@@ -932,6 +937,7 @@ pub mod registro {
             Errores::SaldoInsuficiente
         );
 
+        msg!("CanjearServicio checkpoint 5: token accounts validated; before burn");
         token_interface::burn(
             CpiContext::new(
                 context.accounts.token_program.to_account_info(),
@@ -944,6 +950,7 @@ pub mod registro {
             puntos,
         )?;
 
+        msg!("CanjearServicio checkpoint 6: burn completed; writing receipt");
         context.accounts.canje_servicio.set_inner(CanjeServicio {
             concesionario: context.accounts.concesionario.key(),
             catalogo_servicios: context.accounts.catalogo_servicios.key(),
