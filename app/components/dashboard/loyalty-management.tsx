@@ -83,9 +83,11 @@ function toGatewayUrl(uri: string, cid: string) {
 export function LoyaltyManagement({
   concesionario,
   nombreConcesionario,
+  onNavigate,
 }: {
   concesionario: string;
   nombreConcesionario: string;
+  onNavigate: (module: string) => void;
 }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
@@ -715,7 +717,7 @@ export function LoyaltyManagement({
           <p className="mt-2 text-[9px] font-semibold text-[#d90011]">Ver cuenta en Explorer ↗</p>
         </a>
       <ServiceCatalogManagement concesionario={concesionario} />
-        <ServiceRedemptionManagement concesionario={concesionario} nombreConcesionario={nombreConcesionario} />
+        <ServiceRedemptionManagement concesionario={concesionario} nombreConcesionario={nombreConcesionario} onNavigate={onNavigate} />
       </section>
     );
   }
