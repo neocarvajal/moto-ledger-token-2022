@@ -916,26 +916,36 @@ pub mod registro {
         require!(descripcion.len() <= 100, Errores::DescripcionServicioInvalida);
         require!(puntos > 0, Errores::PuntosInvalidos);
 
-        let servicio = context.accounts.catalogo_servicios.servicios
-            .iter_mut()
-            .find(|servicio| servicio.id == servicio_id)
-            .ok_or(Errores::ServicioNoEncontrado)?;
+        let (id_actualizado, nombre_actualizado, descripcion_actualizada, puntos_actualizados, servicio_activo) = {
+            let servicio = context.accounts.catalogo_servicios.servicios
+                .iter_mut()
+                .find(|servicio| servicio.id == servicio_id)
+                .ok_or(Errores::ServicioNoEncontrado)?;
 
-        servicio.nombre = nombre;
-        servicio.descripcion = descripcion;
-        servicio.puntos = puntos;
-        servicio.activo = activo;
+            servicio.nombre = nombre;
+            servicio.descripcion = descripcion;
+            servicio.puntos = puntos;
+            servicio.activo = activo;
+
+            (
+                servicio.id,
+                servicio.nombre.clone(),
+                servicio.descripcion.clone(),
+                servicio.puntos,
+                servicio.activo,
+            )
+        };
 
         msg!("========================================");
         msg!("       SERVICIO DEL CATALOGO ACTUALIZADO");
         msg!("========================================");
         msg!("Concesionario: {}", context.accounts.catalogo_servicios.concesionario);
         msg!("Catalogo PDA: {}", context.accounts.catalogo_servicios.key());
-        msg!("Servicio ID: {}", servicio.id);
-        msg!("Nombre: {}", servicio.nombre);
-        msg!("Descripcion: {}", servicio.descripcion);
-        msg!("Puntos requeridos: {}", servicio.puntos);
-        msg!("Activo: {}", servicio.activo);
+        msg!("Servicio ID: {}", id_actualizado);
+        msg!("Nombre: {}", nombre_actualizado);
+        msg!("Descripcion: {}", descripcion_actualizada);
+        msg!("Puntos requeridos: {}", puntos_actualizados);
+        msg!("Activo: {}", servicio_activo);
         msg!("Estado: Servicio actualizado exitosamente");
         msg!("========================================");
 
