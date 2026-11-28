@@ -53,22 +53,21 @@ export function ServiceCatalogManagement({
     try {
       const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
       setCatalogAddress(catalogPda);
-      const account = await client.registro.accounts.catalogoServicios.fetch(catalogPda);
-      setServices(account.data.servicios);
-    } catch (error) {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (
-        message.includes("account not found") ||
-        message.includes("could not find") ||
-        message.includes("does not exist") ||
-        message.includes("not found")
-      ) {
+
+      // Check account existence through RPC instead of parsing SolanaError messages.
+      const accountInfo = await client.rpc.getAccountInfo(catalogPda).send();
+      if (accountInfo.value === null) {
         setMissing(true);
         setServices([]);
-      } else {
-        console.error("No se pudo consultar el catálogo de servicios:", error);
-        toast.error("No se pudo consultar el catálogo de servicios en Solana.");
+        return;
       }
+
+      const account = await client.registro.accounts.catalogoServicios.fetch(catalogPda);
+      setMissing(false);
+      setServices(account.data.servicios);
+    } catch (error) {
+      console.error("No se pudo consultar el catálogo de servicios:", error);
+      toast.error("No se pudo consultar el catálogo de servicios en Solana.");
     } finally {
       setLoading(false);
     }
@@ -96,15 +95,20 @@ export function ServiceCatalogManagement({
       await assertOwner();
       const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
 
-      if (missing) {
+      // Always resolve the on-chain state at click time; React state can be stale.
+      const accountInfo = await client.rpc.getAccountInfo(catalogPda).send();
+
+      if (accountInfo.value === null) {
+        // The initializer creates the PDA and inserts the four default services atomically.
         await client.registro.instructions.inicializarCatalogoServicios({
           owner: connected!.signer!,
           concesionario: address(concesionario),
           catalogoServicios: catalogPda,
         }).sendTransaction();
       } else {
-        if (services.length !== 0) {
-          throw new Error("La precarga solo está disponible cuando el catálogo está vacío.");
+        const account = await client.registro.accounts.catalogoServicios.fetch(catalogPda);
+        if (account.data.servicios.length !== 0) {
+          throw new Error("El catálogo ya tiene servicios configurados; no es necesario precargarlo.");
         }
 
         const defaults = [
