@@ -270,6 +270,13 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
     setChecking(true);
     try {
       const [walletPda] = await deriveWalletClientePda(address(selectedCustomer));
+      const walletInfo = await client.rpc.getAccountInfo(walletPda, { encoding: "base64" }).send();
+      if (!walletInfo.value) {
+        // A customer without a linked wallet cannot redeem points.
+        // Keep the wallet and balance empty so the UI explains the state
+        // and the redemption action remains disabled.
+        return;
+      }
       const walletAccount = await client.registro.accounts.walletCliente.fetch(walletPda);
       if (walletAccount.data.cliente !== selectedCustomer) throw new Error("La wallet vinculada no corresponde al cliente.");
       const linkedWallet = walletAccount.data.wallet;
