@@ -55,7 +55,7 @@ export function ServiceCatalogManagement({
       setCatalogAddress(catalogPda);
 
       // Check account existence through RPC instead of parsing SolanaError messages.
-      const accountInfo = await client.rpc.getAccountInfo(catalogPda).send();
+      const accountInfo = await client.rpc.getAccountInfo(catalogPda, { encoding: "base64" }).send();
       if (accountInfo.value === null) {
         setMissing(true);
         setServices([]);
@@ -96,7 +96,7 @@ export function ServiceCatalogManagement({
       const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
 
       // Always resolve the on-chain state at click time; React state can be stale.
-      const accountInfo = await client.rpc.getAccountInfo(catalogPda).send();
+      const accountInfo = await client.rpc.getAccountInfo(catalogPda, { encoding: "base64" }).send();
 
       if (accountInfo.value === null) {
         // The initializer creates the PDA and inserts the four default services atomically.
