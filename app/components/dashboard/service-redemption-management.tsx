@@ -56,6 +56,12 @@ type Service = { id: number; nombre: string; descripcion: string; puntos: bigint
 type RedemptionSession = { token: string; url: string; expiresAt: number; idCanje: string; status?: string };
 type Receipt = { signature: string; address: string; points: bigint };
 
+function stringifyDiagnostic(value: unknown) {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    typeof item === "bigint" ? item.toString() : item
+  ) ?? String(value);
+}
+
 function shortAddress(value: string) {
   return value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-7)}` : value;
 }
@@ -405,7 +411,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   line.includes("CanjearServicio checkpoint")
                 ) ?? "No se alcanzó ningún checkpoint del handler";
                 if (simulation.value.err) {
-                  const simulationError = JSON.stringify(simulation.value.err);
+                  const simulationError = stringifyDiagnostic(simulation.value.err);
                   setSimulationDiagnostic({
                     checkpoint: lastCheckpoint,
                     error: simulationError,
@@ -431,7 +437,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 let confirmed = false;
                 for (let attempt = 0; attempt < 30; attempt += 1) {
                   const status = (await client.rpc.getSignatureStatuses([signature]).send()).value[0];
-                  if (status?.err) throw new Error(`Solana rechazó el canje: ${JSON.stringify(status.err)}`);
+                  if (status?.err) throw new Error(`Solana rechazó el canje: ${stringifyDiagnostic(status.err)}`);
                   if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") { confirmed = true; break; }
                   await new Promise((resolve) => window.setTimeout(resolve, 1500));
                 }
