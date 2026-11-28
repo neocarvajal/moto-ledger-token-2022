@@ -45,6 +45,7 @@ export function WalletLinkClient({ token }: { token: string }) {
   const [message, setMessage] = useState("Cargando solicitud segura…");
   const [now, setNow] = useState(() => Date.now());
   const [walletSelectionConfirmed, setWalletSelectionConfirmed] = useState(false);
+  const [androidDesktopMode, setAndroidDesktopMode] = useState(false);
   const signingRef = useRef(false);
   const walletSentRef = useRef(false);
 
@@ -56,6 +57,16 @@ export function WalletLinkClient({ token }: { token: string }) {
     if (payload.status === "completed") setError(null);
     return payload;
   }, [token]);
+
+  useEffect(() => {
+    const userAgentData = (navigator as Navigator & {
+      userAgentData?: { mobile?: boolean; platform?: string };
+    }).userAgentData;
+    const isAndroid =
+      /Android/i.test(navigator.userAgent) ||
+      /Android/i.test(userAgentData?.platform ?? "");
+    setAndroidDesktopMode(isAndroid && userAgentData?.mobile === false);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -243,9 +254,17 @@ export function WalletLinkClient({ token }: { token: string }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
-                    No se detectó una wallet en este navegador. Abre este enlace desde el navegador integrado de tu wallet compatible con Solana y vuelve a cargar la página.
-                  </p>
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-xs leading-relaxed text-amber-900">
+                    <p className="font-bold">Abre este enlace desde el navegador de tu wallet</p>
+                    <p className="mt-2">
+                      No se detectó una wallet compatible en este navegador. Abre este mismo enlace desde el navegador integrado de Solflare u otra wallet compatible con Solana y vuelve a cargar la página.
+                    </p>
+                    {androidDesktopMode && (
+                      <p className="mt-2 font-semibold">
+                        Detectamos Android en modo de escritorio. Desactiva «Sitio para computadora» en el navegador antes de continuar.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             ) : session.walletAddress && session.walletAddress !== connected.account.address ? (
