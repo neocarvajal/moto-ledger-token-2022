@@ -90,6 +90,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const [now, setNow] = useState(Date.now());
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [transactionSignature, setTransactionSignature] = useState<string | null>(null);
+  const [simulationDiagnostic, setSimulationDiagnostic] = useState<{ checkpoint: string; error: string; logs: string[] } | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -402,6 +403,30 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   const signedSignature = getBase58Decoder().decode(signedBytes.slice(1, 65));
                   setTransactionSignature(signedSignature);
                 }
+                // Simulate the fully signed transaction first. This returns program logs
+                // even when the on-chain instruction fails, without broadcasting it.
+                const simulation = await client.rpc.simulateTransaction(
+                  signedTransaction as Base64EncodedWireTransaction,
+                  { encoding: "base64", commitment: "confirmed", sigVerify: false },
+                ).send();
+                const simulationLogs = simulation.value.logs ?? [];
+                const lastCheckpoint = [...simulationLogs].reverse().find((line) =>
+                  line.includes("CanjearServicio checkpoint")
+                ) ?? "No se alcanzó ningún checkpoint del handler";
+                if (simulation.value.err) {
+                  const simulationError = JSON.stringify(simulation.value.err);
+                  setSimulationDiagnostic({
+                    checkpoint: lastCheckpoint,
+                    error: simulationError,
+                    logs: simulationLogs,
+                  });
+                  throw new Error(`La simulación del canje falló. Último punto: ${lastCheckpoint}. Error: ${simulationError}`);
+                }
+                setSimulationDiagnostic({
+                  checkpoint: lastCheckpoint,
+                  error: "Simulación correcta; la instrucción puede enviarse.",
+                  logs: simulationLogs,
+                });
                 const signature = await client.rpc.sendTransaction(signedTransaction as Base64EncodedWireTransaction, {
                   encoding: "base64", preflightCommitment: "confirmed", maxRetries: 3n,
                 }).send();
@@ -462,7 +487,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       nowSeconds <= saleDetails.garantia.fechaVencimiento && km <= saleDetails.garantia.kilometrajeMaximo;
     if (warrantyCovered) { toast.error("Este servicio aún está cubierto por la garantía. No se deben consumir puntos."); return; }
 
-    setBusy(true); setQrError(null); setShowQrModal(true); preparingRef.current = false;
+    setBusy(true); setQrError(null); setSimulationDiagnostic(null); setShowQrModal(true); preparingRef.current = false;
     try {
       let idCanje = BigInt(Date.now());
       let canjeServicio = await deriveCanjeServicioPda(address(selectedCustomer), idCanje);
@@ -663,6 +688,19 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                     <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
                       <p className="text-[9px] font-bold tracking-wider text-red-700">ERROR DEL CANJE</p>
                       <p className="mt-1 break-words text-[10px] leading-relaxed text-red-800">{qrError}</p>
+                    </div>
+                  )}
+                  {simulationDiagnostic && (
+                    <div className={`mt-4 rounded-lg border p-3 ${simulationDiagnostic.error.startsWith("Simulación correcta") ? "border-[#ccebd9] bg-[#f3fbf6]" : "border-amber-200 bg-amber-50"}`}>
+                      <p className="text-[9px] font-bold tracking-wider text-[#68717b]">DIAGNÓSTICO DE SIMULACIÓN</p>
+                      <p className="mt-2 text-[10px] font-semibold text-[#252a30]">Último checkpoint: {simulationDiagnostic.checkpoint}</p>
+                      <p className="mt-1 break-all text-[10px] text-[#68717b]">Resultado: {simulationDiagnostic.error}</p>
+                      {simulationDiagnostic.logs.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[10px] font-semibold text-[#424950]">Ver logs completos ({simulationDiagnostic.logs.length})</summary>
+                          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-white p-2 font-mono text-[9px] leading-relaxed text-[#424950]">{simulationDiagnostic.logs.join("\\n")}</pre>
+                        </details>
+                      )}
                     </div>
                   )}
                   <div className="mt-4 space-y-3">
