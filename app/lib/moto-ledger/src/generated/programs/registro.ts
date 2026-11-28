@@ -41,6 +41,7 @@ import {
   getClienteCodec,
   getConcesionarioCodec,
   getGarantiaCodec,
+  getIndiceWalletConcesionarioCodec,
   getKilometrajeMotoCodec,
   getMetadataFidelidadCodec,
   getMotoCodec,
@@ -63,6 +64,8 @@ import {
   type ConcesionarioArgs,
   type Garantia,
   type GarantiaArgs,
+  type IndiceWalletConcesionario,
+  type IndiceWalletConcesionarioArgs,
   type KilometrajeMoto,
   type KilometrajeMotoArgs,
   type MetadataFidelidad,
@@ -174,6 +177,7 @@ export enum RegistroAccount {
   ProgramaFidelidad,
   MetadataFidelidad,
   WalletCliente,
+  IndiceWalletConcesionario,
   PuntosVenta,
   CatalogoServicios,
   CanjeServicio,
@@ -225,6 +229,17 @@ export function identifyRegistroAccount(
     )
   ) {
     return RegistroAccount.WalletCliente;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([113, 62, 144, 129, 191, 240, 92, 1])
+      ),
+      0
+    )
+  ) {
+    return RegistroAccount.IndiceWalletConcesionario;
   }
   if (
     containsBytes(
@@ -860,6 +875,13 @@ export type RegistroPluginAccounts = {
     SelfFetchFunctions<MetadataFidelidadArgs, MetadataFidelidad>;
   walletCliente: ReturnType<typeof getWalletClienteCodec> &
     SelfFetchFunctions<WalletClienteArgs, WalletCliente>;
+  indiceWalletConcesionario: ReturnType<
+    typeof getIndiceWalletConcesionarioCodec
+  > &
+    SelfFetchFunctions<
+      IndiceWalletConcesionarioArgs,
+      IndiceWalletConcesionario
+    >;
   puntosVenta: ReturnType<typeof getPuntosVentaCodec> &
     SelfFetchFunctions<PuntosVentaArgs, PuntosVenta>;
   catalogoServicios: ReturnType<typeof getCatalogoServiciosCodec> &
@@ -1013,6 +1035,10 @@ export function registroProgram(
             getMetadataFidelidadCodec()
           ),
           walletCliente: addSelfFetchFunctions(client, getWalletClienteCodec()),
+          indiceWalletConcesionario: addSelfFetchFunctions(
+            client,
+            getIndiceWalletConcesionarioCodec()
+          ),
           puntosVenta: addSelfFetchFunctions(client, getPuntosVentaCodec()),
           catalogoServicios: addSelfFetchFunctions(
             client,

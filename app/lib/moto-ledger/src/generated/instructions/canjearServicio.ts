@@ -113,7 +113,7 @@ export type CanjearServicioInstruction<
         ? WritableAccount<TAccountKilometrajeMoto>
         : TAccountKilometrajeMoto,
       TAccountGarantia extends string
-        ? ReadonlyAccount<TAccountGarantia>
+        ? WritableAccount<TAccountGarantia>
         : TAccountGarantia,
       TAccountMint extends string
         ? WritableAccount<TAccountMint>
@@ -383,7 +383,7 @@ export function getCanjearServicioInstruction<
     garantia: {
       value: input.garantia ?? null,
       isSigner: false,
-      isWritable: false,
+      isWritable: true,
     },
     mint: { value: input.mint ?? null, isSigner: false, isWritable: true },
     tokenAccount: {

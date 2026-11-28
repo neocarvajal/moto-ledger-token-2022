@@ -55,8 +55,13 @@ export type VincularWalletClienteInstruction<
   TProgram extends string = typeof REGISTRO_PROGRAM_ADDRESS,
   TAccountOwner extends string | AccountMeta<string> = string,
   TAccountWallet extends string | AccountMeta<string> = string,
+  TAccountConcesionario extends string | AccountMeta<string> = string,
   TAccountCliente extends string | AccountMeta<string> = string,
+  TAccountAsociacionCliente extends string | AccountMeta<string> = string,
+  TAccountVenta extends string | AccountMeta<string> = string,
   TAccountWalletCliente extends string | AccountMeta<string> = string,
+  TAccountIndiceWalletConcesionario extends string | AccountMeta<string> =
+    string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -72,12 +77,24 @@ export type VincularWalletClienteInstruction<
         ? WritableSignerAccount<TAccountWallet> &
             AccountSignerMeta<TAccountWallet>
         : TAccountWallet,
+      TAccountConcesionario extends string
+        ? ReadonlyAccount<TAccountConcesionario>
+        : TAccountConcesionario,
       TAccountCliente extends string
         ? ReadonlyAccount<TAccountCliente>
         : TAccountCliente,
+      TAccountAsociacionCliente extends string
+        ? ReadonlyAccount<TAccountAsociacionCliente>
+        : TAccountAsociacionCliente,
+      TAccountVenta extends string
+        ? ReadonlyAccount<TAccountVenta>
+        : TAccountVenta,
       TAccountWalletCliente extends string
         ? WritableAccount<TAccountWalletCliente>
         : TAccountWalletCliente,
+      TAccountIndiceWalletConcesionario extends string
+        ? WritableAccount<TAccountIndiceWalletConcesionario>
+        : TAccountIndiceWalletConcesionario,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -120,32 +137,51 @@ export function getVincularWalletClienteInstructionDataCodec(): FixedSizeCodec<
 export type VincularWalletClienteInput<
   TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
   TAccountWallet extends InstructionSignerInput = InstructionSignerInput,
+  TAccountConcesionario extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountCliente extends InstructionAccountInput = InstructionAccountInput,
+  TAccountAsociacionCliente extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountVenta extends InstructionAccountInput = InstructionAccountInput,
   TAccountWalletCliente extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountIndiceWalletConcesionario extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
 > = {
   owner: TAccountOwner;
   wallet: TAccountWallet;
+  concesionario: TAccountConcesionario;
   cliente: TAccountCliente;
+  asociacionCliente: TAccountAsociacionCliente;
+  venta: TAccountVenta;
   walletCliente: TAccountWalletCliente;
+  indiceWalletConcesionario: TAccountIndiceWalletConcesionario;
   systemProgram?: TAccountSystemProgram;
 };
 
 export function getVincularWalletClienteInstruction<
   TAccountOwner extends InstructionSignerInput,
   TAccountWallet extends InstructionSignerInput,
+  TAccountConcesionario extends InstructionAccountInput,
   TAccountCliente extends InstructionAccountInput,
+  TAccountAsociacionCliente extends InstructionAccountInput,
+  TAccountVenta extends InstructionAccountInput,
   TAccountWalletCliente extends InstructionAccountInput,
+  TAccountIndiceWalletConcesionario extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof REGISTRO_PROGRAM_ADDRESS,
 >(
   input: VincularWalletClienteInput<
     TAccountOwner,
     TAccountWallet,
+    TAccountConcesionario,
     TAccountCliente,
+    TAccountAsociacionCliente,
+    TAccountVenta,
     TAccountWalletCliente,
+    TAccountIndiceWalletConcesionario,
     TAccountSystemProgram
   >,
   config?: {
@@ -162,12 +198,28 @@ export function getVincularWalletClienteInstruction<
     InstructionAccountInputAddress<TAccountWallet>
   >,
   ResolvedInstructionAccountMeta<
+    TAccountConcesionario,
+    InstructionAccountInputAddress<TAccountConcesionario>
+  >,
+  ResolvedInstructionAccountMeta<
     TAccountCliente,
     InstructionAccountInputAddress<TAccountCliente>
   >,
   ResolvedInstructionAccountMeta<
+    TAccountAsociacionCliente,
+    InstructionAccountInputAddress<TAccountAsociacionCliente>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountVenta,
+    InstructionAccountInputAddress<TAccountVenta>
+  >,
+  ResolvedInstructionAccountMeta<
     TAccountWalletCliente,
     InstructionAccountInputAddress<TAccountWalletCliente>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountIndiceWalletConcesionario,
+    InstructionAccountInputAddress<TAccountIndiceWalletConcesionario>
   >,
   ResolvedInstructionAccountMeta<
     TAccountSystemProgram,
@@ -189,13 +241,29 @@ export function getVincularWalletClienteInstruction<
   const originalAccounts = {
     owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
     wallet: { value: input.wallet ?? null, isSigner: true, isWritable: true },
+    concesionario: {
+      value: input.concesionario ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     cliente: {
       value: input.cliente ?? null,
       isSigner: false,
       isWritable: false,
     },
+    asociacionCliente: {
+      value: input.asociacionCliente ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    venta: { value: input.venta ?? null, isSigner: false, isWritable: false },
     walletCliente: {
       value: input.walletCliente ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    indiceWalletConcesionario: {
+      value: input.indiceWalletConcesionario ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -220,8 +288,15 @@ export function getVincularWalletClienteInstruction<
     accounts: [
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("wallet", accounts.wallet),
+      getAccountMeta("concesionario", accounts.concesionario),
       getAccountMeta("cliente", accounts.cliente),
+      getAccountMeta("asociacionCliente", accounts.asociacionCliente),
+      getAccountMeta("venta", accounts.venta),
       getAccountMeta("walletCliente", accounts.walletCliente),
+      getAccountMeta(
+        "indiceWalletConcesionario",
+        accounts.indiceWalletConcesionario
+      ),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getVincularWalletClienteInstructionDataEncoder().encode({}),
@@ -237,12 +312,28 @@ export function getVincularWalletClienteInstruction<
       InstructionAccountInputAddress<TAccountWallet>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountConcesionario,
+      InstructionAccountInputAddress<TAccountConcesionario>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountCliente,
       InstructionAccountInputAddress<TAccountCliente>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountAsociacionCliente,
+      InstructionAccountInputAddress<TAccountAsociacionCliente>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVenta,
+      InstructionAccountInputAddress<TAccountVenta>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountWalletCliente,
       InstructionAccountInputAddress<TAccountWalletCliente>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountIndiceWalletConcesionario,
+      InstructionAccountInputAddress<TAccountIndiceWalletConcesionario>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
@@ -259,9 +350,13 @@ export type ParsedVincularWalletClienteInstruction<
   accounts: {
     owner: TAccountMetas[0];
     wallet: TAccountMetas[1];
-    cliente: TAccountMetas[2];
-    walletCliente: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
+    concesionario: TAccountMetas[2];
+    cliente: TAccountMetas[3];
+    asociacionCliente: TAccountMetas[4];
+    venta: TAccountMetas[5];
+    walletCliente: TAccountMetas[6];
+    indiceWalletConcesionario: TAccountMetas[7];
+    systemProgram: TAccountMetas[8];
   };
   data: VincularWalletClienteInstructionData;
 };
@@ -274,12 +369,12 @@ export function parseVincularWalletClienteInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedVincularWalletClienteInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 9) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 5,
+        expectedAccountMetas: 9,
       }
     );
   }
@@ -294,8 +389,12 @@ export function parseVincularWalletClienteInstruction<
     accounts: {
       owner: getNextAccount(),
       wallet: getNextAccount(),
+      concesionario: getNextAccount(),
       cliente: getNextAccount(),
+      asociacionCliente: getNextAccount(),
+      venta: getNextAccount(),
       walletCliente: getNextAccount(),
+      indiceWalletConcesionario: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getVincularWalletClienteInstructionDataDecoder().decode(

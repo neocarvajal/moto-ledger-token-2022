@@ -90,7 +90,7 @@ export type RegistrarServicioInstruction<
         ? WritableAccount<TAccountMoto>
         : TAccountMoto,
       TAccountGarantia extends string
-        ? ReadonlyAccount<TAccountGarantia>
+        ? WritableAccount<TAccountGarantia>
         : TAccountGarantia,
       TAccountKilometrajeMoto extends string
         ? WritableAccount<TAccountKilometrajeMoto>
@@ -270,7 +270,7 @@ export function getRegistrarServicioInstruction<
     garantia: {
       value: input.garantia ?? null,
       isSigner: false,
-      isWritable: false,
+      isWritable: true,
     },
     kilometrajeMoto: {
       value: input.kilometrajeMoto ?? null,

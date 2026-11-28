@@ -53,8 +53,11 @@ export function getDesvincularWalletClienteDiscriminatorBytes(): ReadonlyUint8Ar
 export type DesvincularWalletClienteInstruction<
   TProgram extends string = typeof REGISTRO_PROGRAM_ADDRESS,
   TAccountOwner extends string | AccountMeta<string> = string,
+  TAccountConcesionario extends string | AccountMeta<string> = string,
   TAccountCliente extends string | AccountMeta<string> = string,
   TAccountWalletCliente extends string | AccountMeta<string> = string,
+  TAccountIndiceWalletConcesionario extends string | AccountMeta<string> =
+    string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -64,12 +67,18 @@ export type DesvincularWalletClienteInstruction<
         ? WritableSignerAccount<TAccountOwner> &
             AccountSignerMeta<TAccountOwner>
         : TAccountOwner,
+      TAccountConcesionario extends string
+        ? ReadonlyAccount<TAccountConcesionario>
+        : TAccountConcesionario,
       TAccountCliente extends string
         ? ReadonlyAccount<TAccountCliente>
         : TAccountCliente,
       TAccountWalletCliente extends string
         ? WritableAccount<TAccountWalletCliente>
         : TAccountWalletCliente,
+      TAccountIndiceWalletConcesionario extends string
+        ? WritableAccount<TAccountIndiceWalletConcesionario>
+        : TAccountIndiceWalletConcesionario,
       ...TRemainingAccounts,
     ]
   >;
@@ -108,25 +117,35 @@ export function getDesvincularWalletClienteInstructionDataCodec(): FixedSizeCode
 
 export type DesvincularWalletClienteInput<
   TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountConcesionario extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountCliente extends InstructionAccountInput = InstructionAccountInput,
   TAccountWalletCliente extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountIndiceWalletConcesionario extends InstructionAccountInput =
+    InstructionAccountInput,
 > = {
   owner: TAccountOwner;
+  concesionario: TAccountConcesionario;
   cliente: TAccountCliente;
   walletCliente: TAccountWalletCliente;
+  indiceWalletConcesionario: TAccountIndiceWalletConcesionario;
 };
 
 export function getDesvincularWalletClienteInstruction<
   TAccountOwner extends InstructionSignerInput,
+  TAccountConcesionario extends InstructionAccountInput,
   TAccountCliente extends InstructionAccountInput,
   TAccountWalletCliente extends InstructionAccountInput,
+  TAccountIndiceWalletConcesionario extends InstructionAccountInput,
   TProgramAddress extends Address = typeof REGISTRO_PROGRAM_ADDRESS,
 >(
   input: DesvincularWalletClienteInput<
     TAccountOwner,
+    TAccountConcesionario,
     TAccountCliente,
-    TAccountWalletCliente
+    TAccountWalletCliente,
+    TAccountIndiceWalletConcesionario
   >,
   config?: {
     programAddress?: TProgramAddress | { readonly address: TProgramAddress };
@@ -138,12 +157,20 @@ export function getDesvincularWalletClienteInstruction<
     InstructionAccountInputAddress<TAccountOwner>
   >,
   ResolvedInstructionAccountMeta<
+    TAccountConcesionario,
+    InstructionAccountInputAddress<TAccountConcesionario>
+  >,
+  ResolvedInstructionAccountMeta<
     TAccountCliente,
     InstructionAccountInputAddress<TAccountCliente>
   >,
   ResolvedInstructionAccountMeta<
     TAccountWalletCliente,
     InstructionAccountInputAddress<TAccountWalletCliente>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountIndiceWalletConcesionario,
+    InstructionAccountInputAddress<TAccountIndiceWalletConcesionario>
   >
 > {
   // Program address.
@@ -160,6 +187,11 @@ export function getDesvincularWalletClienteInstruction<
   // Original accounts.
   const originalAccounts = {
     owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
+    concesionario: {
+      value: input.concesionario ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     cliente: {
       value: input.cliente ?? null,
       isSigner: false,
@@ -167,6 +199,11 @@ export function getDesvincularWalletClienteInstruction<
     },
     walletCliente: {
       value: input.walletCliente ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    indiceWalletConcesionario: {
+      value: input.indiceWalletConcesionario ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -179,8 +216,13 @@ export function getDesvincularWalletClienteInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta("owner", accounts.owner),
+      getAccountMeta("concesionario", accounts.concesionario),
       getAccountMeta("cliente", accounts.cliente),
       getAccountMeta("walletCliente", accounts.walletCliente),
+      getAccountMeta(
+        "indiceWalletConcesionario",
+        accounts.indiceWalletConcesionario
+      ),
     ],
     data: getDesvincularWalletClienteInstructionDataEncoder().encode({}),
     programAddress,
@@ -191,12 +233,20 @@ export function getDesvincularWalletClienteInstruction<
       InstructionAccountInputAddress<TAccountOwner>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountConcesionario,
+      InstructionAccountInputAddress<TAccountConcesionario>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountCliente,
       InstructionAccountInputAddress<TAccountCliente>
     >,
     ResolvedInstructionAccountMeta<
       TAccountWalletCliente,
       InstructionAccountInputAddress<TAccountWalletCliente>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountIndiceWalletConcesionario,
+      InstructionAccountInputAddress<TAccountIndiceWalletConcesionario>
     >
   >);
 }
@@ -208,8 +258,10 @@ export type ParsedDesvincularWalletClienteInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     owner: TAccountMetas[0];
-    cliente: TAccountMetas[1];
-    walletCliente: TAccountMetas[2];
+    concesionario: TAccountMetas[1];
+    cliente: TAccountMetas[2];
+    walletCliente: TAccountMetas[3];
+    indiceWalletConcesionario: TAccountMetas[4];
   };
   data: DesvincularWalletClienteInstructionData;
 };
@@ -222,12 +274,12 @@ export function parseDesvincularWalletClienteInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedDesvincularWalletClienteInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
+  if (instruction.accounts.length < 5) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 3,
+        expectedAccountMetas: 5,
       }
     );
   }
@@ -241,8 +293,10 @@ export function parseDesvincularWalletClienteInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       owner: getNextAccount(),
+      concesionario: getNextAccount(),
       cliente: getNextAccount(),
       walletCliente: getNextAccount(),
+      indiceWalletConcesionario: getNextAccount(),
     },
     data: getDesvincularWalletClienteInstructionDataDecoder().decode(
       instruction.data
