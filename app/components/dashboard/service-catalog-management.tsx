@@ -90,7 +90,7 @@ export function ServiceCatalogManagement({
     }
   };
 
-  const initializeCatalog = async () => {
+  const preloadServiceCatalog = async () => {
     setBusy(true);
     try {
       await assertOwner();
@@ -100,11 +100,11 @@ export function ServiceCatalogManagement({
         concesionario: address(concesionario),
         catalogoServicios: catalogPda,
       }).sendTransaction();
-      toast.success("Catálogo inicial creado para este concesionario.");
+      toast.success("Catálogo de servicios precargado para este concesionario.");
       await loadCatalog();
     } catch (error) {
-      console.error("No se pudo inicializar el catálogo:", error);
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el catálogo.");
+      console.error("No se pudo precargar el catálogo de servicios:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo precargar el catálogo de servicios.");
     } finally {
       setBusy(false);
     }
@@ -208,10 +208,10 @@ export function ServiceCatalogManagement({
         <p className="mt-4 rounded-lg bg-[#f7f8fa] p-4 text-[10px] text-[#858d96]">Consultando catálogo en Solana…</p>
       ) : missing ? (
         <div className="mt-4 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-4">
-          <p className="text-[11px] font-semibold text-[#252a30]">Este concesionario aún no tiene un catálogo.</p>
-          <p className="mt-1 text-[10px] leading-relaxed text-[#858d96]">Puedes crear el catálogo inicial con cuatro servicios de ejemplo. Después podrás personalizar los servicios y sus puntos.</p>
-          <button type="button" onClick={() => void initializeCatalog()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
-            {busy ? "Creando catálogo…" : "Crear catálogo inicial"}
+          <p className="text-[11px] font-semibold text-[#252a30]">Este concesionario aún no tiene un catálogo de servicios.</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-[#858d96]">Precarga cuatro servicios de demostración en una sola operación on-chain. Después podrás editar sus nombres, descripciones, disponibilidad y puntos.</p>
+          <button type="button" onClick={() => void preloadServiceCatalog()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
+            {busy ? "Precargando servicios…" : "Precargar servicios"}
           </button>
         </div>
       ) : (
