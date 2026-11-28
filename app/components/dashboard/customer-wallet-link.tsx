@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   address,
+  getBase58Decoder,
+  type Base58EncodedBytes,
   assertIsTransactionWithBlockhashLifetime,
   appendTransactionMessageInstruction,
   createNoopSigner,
@@ -19,7 +21,13 @@ import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { useAppClient } from "../../lib/client-provider";
 import { useCluster } from "../cluster-context";
-import { deriveWalletClientePda } from "../../lib/moto-ledger/pdas";
+import {
+  deriveAsociacionClientePda,
+  deriveIndiceWalletConcesionarioPda,
+  deriveWalletClientePda,
+} from "../../lib/moto-ledger/pdas";
+import { REGISTRO_PROGRAM_ADDRESS } from "../../lib/moto-ledger/src/generated/programs";
+import { getVentaDiscriminatorBytes } from "../../lib/moto-ledger/src/generated/accounts/venta";
 
 type LinkSession = {
   owner: string;
@@ -148,15 +156,61 @@ export function CustomerWalletLink({
     setBusy(true);
     setError(null);
     try {
-      const [walletCliente] = await deriveWalletClientePda(address(cliente));
+      const customerAddress = address(cliente);
+      const dealershipAddress = address(concesionario);
+      const buyerWalletAddress = address(buyerAddress);
+      const [walletCliente] = await deriveWalletClientePda(customerAddress);
       const existing = await client.registro.accounts.walletCliente.fetch(walletCliente).catch(() => null);
       if (existing) throw new Error("Este cliente ya tiene una wallet vinculada.");
 
+      const [asociacionCliente] = await deriveAsociacionClientePda(
+        dealershipAddress,
+        customerAddress
+      );
+      const association = await client.registro.accounts.asociacionCliente
+        .fetch(asociacionCliente)
+        .catch(() => null);
+      if (!association || !association.data.activo) {
+        throw new Error("El cliente no tiene una asociación activa con este concesionario.");
+      }
+
+      // Anchor requires a real sale PDA belonging to this exact customer and dealership.
+      // Venta layout: discriminator (8), concesionario (32), cliente (32), moto (32).
+      const saleDiscriminator = getBase58Decoder().decode(
+        getVentaDiscriminatorBytes()
+      ) as Base58EncodedBytes;
+      const dealershipFilter = dealershipAddress as Base58EncodedBytes;
+      const customerFilter = customerAddress as Base58EncodedBytes;
+      const sales = await client.rpc
+        .getProgramAccounts(REGISTRO_PROGRAM_ADDRESS, {
+          encoding: "base64",
+          filters: [
+            { memcmp: { offset: 0n, bytes: saleDiscriminator, encoding: "base58" } },
+            { memcmp: { offset: 8n, bytes: dealershipFilter, encoding: "base58" } },
+            { memcmp: { offset: 40n, bytes: customerFilter, encoding: "base58" } },
+          ],
+        })
+        .send();
+      const sale = sales[0];
+      if (!sale) {
+        throw new Error("No se encontró una venta registrada de este cliente en el concesionario seleccionado.");
+      }
+      const venta = address(sale.pubkey);
+      const [indiceWalletConcesionario] =
+        await deriveIndiceWalletConcesionarioPda(
+          dealershipAddress,
+          buyerWalletAddress
+        );
+
       const instruction = client.registro.instructions.vincularWalletCliente({
         owner: ownerSigner,
-        wallet: createNoopSigner(address(buyerAddress)),
-        cliente: address(cliente),
+        wallet: createNoopSigner(buyerWalletAddress),
+        concesionario: dealershipAddress,
+        cliente: customerAddress,
+        asociacionCliente,
+        venta,
         walletCliente,
+        indiceWalletConcesionario,
       });
 
       const latestBlockhash = await client.rpc
@@ -286,10 +340,17 @@ export function CustomerWalletLink({
         return;
       }
 
+      const [indiceWalletConcesionario] =
+        await deriveIndiceWalletConcesionarioPda(
+          address(concesionario),
+          address(existing.data.wallet)
+        );
       const instruction = client.registro.instructions.desvincularWalletCliente({
         owner: connected.signer,
+        concesionario: address(concesionario),
         cliente: address(cliente),
         walletCliente,
+        indiceWalletConcesionario,
       });
       const result = await instruction.sendTransaction();
 
