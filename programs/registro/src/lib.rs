@@ -1103,15 +1103,7 @@ pub mod registro {
         // with the account constraint: address = programa_fidelidad.mint.
         // Avoid repeating the same validation inside the handler.
         msg!("CanjearServicio checkpoint 4a: mint address validated by Anchor account constraint");
-        msg!("CanjearServicio checkpoint 4b: mint address valid");
-        let mint_info = context.accounts.mint.to_account_info();
-        msg!("CanjearServicio checkpoint 4c: validating mint program owner");
-        require_keys_eq!(
-            *mint_info.owner,
-            anchor_spl::token_2022::ID,
-            Errores::Token2022Requerido
-        );
-        msg!("CanjearServicio checkpoint 4d: mint program owner valid");
+        msg!("CanjearServicio checkpoint 4b: mint address and Token-2022 owner validated by Anchor constraints");
         msg!("CanjearServicio checkpoint 4e: validating mint decimals");
         require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
         msg!("CanjearServicio checkpoint 4f: mint decimals valid");
@@ -1687,7 +1679,8 @@ pub struct CanjearServicio<'info> {
 
     #[account(
         mut,
-        address = programa_fidelidad.mint
+        address = programa_fidelidad.mint,
+        owner = anchor_spl::token_2022::ID
     )]
     pub mint: InterfaceAccount<'info, Mint>,
 
