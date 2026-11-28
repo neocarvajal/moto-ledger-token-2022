@@ -383,7 +383,7 @@ export function getCanjearServicioInstruction<
     garantia: {
       value: input.garantia ?? null,
       isSigner: false,
-      isWritable: false,
+      isWritable: true,
     },
     mint: { value: input.mint ?? null, isSigner: false, isWritable: true },
     tokenAccount: {
