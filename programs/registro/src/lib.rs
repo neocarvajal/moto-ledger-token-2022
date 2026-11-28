@@ -284,6 +284,16 @@ pub mod registro {
             require!(association.activo, Errores::AsociacionClienteInactiva);
         }
 
+        msg!("========================================");
+        msg!("       ASOCIACION DE CLIENTE");
+        msg!("========================================");
+        msg!("Owner: {}", context.accounts.owner.key());
+        msg!("Concesionario: {}", context.accounts.concesionario.key());
+        msg!("Cliente PDA: {}", context.accounts.cliente.key());
+        msg!("Asociacion PDA: {}", context.accounts.asociacion_cliente.key());
+        msg!("Estado: Asociacion activa");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -623,6 +633,17 @@ pub mod registro {
             bump: context.bumps.metadata_fidelidad,
         });
 
+        msg!("========================================");
+        msg!("       METADATA DE FIDELIDAD REGISTRADA");
+        msg!("========================================");
+        msg!("Programa de fidelidad: {}", context.accounts.programa_fidelidad.key());
+        msg!("Mint Token-2022: {}", context.accounts.mint.key());
+        msg!("Autoridad: {}", context.accounts.autoridad_fidelidad.key());
+        msg!("Metadata CID: {}", context.accounts.metadata_fidelidad.metadata_cid);
+        msg!("Image CID: {}", context.accounts.metadata_fidelidad.image_cid);
+        msg!("Estado: Metadata registrada exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -649,12 +670,32 @@ pub mod registro {
         context.accounts.metadata_fidelidad.metadata_cid = metadata_cid;
         context.accounts.metadata_fidelidad.image_cid = image_cid;
 
+        msg!("========================================");
+        msg!("       METADATA DE FIDELIDAD ACTUALIZADA");
+        msg!("========================================");
+        msg!("Programa de fidelidad: {}", context.accounts.programa_fidelidad.key());
+        msg!("Mint Token-2022: {}", context.accounts.mint.key());
+        msg!("Metadata CID: {}", context.accounts.metadata_fidelidad.metadata_cid);
+        msg!("Image CID: {}", context.accounts.metadata_fidelidad.image_cid);
+        msg!("Estado: Metadata actualizada exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
     pub fn actualizar_puntos_fidelidad(context: Context<ActualizarPuntosFidelidad>, puntos_por_venta: u64) -> Result<()> {
         require!(puntos_por_venta > 0, Errores::PuntosInvalidos);
         context.accounts.programa_fidelidad.puntos_por_venta = puntos_por_venta;
+
+        msg!("========================================");
+        msg!("       PUNTOS POR VENTA ACTUALIZADOS");
+        msg!("========================================");
+        msg!("Concesionario: {}", context.accounts.programa_fidelidad.concesionario);
+        msg!("Programa de fidelidad: {}", context.accounts.programa_fidelidad.key());
+        msg!("Puntos por venta: {}", puntos_por_venta);
+        msg!("Estado: Configuracion actualizada exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -691,6 +732,18 @@ pub mod registro {
                 bump: context.bumps.indice_wallet_concesionario,
             },
         );
+
+        msg!("========================================");
+        msg!("       WALLET DE CLIENTE VINCULADA");
+        msg!("========================================");
+        msg!("Concesionario: {}", context.accounts.concesionario.key());
+        msg!("Cliente PDA: {}", context.accounts.cliente.key());
+        msg!("Wallet cliente: {}", context.accounts.wallet.key());
+        msg!("WalletCliente PDA: {}", context.accounts.wallet_cliente.key());
+        msg!("Indice wallet PDA: {}", context.accounts.indice_wallet_concesionario.key());
+        msg!("Estado: Wallet vinculada exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -736,6 +789,18 @@ pub mod registro {
                 Errores::IndiceWalletInvalido
             );
         }
+
+        msg!("========================================");
+        msg!("       WALLET DE CLIENTE DESVINCULADA");
+        msg!("========================================");
+        msg!("Owner: {}", context.accounts.owner.key());
+        msg!("Concesionario: {}", context.accounts.concesionario.key());
+        msg!("Cliente PDA: {}", context.accounts.cliente.key());
+        msg!("Wallet desvinculada: {}", context.accounts.wallet_cliente.wallet);
+        msg!("Indice wallet PDA: {}", context.accounts.indice_wallet_concesionario.key());
+        msg!("Estado: Wallet desvinculada exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -774,6 +839,21 @@ pub mod registro {
             fecha_emision: Clock::get()?.unix_timestamp,
             bump: context.bumps.puntos_venta,
         });
+
+        msg!("========================================");
+        msg!("       PUNTOS DE FIDELIDAD OTORGADOS");
+        msg!("========================================");
+        msg!("Concesionario: {}", context.accounts.concesionario.key());
+        msg!("Cliente PDA: {}", context.accounts.cliente.key());
+        msg!("Venta PDA: {}", context.accounts.venta.key());
+        msg!("Wallet destinataria: {}", context.accounts.wallet_cliente.wallet);
+        msg!("Mint: {}", context.accounts.mint.key());
+        msg!("Token account: {}", context.accounts.token_account.key());
+        msg!("Cantidad otorgada: {}", cantidad);
+        msg!("Registro puntos PDA: {}", context.accounts.puntos_venta.key());
+        msg!("Estado: Puntos otorgados exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -846,6 +926,19 @@ pub mod registro {
         servicio.puntos = puntos;
         servicio.activo = activo;
 
+        msg!("========================================");
+        msg!("       SERVICIO DEL CATALOGO ACTUALIZADO");
+        msg!("========================================");
+        msg!("Concesionario: {}", context.accounts.catalogo_servicios.concesionario);
+        msg!("Catalogo PDA: {}", context.accounts.catalogo_servicios.key());
+        msg!("Servicio ID: {}", servicio.id);
+        msg!("Nombre: {}", servicio.nombre);
+        msg!("Descripcion: {}", servicio.descripcion);
+        msg!("Puntos requeridos: {}", servicio.puntos);
+        msg!("Activo: {}", servicio.activo);
+        msg!("Estado: Servicio actualizado exitosamente");
+        msg!("========================================");
+
         Ok(())
     }
 
@@ -877,6 +970,19 @@ pub mod registro {
             activo,
         });
         context.accounts.catalogo_servicios.total_servicios = id;
+
+        msg!("========================================");
+        msg!("       SERVICIO AGREGADO AL CATALOGO");
+        msg!("========================================");
+        msg!("Concesionario: {}", context.accounts.catalogo_servicios.concesionario);
+        msg!("Catalogo PDA: {}", context.accounts.catalogo_servicios.key());
+        msg!("Servicio ID: {}", id);
+        msg!("Nombre: {}", context.accounts.catalogo_servicios.servicios.last().unwrap().nombre);
+        msg!("Puntos requeridos: {}", context.accounts.catalogo_servicios.servicios.last().unwrap().puntos);
+        msg!("Activo: {}", context.accounts.catalogo_servicios.servicios.last().unwrap().activo);
+        msg!("Total servicios catalogo: {}", context.accounts.catalogo_servicios.total_servicios);
+        msg!("Estado: Servicio agregado exitosamente");
+        msg!("========================================");
 
         Ok(())
     }
