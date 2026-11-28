@@ -911,31 +911,44 @@ pub mod registro {
         let nombre_servicio = servicio.nombre.clone();
 
         msg!("CanjearServicio checkpoint 4: service loaded");
+        msg!("CanjearServicio checkpoint 4a: validating mint address");
         require_keys_eq!(
             context.accounts.mint.key(),
             context.accounts.programa_fidelidad.mint,
             Errores::MintInvalido
         );
+        msg!("CanjearServicio checkpoint 4b: mint address valid");
+        let mint_info = context.accounts.mint.to_account_info();
+        msg!("CanjearServicio checkpoint 4c: validating mint program owner");
         require_keys_eq!(
-            *context.accounts.mint.to_account_info().owner,
+            *mint_info.owner,
             anchor_spl::token_2022::ID,
             Errores::Token2022Requerido
         );
+        msg!("CanjearServicio checkpoint 4d: mint program owner valid");
+        msg!("CanjearServicio checkpoint 4e: validating mint decimals");
         require!(context.accounts.mint.decimals == 0, Errores::DecimalesMintInvalidos);
+        msg!("CanjearServicio checkpoint 4f: mint decimals valid");
+        msg!("CanjearServicio checkpoint 4g: validating token account mint");
         require_keys_eq!(
             context.accounts.token_account.mint,
             context.accounts.mint.key(),
             Errores::MintInvalido
         );
+        msg!("CanjearServicio checkpoint 4h: token account mint valid");
+        msg!("CanjearServicio checkpoint 4i: validating token account owner");
         require_keys_eq!(
             context.accounts.token_account.owner,
             context.accounts.wallet.key(),
             Errores::WalletClienteInvalida
         );
+        msg!("CanjearServicio checkpoint 4j: token account owner valid");
+        msg!("CanjearServicio checkpoint 4k: validating token account balance");
         require!(
             context.accounts.token_account.amount >= puntos,
             Errores::SaldoInsuficiente
         );
+        msg!("CanjearServicio checkpoint 4l: token account balance valid");
 
         msg!("CanjearServicio checkpoint 5: token accounts validated; before burn");
         token_interface::burn(
