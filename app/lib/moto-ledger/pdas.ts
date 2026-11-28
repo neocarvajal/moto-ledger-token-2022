@@ -126,6 +126,21 @@ export async function deriveWalletClientePda(cliente: Address) {
   });
 }
 
+/** Unique customer wallet index scoped to one dealership. */
+export async function deriveIndiceWalletConcesionarioPda(
+  concesionario: Address,
+  wallet: Address
+) {
+  return getProgramDerivedAddress({
+    programAddress: REGISTRO_PROGRAM_ADDRESS,
+    seeds: [
+      seed("wallet_cliente_concesionario"),
+      key(concesionario),
+      key(wallet),
+    ],
+  });
+}
+
 /** One issuance record per sale, preventing duplicate loyalty rewards. */
 export async function derivePuntosVentaPda(venta: Address) {
   return getProgramDerivedAddress({
