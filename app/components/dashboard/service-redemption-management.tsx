@@ -8,6 +8,7 @@ import {
   createNoopSigner,
   createTransactionMessage,
   getBase58Decoder,
+  getBase58Encoder,
   getBase64Encoder,
   getBase64EncodedWireTransaction,
   partiallySignTransactionMessageWithSigners,
@@ -89,6 +90,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
   const [session, setSession] = useState<RedemptionSession | null>(null);
   const [now, setNow] = useState(Date.now());
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [transactionSignature, setTransactionSignature] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -391,6 +393,15 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   setSession(null);
                   throw new Error("La transacción caducó en Solana antes de enviarse. Genera un nuevo QR para continuar.");
                 }
+                // A signed Solana wire transaction starts with a compact signature count,
+                // followed by 64-byte signatures. Capture the first signature before RPC
+                // submission so it remains available even when preflight rejects the tx.
+                const signedBytes = getBase64Encoder().encode(data.signedTransaction);
+                const signatureCount = signedBytes[0] ?? 0;
+                if (signatureCount > 0 && signedBytes.length >= 65) {
+                  const signedSignature = getBase58Encoder().encode(signedBytes.slice(1, 65));
+                  setTransactionSignature(signedSignature);
+                }
                 const signature = await client.rpc.sendTransaction(data.signedTransaction as Base64EncodedWireTransaction, {
                   encoding: "base64", preflightCommitment: "confirmed", maxRetries: 3n,
                 }).send();
@@ -415,6 +426,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                     receiptData.moto !== selectedSaleRecord?.data.moto) {
                   throw new Error(`El recibo on-chain no coincide con la intención firmada. Firma: ${signature}`);
                 }
+                setTransactionSignature(signature);
                 setReceipt({ signature, address: receiptPda, points: receiptData.puntos });
                 toast.success("Canje registrado en Solana y puntos quemados.");
                 setSession(null); setShowCancelConfirm(false);
@@ -640,6 +652,19 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 </div>
                 <div className="min-w-0">
                   <p className="text-[11px] leading-relaxed text-[#737b84]">El cliente escanea el QR, conecta la wallet vinculada y autoriza la quema. El concesionario enviará la transacción y verificará el recibo directamente en Solana.</p>
+                  {transactionSignature && (
+                    <div className="mt-4 rounded-lg border border-[#e2e5e8] bg-[#f7f8fa] p-3">
+                      <p className="text-[9px] font-bold tracking-wider text-[#68717b]">FIRMA DE LA TRANSACCIÓN</p>
+                      <p className="mt-2 break-all font-mono text-[10px] text-[#252a30]">{transactionSignature}</p>
+                      <a className="mt-2 inline-block text-[10px] font-semibold text-[#d90011] underline" href={`https://explorer.solana.com/tx/${transactionSignature}?cluster=${cluster === "mainnet" ? "mainnet-beta" : cluster}`} target="_blank" rel="noopener noreferrer">Abrir transacción y logs en Solana Explorer ↗</a>
+                    </div>
+                  )}
+                  {qrError && (
+                    <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                      <p className="text-[9px] font-bold tracking-wider text-red-700">ERROR DEL CANJE</p>
+                      <p className="mt-1 break-words text-[10px] leading-relaxed text-red-800">{qrError}</p>
+                    </div>
+                  )}
                   <div className="mt-4 space-y-3">
                     <div className="rounded-lg border border-[#ccebd9] bg-[#f3fbf6] p-3">
                       <p className="text-[9px] font-bold tracking-wider text-[#168354]">1 · SOLICITUD DE CANJE</p>
