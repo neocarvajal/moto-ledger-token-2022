@@ -1316,6 +1316,13 @@ pub struct VincularWalletCliente<'info> {
     )]
     pub asociacion_cliente: Account<'info, AsociacionCliente>,
 
+    /// A real sale is required from this exact dealership, not merely a customer-wide sale counter.
+    #[account(
+        constraint = venta.cliente == cliente.key() @ Errores::VentaNoCorresponde,
+        constraint = venta.concesionario == concesionario.key() @ Errores::VentaNoCorresponde
+    )]
+    pub venta: Account<'info, Venta>,
+
     #[account(
         init,
         payer = wallet,
