@@ -95,16 +95,41 @@ export function ServiceCatalogManagement({
     try {
       await assertOwner();
       const [catalogPda] = await deriveCatalogoServiciosPda(address(concesionario));
-      await client.registro.instructions.inicializarCatalogoServicios({
-        owner: connected!.signer!,
-        concesionario: address(concesionario),
-        catalogoServicios: catalogPda,
-      }).sendTransaction();
+
+      if (missing) {
+        await client.registro.instructions.inicializarCatalogoServicios({
+          owner: connected!.signer!,
+          concesionario: address(concesionario),
+          catalogoServicios: catalogPda,
+        }).sendTransaction();
+      } else {
+        if (services.length !== 0) {
+          throw new Error("La precarga solo está disponible cuando el catálogo está vacío.");
+        }
+
+        const defaults = [
+          { nombre: "Cambio de aceite", descripcion: "Cambio de aceite y revision basica", puntos: 80n, activo: true },
+          { nombre: "Ajuste de frenos", descripcion: "Revision y ajuste basico de frenos", puntos: 60n, activo: true },
+          { nombre: "Revision general", descripcion: "Inspeccion general de la motocicleta", puntos: 120n, activo: true },
+          { nombre: "Mantenimiento preventivo", descripcion: "Mantenimiento preventivo general", puntos: 150n, activo: true },
+        ];
+
+        for (const service of defaults) {
+          await client.registro.instructions.agregarServicioCatalogo({
+            owner: connected!.signer!,
+            concesionario: address(concesionario),
+            catalogoServicios: catalogPda,
+            ...service,
+          }).sendTransaction();
+        }
+      }
+
       toast.success("Catálogo de servicios precargado para este concesionario.");
       await loadCatalog();
     } catch (error) {
       console.error("No se pudo precargar el catálogo de servicios:", error);
       toast.error(error instanceof Error ? error.message : "No se pudo precargar el catálogo de servicios.");
+      await loadCatalog();
     } finally {
       setBusy(false);
     }
@@ -216,6 +241,16 @@ export function ServiceCatalogManagement({
         </div>
       ) : (
         <>
+          {services.length === 0 && (
+            <div className="mt-3 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-4">
+              <p className="text-[10px] font-semibold text-[#252a30]">El catálogo existe, pero todavía no tiene servicios.</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-[#858d96]">Puedes precargar cuatro servicios de demostración sin crear ni reemplazar el PDA existente.</p>
+              <button type="button" onClick={() => void preloadServiceCatalog()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
+                {busy ? "Precargando servicios…" : "Precargar servicios"}
+              </button>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[10px] text-[#858d96]">{services.length} de {MAX_SERVICES} servicios configurados</p>
             <button
