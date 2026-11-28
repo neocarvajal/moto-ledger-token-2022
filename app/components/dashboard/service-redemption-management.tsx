@@ -394,15 +394,6 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   setSession(null);
                   throw new Error("La transacción caducó en Solana antes de enviarse. Genera un nuevo QR para continuar.");
                 }
-                // A signed Solana wire transaction starts with a compact signature count,
-                // followed by 64-byte signatures. Capture the first signature before RPC
-                // submission so it remains available even when preflight rejects the tx.
-                const signedBytes = getBase64Encoder().encode(signedTransaction);
-                const signatureCount = signedBytes[0] ?? 0;
-                if (signatureCount > 0 && signedBytes.length >= 65) {
-                  const signedSignature = getBase58Decoder().decode(signedBytes.slice(1, 65));
-                  setTransactionSignature(signedSignature);
-                }
                 // Simulate the fully signed transaction first. This returns program logs
                 // even when the on-chain instruction fails, without broadcasting it.
                 const simulation = await client.rpc.simulateTransaction(
@@ -427,6 +418,13 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   error: "Simulación correcta; la instrucción puede enviarse.",
                   logs: simulationLogs,
                 });
+                // Capture the transaction signature only after simulation passes.
+                const signedBytes = getBase64Encoder().encode(signedTransaction);
+                const signatureCount = signedBytes[0] ?? 0;
+                if (signatureCount > 0 && signedBytes.length >= 65) {
+                  const signedSignature = getBase58Decoder().decode(signedBytes.slice(1, 65));
+                  setTransactionSignature(signedSignature);
+                }
                 const signature = await client.rpc.sendTransaction(signedTransaction as Base64EncodedWireTransaction, {
                   encoding: "base64", preflightCommitment: "confirmed", maxRetries: 3n,
                 }).send();
