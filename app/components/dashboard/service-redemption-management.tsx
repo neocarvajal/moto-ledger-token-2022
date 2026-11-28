@@ -8,6 +8,7 @@ import {
   createNoopSigner,
   createTransactionMessage,
   getBase58Decoder,
+  getBase58Encoder,
   getBase64Encoder,
   getBase64EncodedWireTransaction,
   partiallySignTransactionMessageWithSigners,
@@ -399,7 +400,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                 const signedBytes = getBase64Encoder().encode(signedTransaction);
                 const signatureCount = signedBytes[0] ?? 0;
                 if (signatureCount > 0 && signedBytes.length >= 65) {
-                  const signedSignature = getBase58Decoder().decode(signedBytes.slice(1, 65) as Base58EncodedBytes);
+                  const signedSignature = getBase58Encoder().encode(signedBytes.slice(1, 65));
                   setTransactionSignature(signedSignature);
                 }
                 const signature = await client.rpc.sendTransaction(signedTransaction as Base64EncodedWireTransaction, {
