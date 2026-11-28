@@ -224,9 +224,20 @@ export function ServiceCatalogManagement({
             Cada concesionario administra su propio catálogo. Los precios se expresan en puntos del mint Token-2022 asociado a su programa de fidelización.
           </p>
         </div>
-        <button type="button" onClick={() => void loadCatalog()} disabled={loading || busy} className="rounded-lg border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">
-          Actualizar
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void loadCatalog()} disabled={loading || busy} className="rounded-lg border border-[#e2e5e8] px-3 py-2 text-[9px] font-semibold text-[#555e68] hover:bg-[#f7f8fa] disabled:opacity-50">
+            Actualizar
+          </button>
+          <button
+            type="button"
+            onClick={() => void preloadServiceCatalog()}
+            disabled={loading || busy || services.length > 0 || !connected?.signer}
+            title={services.length > 0 ? "El catálogo ya tiene servicios configurados." : "Precarga los servicios predeterminados de este concesionario."}
+            className="rounded-lg bg-[#e60012] px-3 py-2 text-[9px] font-semibold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "Precargando servicios…" : "Precargar servicios"}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -235,9 +246,6 @@ export function ServiceCatalogManagement({
         <div className="mt-4 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-4">
           <p className="text-[11px] font-semibold text-[#252a30]">Este concesionario aún no tiene un catálogo de servicios.</p>
           <p className="mt-1 text-[10px] leading-relaxed text-[#858d96]">Precarga cuatro servicios de demostración en una sola operación on-chain. Después podrás editar sus nombres, descripciones, disponibilidad y puntos.</p>
-          <button type="button" onClick={() => void preloadServiceCatalog()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
-            {busy ? "Precargando servicios…" : "Precargar servicios"}
-          </button>
         </div>
       ) : (
         <>
@@ -245,9 +253,6 @@ export function ServiceCatalogManagement({
             <div className="mt-3 rounded-lg border border-dashed border-[#e2e5e8] bg-[#fafbfc] p-4">
               <p className="text-[10px] font-semibold text-[#252a30]">El catálogo existe, pero todavía no tiene servicios.</p>
               <p className="mt-1 text-[10px] leading-relaxed text-[#858d96]">Puedes precargar cuatro servicios de demostración sin crear ni reemplazar el PDA existente.</p>
-              <button type="button" onClick={() => void preloadServiceCatalog()} disabled={busy || !connected?.signer} className="mt-3 rounded-lg bg-[#e60012] px-4 py-2.5 text-[10px] font-semibold text-white hover:bg-[#c90010] disabled:cursor-not-allowed disabled:opacity-50">
-                {busy ? "Precargando servicios…" : "Precargar servicios"}
-              </button>
             </div>
           )}
 
