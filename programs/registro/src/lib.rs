@@ -663,19 +663,79 @@ pub mod registro {
             context.accounts.cliente.total_motos_cliente > 0,
             Errores::ClienteSinCompras
         );
+        require!(
+            context.accounts.asociacion_cliente.activo,
+            Errores::AsociacionClienteInactiva
+        );
+        require_keys_eq!(
+            context.accounts.asociacion_cliente.cliente,
+            context.accounts.cliente.key(),
+            Errores::AsociacionClienteInvalida
+        );
+        require_keys_eq!(
+            context.accounts.asociacion_cliente.concesionario,
+            context.accounts.concesionario.key(),
+            Errores::AsociacionClienteInvalida
+        );
 
         context.accounts.wallet_cliente.set_inner(WalletCliente {
             cliente: context.accounts.cliente.key(),
             wallet: context.accounts.wallet.key(),
             bump: context.bumps.wallet_cliente,
         });
+        context.accounts.indice_wallet_concesionario.set_inner(
+            IndiceWalletConcesionario {
+                concesionario: context.accounts.concesionario.key(),
+                wallet: context.accounts.wallet.key(),
+                cliente: context.accounts.cliente.key(),
+                bump: context.bumps.indice_wallet_concesionario,
+            },
+        );
         Ok(())
     }
 
-    /// Removes the wallet association for a customer without deleting customer history.
+    /// Removes the wallet association and releases the wallet/dealership uniqueness index.
     pub fn desvincular_wallet_cliente(
-        _context: Context<DesvincularWalletCliente>,
+        context: Context<DesvincularWalletCliente>,
     ) -> Result<()> {
+        let index_info = context.accounts.indice_wallet_concesionario.to_account_info();
+        if *index_info.owner == crate::ID {
+            let data = index_info.try_borrow_data()?;
+            let mut data_slice: &[u8] = &data;
+            let index = IndiceWalletConcesionario::try_deserialize(&mut data_slice)?;
+            require_keys_eq!(
+                index.cliente,
+                context.accounts.cliente.key(),
+                Errores::IndiceWalletInvalido
+            );
+            require_keys_eq!(
+                index.concesionario,
+                context.accounts.concesionario.key(),
+                Errores::IndiceWalletInvalido
+            );
+            require_keys_eq!(
+                index.wallet,
+                context.accounts.wallet_cliente.wallet,
+                Errores::IndiceWalletInvalido
+            );
+            drop(data);
+
+            let lamports = index_info.lamports();
+            let owner_info = context.accounts.owner.to_account_info();
+            let updated_owner_lamports = owner_info
+                .lamports()
+                .checked_add(lamports)
+                .ok_or(Errores::ContadorInvalido)?;
+            **index_info.try_borrow_mut_lamports()? = 0;
+            **owner_info.try_borrow_mut_lamports()? = updated_owner_lamports;
+            index_info.realloc(0, false)?;
+            index_info.assign(&system_program::ID);
+        } else {
+            require!(
+                *index_info.owner == system_program::ID && index_info.data_is_empty(),
+                Errores::IndiceWalletInvalido
+            );
+        }
         Ok(())
     }
 
@@ -1052,18 +1112,28 @@ fn validar_cid(cid: &str) -> Result<()> {
 }
 
 #[account]
-pub struct WalletCliente { 
-    pub cliente: Pubkey, 
-    pub wallet: Pubkey, 
-    pub bump: u8 
+pub struct WalletCliente {
+    pub cliente: Pubkey,
+    pub wallet: Pubkey,
+    pub bump: u8
 }
 
-impl WalletCliente { 
-    pub const LEN: usize = 
-    DISCRIMINATOR + 
-    32 + 
-    32 + 
-    1; 
+impl WalletCliente {
+    pub const LEN: usize = DISCRIMINATOR + 32 + 32 + 1;
+}
+
+/// Enforces one customer per wallet within a dealership.
+/// The same wallet can have a separate index in another dealership.
+#[account]
+pub struct IndiceWalletConcesionario {
+    pub concesionario: Pubkey,
+    pub wallet: Pubkey,
+    pub cliente: Pubkey,
+    pub bump: u8,
+}
+
+impl IndiceWalletConcesionario {
+    pub const LEN: usize = DISCRIMINATOR + 32 + 32 + 32 + 1;
 }
 
 #[account]
@@ -1221,26 +1291,49 @@ pub struct ActualizarPuntosFidelidad<'info> {
 #[derive(Accounts)]
 pub struct VincularWalletCliente<'info> {
     pub owner: Signer<'info>,
-    
+
     #[account(mut)]
     pub wallet: Signer<'info>,
-    
+
+    #[account(
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized
+    )]
+    pub concesionario: Account<'info, Concesionario>,
+
     #[account(
         constraint = cliente.owner == owner.key() @ Errores::Unauthorized,
-        seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()], 
+        seeds = [b"cliente", owner.key().as_ref(), cliente.cedula_cliente.to_le_bytes().as_ref()],
         bump
     )]
     pub cliente: Account<'info, Cliente>,
 
     #[account(
-        init, 
-        payer = wallet, 
-        space = WalletCliente::LEN, 
-        seeds = [b"wallet_cliente", cliente.key().as_ref()], 
+        seeds = [b"asociacion_cliente", concesionario.key().as_ref(), cliente.key().as_ref()],
+        bump = asociacion_cliente.bump,
+        constraint = asociacion_cliente.owner == owner.key() @ Errores::AsociacionClienteInvalida
+    )]
+    pub asociacion_cliente: Account<'info, AsociacionCliente>,
+
+    #[account(
+        init,
+        payer = wallet,
+        space = WalletCliente::LEN,
+        seeds = [b"wallet_cliente", cliente.key().as_ref()],
         bump
     )]
     pub wallet_cliente: Account<'info, WalletCliente>,
-    
+
+    #[account(
+        init,
+        payer = wallet,
+        space = IndiceWalletConcesionario::LEN,
+        seeds = [b"wallet_cliente_concesionario", concesionario.key().as_ref(), wallet.key().as_ref()],
+        bump
+    )]
+    pub indice_wallet_concesionario: Account<'info, IndiceWalletConcesionario>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -1248,6 +1341,13 @@ pub struct VincularWalletCliente<'info> {
 pub struct DesvincularWalletCliente<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
+
+    #[account(
+        seeds = [b"concesionario", concesionario.nombre_concesionario.as_bytes(), owner.key().as_ref()],
+        bump,
+        constraint = concesionario.owner == owner.key() @ Errores::Unauthorized
+    )]
+    pub concesionario: Account<'info, Concesionario>,
 
     #[account(
         constraint = cliente.owner == owner.key() @ Errores::Unauthorized,
@@ -1268,6 +1368,18 @@ pub struct DesvincularWalletCliente<'info> {
         bump
     )]
     pub wallet_cliente: Account<'info, WalletCliente>,
+
+    /// CHECK: The PDA is derived from this dealership and the wallet stored in WalletCliente.
+    #[account(
+        mut,
+        seeds = [
+            b"wallet_cliente_concesionario",
+            concesionario.key().as_ref(),
+            wallet_cliente.wallet.as_ref()
+        ],
+        bump
+    )]
+    pub indice_wallet_concesionario: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -1558,6 +1670,8 @@ pub enum Errores {
     ContadorInvalido,
     #[msg("El cliente debe tener al menos una motocicleta comprada en este concesionario para vincular su wallet")]
     ClienteSinCompras,
+    #[msg("El indice de wallet no corresponde al cliente, concesionario o wallet")]
+    IndiceWalletInvalido,
     #[msg("El CID debe contener entre 1 y 100 caracteres alfanuméricos")]
     MetadataCidInvalido,
     #[msg("El registro de kilometraje no corresponde a esta moto o concesionario")]
