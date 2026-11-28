@@ -1099,12 +1099,10 @@ pub mod registro {
         let nombre_servicio = servicio.nombre.clone();
 
         msg!("CanjearServicio checkpoint 4: service loaded");
-        msg!("CanjearServicio checkpoint 4a: validating mint address");
-        require_keys_eq!(
-            context.accounts.mint.key(),
-            context.accounts.programa_fidelidad.mint,
-            Errores::MintInvalido
-        );
+        // Anchor already enforces this address in CanjearServicio.mint
+        // with the account constraint: address = programa_fidelidad.mint.
+        // Avoid repeating the same validation inside the handler.
+        msg!("CanjearServicio checkpoint 4a: mint address validated by Anchor account constraint");
         msg!("CanjearServicio checkpoint 4b: mint address valid");
         let mint_info = context.accounts.mint.to_account_info();
         msg!("CanjearServicio checkpoint 4c: validating mint program owner");
