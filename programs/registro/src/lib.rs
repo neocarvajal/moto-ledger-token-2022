@@ -367,6 +367,12 @@ pub mod registro {
             context.bumps.kilometraje_moto,
         )?;
 
+        actualizar_estado_garantia(
+            &mut context.accounts.garantia,
+            fecha_servicio,
+            kilometraje,
+        );
+
         if tipo == TipoServicio::Garantia {
 
             require!(
@@ -886,15 +892,21 @@ pub mod registro {
             context.bumps.kilometraje_moto,
         )?;
 
-        msg!("CanjearServicio checkpoint 2: mileage updated");
+        actualizar_estado_garantia(
+            &mut context.accounts.garantia,
+            fecha_canje,
+            kilometraje_actual,
+        );
+
+        msg!("CanjearServicio checkpoint 2: mileage and warranty status updated");
         require!(
             fecha_canje >= context.accounts.garantia.fecha_inicio,
             Errores::GarantiaNoIniciada
         );
         let garantia_cubre_servicio =
             context.accounts.garantia.estado == EstadoGarantia::Activa
-            && fecha_canje <= context.accounts.garantia.fecha_vencimiento
-            && kilometraje_actual <= context.accounts.garantia.kilometraje_maximo;
+            && fecha_canje < context.accounts.garantia.fecha_vencimiento
+            && kilometraje_actual < context.accounts.garantia.kilometraje_maximo;
         require!(
             !garantia_cubre_servicio,
             Errores::CanjeDuranteGarantia
@@ -1434,6 +1446,7 @@ pub struct CanjearServicio<'info> {
     pub kilometraje_moto: Account<'info, KilometrajeMoto>,
 
     #[account(
+        mut,
         constraint = garantia.moto == moto.key() @ Errores::GarantiaNoCorresponde,
         constraint = garantia.concesionario == concesionario.key() @ Errores::GarantiaNoCorresponde
     )]
@@ -1768,6 +1781,26 @@ fn actualizar_kilometraje_moto(
     }
 
     Ok(())
+}
+
+fn actualizar_estado_garantia(
+    garantia: &mut Account<Garantia>,
+    fecha: i64,
+    kilometraje: u64,
+) {
+    if garantia.estado == EstadoGarantia::Activa
+        && (fecha >= garantia.fecha_vencimiento
+            || kilometraje >= garantia.kilometraje_maximo)
+    {
+        garantia.estado = EstadoGarantia::Vencida;
+        msg!(
+            "Garantia vencida: fecha {} / limite {}, kilometraje {} / limite {}",
+            fecha,
+            garantia.fecha_vencimiento,
+            kilometraje,
+            garantia.kilometraje_maximo
+        );
+    }
 }
 
 #[account]
@@ -2167,6 +2200,7 @@ pub struct RegistrarServicio<'info> {
     pub moto: Account<'info, Moto>,
 
     #[account(
+        mut,
         seeds = [
             b"garantia",
             serial.as_bytes()
