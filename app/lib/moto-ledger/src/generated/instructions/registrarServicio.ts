@@ -270,7 +270,7 @@ export function getRegistrarServicioInstruction<
     garantia: {
       value: input.garantia ?? null,
       isSigner: false,
-      isWritable: true,
+      isWritable: false,
     },
     kilometrajeMoto: {
       value: input.kilometrajeMoto ?? null,
