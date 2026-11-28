@@ -409,7 +409,7 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
                   signedTransaction as Base64EncodedWireTransaction,
                   { encoding: "base64", commitment: "confirmed", sigVerify: false },
                 ).send();
-                const simulationLogs = simulation.value.logs ?? [];
+                const simulationLogs = [...(simulation.value.logs ?? [])];
                 const lastCheckpoint = [...simulationLogs].reverse().find((line) =>
                   line.includes("CanjearServicio checkpoint")
                 ) ?? "No se alcanzó ningún checkpoint del handler";
