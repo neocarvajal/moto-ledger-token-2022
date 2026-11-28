@@ -479,6 +479,7 @@ export function DealershipWorkspace({
             key={`${dealership.address}:${activeModule}`}
             concesionario={dealership.address}
             nombreConcesionario={dealership.data.nombreConcesionario}
+            onNavigate={onNavigate}
           />
         </div>
       )}
