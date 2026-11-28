@@ -67,7 +67,7 @@ function parseMileage(value: string) {
   return BigInt(value);
 }
 
-export function ServiceRedemptionManagement({ concesionario, nombreConcesionario }: { concesionario: string; nombreConcesionario: string }) {
+export function ServiceRedemptionManagement({ concesionario, nombreConcesionario, onNavigate }: { concesionario: string; nombreConcesionario: string; onNavigate: (module: string) => void }) {
   const client = useAppClient();
   const connected = useConnectedWallet(client);
   const { cluster } = useCluster();
@@ -531,7 +531,21 @@ export function ServiceRedemptionManagement({ concesionario, nombreConcesionario
       )}
 
       {selectedCustomerRecord && <div className="mt-4 rounded-lg bg-[#f7f8fa] p-3 text-xs">
-        <div className="flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Wallet vinculada</span><strong className="font-mono text-[#252a30]">{checking ? "Consultando…" : wallet ? shortAddress(wallet) : "No vinculada"}</strong></div>
+        <div className="flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Wallet vinculada</span><strong className={`font-mono ${checking ? "text-[#252a30]" : wallet ? "text-[#168354]" : "text-red-700"}`}>{checking ? "Consultando…" : wallet ? shortAddress(wallet) : "No vinculada"}</strong></div>
+        {!checking && !wallet && (
+          <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">
+            <div className="flex items-start gap-3">
+              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-lg font-bold text-red-700">!</span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-extrabold">Este cliente no tiene una wallet vinculada</p>
+                <p className="mt-1 text-[10px] leading-relaxed text-red-700">Para consultar sus puntos y canjear servicios, primero debes vincular una wallet desde el módulo Clientes.</p>
+                <button type="button" onClick={() => onNavigate("customers")} className="mt-3 inline-flex items-center gap-2 rounded-md bg-red-700 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-red-800">
+                  Ir a Clientes para vincular wallet <span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mt-2 flex flex-wrap justify-between gap-2"><span className="text-[#68717b]">Saldo Token-2022</span><strong className="text-[#252a30]">{balance === null ? "—" : balance.toLocaleString("es-VE") + " puntos"}</strong></div>
         {saleDetails && (
           <>
